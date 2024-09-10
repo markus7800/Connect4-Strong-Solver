@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include "node.h"
 #include "uniquetable.h"
 

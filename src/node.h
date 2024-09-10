@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef uint32_t nodeindex_t;
 #define ZEROINDEX 0

@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <time.h>
+#include <stdint.h>
 
 #include "caches.h"
 #include "node.h"
@@ -46,8 +47,8 @@ void keepalive(bddnode_t* node);
 void undo_keepalive(bddnode_t* node);
 void gc(bool disable_rec, bool force);
 double get_elapsed_time(struct timespec t0, struct timespec t1);
-double GC_TIME;
-double GC_MAX_FILLLEVEL;
+extern double GC_TIME;
+extern double GC_MAX_FILLLEVEL;
 void verify_uniquetable();
 
 void print_nodes(bool statsonly);

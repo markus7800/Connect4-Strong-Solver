@@ -238,7 +238,11 @@ nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
 #endif
 
 
-uint64_t connect4(uint32_t width, uint32_t height) {
+#ifndef WRITE_TO_FILE
+#define WRITE_TO_FILE 1
+#endif
+
+uint64_t connect4(uint32_t width, uint32_t height, uint32_t log2size) {
     nodeindex_t stm0 = create_variable();
     nodeindex_t stm1 = create_variable();
     nodeindex_t (**X)[2][2];
@@ -291,8 +295,7 @@ uint64_t connect4(uint32_t width, uint32_t height) {
     gc(true, true);
 
     uniquetable_t nodecount_set;
-    init_set(&nodecount_set, 27);
-
+    init_set(&nodecount_set, log2size-1);
 
     uint64_t total = 0;
 
@@ -301,12 +304,20 @@ uint64_t connect4(uint32_t width, uint32_t height) {
     printf("Ply 0/%d: BDD(%llu) %llu\n", width*height, _nodecount(current, &nodecount_set), cnt);
     total += cnt;
 
+#if WRITE_TO_FILE
+    FILE* f = fopen("ply_results.csv", "a");
+    if (f != NULL) {
+        fprintf(f, "%u, %u, %d, %llu, %.3f\n", width, height, 0, cnt, 0.0);
+    }
+#endif
+
 #if FULLBDD
     nodeindex_t full_bdd = current;
     keepalive(get_node(full_bdd));
 #endif
 
     struct timespec t0, t1;
+    double t;
 
     int gc_level;
     for (int d = 1; d <= width*height+1; d++) {
@@ -358,8 +369,16 @@ uint64_t connect4(uint32_t width, uint32_t height) {
         
         clock_gettime(CLOCK_REALTIME, &t1);
 
+        t = get_elapsed_time(t0, t1);
         reset_set(&nodecount_set);
-        printf("Ply %d/%d: BDD(%llu) %llu in %.3f seconds\n", d, width*height, _nodecount(current, &nodecount_set), cnt, get_elapsed_time(t0, t1));
+        printf("Ply %d/%d: BDD(%llu) %llu in %.3f seconds\n", d, width*height, _nodecount(current, &nodecount_set), cnt, t);
+
+
+#if WRITE_TO_FILE
+        if (f != NULL && d <= width*height) {
+            fprintf(f, "%u, %u, %d, %llu, %.3f\n", width, height, d, cnt, t);
+        }
+#endif
            
     } 
 
@@ -375,6 +394,10 @@ uint64_t connect4(uint32_t width, uint32_t height) {
     free(nodecount_set.buckets);
     free(nodecount_set.entries);
 
+#if WRITE_TO_FILE
+    fclose(f);
+#endif
+
     for (int col = 0; col < width; col++) {
         free(X[col]);
     }
@@ -385,10 +408,6 @@ uint64_t connect4(uint32_t width, uint32_t height) {
 
 #ifndef ENTER_TO_CONTINUE
 #define ENTER_TO_CONTINUE 1
-#endif
-
-#ifndef PRINT_TO_FILE
-#define PRINT_TO_FILE 0
 #endif
 
 int main(int argc, char const *argv[]) {
@@ -423,7 +442,7 @@ int main(int argc, char const *argv[]) {
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
 
-    uint64_t count = connect4(width, height);
+    uint64_t count = connect4(width, height, log2size);
     
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
@@ -434,7 +453,7 @@ int main(int argc, char const *argv[]) {
 
     free_all();
 
-#if PRINT_TO_FILE
+#if WRITE_TO_FILE
     FILE* f = fopen("results.csv", "a");
     if (f == NULL) {
         perror("Error opening file");

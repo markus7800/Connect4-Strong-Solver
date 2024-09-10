@@ -170,6 +170,8 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
 // remove all nodes that do not have parent
 // to keep a specific root node alive (it does not have parents) call keepalive(node)
 
+double GC_TIME;
+double GC_MAX_FILLLEVEL;
 void gc(bool disable_rec, bool force) {
     double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
     if (fill_level > GC_MAX_FILLLEVEL) { GC_MAX_FILLLEVEL = fill_level; }

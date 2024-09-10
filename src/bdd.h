@@ -21,7 +21,7 @@
 uint64_t print_RAM_info(uint32_t log2size) {
     uint32_t num_nodes = 1 << log2size;
     printf("number of allocatable nodes: %g\n", (double) num_nodes);
-    uint64_t bytes = num_nodes*(sizeof(bddnode_t) + sizeof(bucket_t) + sizeof(uniquetable_entry_t)) + num_nodes/4 * (sizeof(unaryopcache_entry_t) + sizeof(binaryopcache_entry_t) + sizeof(ternaryopcache_entry_t));
+    uint64_t bytes = num_nodes*(sizeof(bddnode_t) + 1.5*sizeof(bucket_t) + 1.5*sizeof(uniquetable_entry_t)) + num_nodes/4 * (sizeof(unaryopcache_entry_t) + sizeof(binaryopcache_entry_t) + sizeof(ternaryopcache_entry_t));
     printf("RAM needed %.3f GB\n", (double) bytes / 1000 / 1000 / 1000);
     return bytes;
 }
