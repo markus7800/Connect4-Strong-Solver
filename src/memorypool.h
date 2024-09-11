@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <assert.h>
 #include "node.h"
 #include "uniquetable.h"
 

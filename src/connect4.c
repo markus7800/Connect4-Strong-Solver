@@ -298,16 +298,21 @@ uint64_t connect4(uint32_t width, uint32_t height, uint32_t log2size) {
     init_set(&nodecount_set, log2size-1);
 
     uint64_t total = 0;
+    uint64_t bdd_nodecount;
 
     nodeindex_t current = connect4_start(stm0, X, width, height);
     uint64_t cnt = connect4_satcount(current);
-    printf("Ply 0/%d: BDD(%llu) %llu\n", width*height, _nodecount(current, &nodecount_set), cnt);
+    bdd_nodecount = _nodecount(current, &nodecount_set);
+    printf("Ply 0/%d: BDD(%llu) %llu\n", width*height, bdd_nodecount, cnt);
     total += cnt;
 
 #if WRITE_TO_FILE
-    FILE* f = fopen("ply_results.csv", "a");
+    char filename[50];
+    sprintf(filename, "results_ply_w%u_h%u.csv", width, height);
+    FILE* f = fopen(filename, "w");
+    fprintf(f, "width,height,ply,poscount,nodecount,time\n");
     if (f != NULL) {
-        fprintf(f, "%u, %u, %d, %llu, %.3f\n", width, height, 0, cnt, 0.0);
+        fprintf(f, "%u, %u, %d, %llu, %llu, %.3f\n", width, height, 0, cnt, bdd_nodecount, 0.0);
     }
 #endif
 
@@ -371,12 +376,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint32_t log2size) {
 
         t = get_elapsed_time(t0, t1);
         reset_set(&nodecount_set);
-        printf("Ply %d/%d: BDD(%llu) %llu in %.3f seconds\n", d, width*height, _nodecount(current, &nodecount_set), cnt, t);
+        bdd_nodecount = _nodecount(current, &nodecount_set);
+        printf("Ply %d/%d: BDD(%llu) %llu in %.3f seconds\n", d, width*height, bdd_nodecount, cnt, t);
 
 
 #if WRITE_TO_FILE
         if (f != NULL && d <= width*height) {
-            fprintf(f, "%u, %u, %d, %llu, %.3f\n", width, height, d, cnt, t);
+            fprintf(f, "%u, %u, %d, %llu, %llu, %.3f\n", width, height, d, cnt, bdd_nodecount, t);
         }
 #endif
            
@@ -454,7 +460,10 @@ int main(int argc, char const *argv[]) {
     free_all();
 
 #if WRITE_TO_FILE
-    FILE* f = fopen("results.csv", "a");
+    char filename[50];
+    sprintf(filename, "results_w%u_h%u.csv", width, height);
+    FILE* f = fopen(filename, "w");
+    fprintf(f, "width,height,count,time,GC,bytes,usage\n");
     if (f == NULL) {
         perror("Error opening file");
     } else {

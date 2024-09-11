@@ -13,6 +13,7 @@ void init_memorypool(u_int32_t log2size) {
     if (memorypool.nodes != NULL) {
         // printf("allocated!\n");
     } else {
+        perror("Could not allocate memorypool :(\n");
         assert(false);
     }
     for (nodeindex_t i = 0; i < capacity; i++) {

@@ -8,6 +8,10 @@ void init_set(uniquetable_t* set, uint32_t log2size) {
     set->mask = size - 1;
     set->buckets = (bucket_t*) malloc(size * sizeof(bucket_t));
     set->entries = (uniquetable_entry_t*) malloc(size * sizeof(uniquetable_entry_t));
+    if (set->buckets == NULL || set->entries == NULL) {
+        perror("Could not allocate set :(\n");
+        assert(0);
+    }
     set->size = size;
     set->count = 0;
     for (int i = 0; i < size; i++) {

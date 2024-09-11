@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "caches.h"
 
 unaryopcache_t unaryopcache;
@@ -10,6 +11,10 @@ void init_unaryopcache(uint32_t log2size) {
     uint32_t size = (1 << log2size);
     unaryopcache.size = size;
     unaryopcache.data = (unaryopcache_entry_t*) malloc(size * sizeof(unaryopcache_entry_t));
+    if (unaryopcache.data == NULL) {
+        perror("Could not allocate unary op cache :(\n");
+        assert(0);
+    }
     unaryopcache.mask = size - 1;
     for (int i = 0; i < size; i++) {
         unaryopcache.data[i].arg = 0;
@@ -30,6 +35,10 @@ void init_binaryopcache(uint32_t log2size) {
     uint32_t size = (1 << log2size);
     binaryopcache.size = size;
     binaryopcache.data = (binaryopcache_entry_t*) malloc(size * sizeof(binaryopcache_entry_t));
+    if (binaryopcache.data == NULL) {
+        perror("Could not allocate binary op cache :(\n");
+        assert(0);
+    }
     binaryopcache.mask = size - 1;
     for (int i = 0; i < size; i++) {
         binaryopcache.data[i].arg1 = 0;
@@ -52,6 +61,10 @@ void init_ternaryopcache(uint32_t log2size) {
     uint32_t size = (1 << log2size);
     ternaryopcache.size = size;
     ternaryopcache.data = (ternaryopcache_entry_t*) malloc(size * sizeof(ternaryopcache_entry_t));
+    if (binaryopcache.data == NULL) {
+        perror("Could not allocate ternaryopcache op cache :(\n");
+        assert(0);
+    }
     ternaryopcache.mask = size - 1;
     for (int i = 0; i < size; i++) {
         ternaryopcache.data[i].arg1 = 0;
