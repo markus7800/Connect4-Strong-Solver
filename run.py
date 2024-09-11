@@ -12,7 +12,7 @@ for width in range(1,12+1):
             continue
         
         print(f"Count for width={width} x height={height} ... ", end="", flush=True)
-        subprocess.run(["src/connect4.out", "29", str(width), str(height)], check=True)
+        subprocess.run(["src/connect4.out", "29", str(width), str(height)], check=False)
         print("finished.")
 
 # for width in range(1,12+1):
