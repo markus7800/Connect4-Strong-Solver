@@ -15,15 +15,15 @@ holds all BBDNode structs
 */ 
 typedef struct MemoryPool {
     bddnode_t* nodes;
-    uint32_t capacity;
+    uint64_t capacity;
     nodeindex_t next;
     variable_t num_variables;
-    uint32_t num_nodes;
+    uint64_t num_nodes;
 } memorypool_t;
 
 extern memorypool_t memorypool;
 
-void init_memorypool(u_int32_t log2size);
+void init_memorypool(uint64_t log2size);
 
 nodeindex_t pop_index();
 void push_index(nodeindex_t index);

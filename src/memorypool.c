@@ -3,8 +3,9 @@
 
 memorypool_t memorypool;
 
-void init_memorypool(u_int32_t log2size) {
-    uint32_t capacity = 1 << log2size;
+void init_memorypool(uint64_t log2size) {
+    assert(log2size <= 32);
+    uint64_t capacity = ((uint64_t) 1) << log2size;
 
     memorypool.capacity = capacity;
     memorypool.num_nodes = 0;

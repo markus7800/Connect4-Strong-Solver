@@ -43,7 +43,7 @@ uint64_t _nodecount(nodeindex_t ix, uniquetable_t* set) {
     return 1 + _nodecount(u->low, set) + _nodecount(u->high, set);
 }
 
-uint64_t nodecount(nodeindex_t ix, uint32_t log2size) {
+uint64_t nodecount(nodeindex_t ix, uint64_t log2size) {
     uniquetable_t set;
     init_set(&set, log2size);
     uint64_t res = _nodecount(ix, &set);

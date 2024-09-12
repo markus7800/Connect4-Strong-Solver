@@ -114,7 +114,7 @@ nodeindex_t connect4_substruct_term(nodeindex_t current, int board, int player, 
         }
         if (gc_level == 1) {
             // if we need to be even more aggressive with GC, we could move this in the loop
-            printf("  COL GC: ");
+            printf("  COL %u GC: ", width);
             keepalive(get_node(current));
             gc(true,true);
             undo_keepalive(get_node(current));
@@ -133,7 +133,7 @@ nodeindex_t connect4_substruct_term(nodeindex_t current, int board, int player, 
             }
         }
         if (gc_level) {
-            printf("  ROW GC: ");
+            printf("  ROW %u GC: ", height);
             keepalive(get_node(current));
             gc(true,true);
             undo_keepalive(get_node(current));
@@ -242,7 +242,7 @@ nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
 #define WRITE_TO_FILE 1
 #endif
 
-uint64_t connect4(uint32_t width, uint32_t height, uint32_t log2size) {
+uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t stm0 = create_variable();
     nodeindex_t stm1 = create_variable();
     nodeindex_t (**X)[2][2];
@@ -427,7 +427,7 @@ int main(int argc, char const *argv[]) {
     uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
     printf("Connect4: width=%u x height=%u board\n", width, height);
 
-    uint32_t log2size = (uint32_t) strtoul(argv[1], &succ, 10);
+    uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
 
     uint64_t bytes = print_RAM_info(log2size);
 
@@ -463,11 +463,11 @@ int main(int argc, char const *argv[]) {
     char filename[50];
     sprintf(filename, "results_w%u_h%u.csv", width, height);
     FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,count,time,GC,bytes,usage\n");
+    fprintf(f, "width,height,count,time,GC,bytes,usage,log2tbsize\n");
     if (f == NULL) {
         perror("Error opening file");
     } else {
-        fprintf(f, "%u, %u, %llu, %.3f, %.4f, %llu, %.4f\n", width, height, count, t, gc_perc/100, bytes, GC_MAX_FILLLEVEL);
+        fprintf(f, "%u, %u, %llu, %.3f, %.4f, %llu, %.4f, %llu\n", width, height, count, t, gc_perc/100, bytes, GC_MAX_FILLLEVEL,log2size);
     }
     fclose(f);
 #endif

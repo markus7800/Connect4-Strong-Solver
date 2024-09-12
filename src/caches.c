@@ -7,7 +7,8 @@ ternaryopcache_t ternaryopcache;
 
 #include "ops.h"
 
-void init_unaryopcache(uint32_t log2size) {
+void init_unaryopcache(uint64_t log2size) {
+    assert(log2size < 32);
     uint32_t size = (1 << log2size);
     unaryopcache.size = size;
     unaryopcache.data = (unaryopcache_entry_t*) malloc(size * sizeof(unaryopcache_entry_t));
@@ -31,7 +32,8 @@ void clear_unaryopcache() {
     }
 }
 
-void init_binaryopcache(uint32_t log2size) {
+void init_binaryopcache(uint64_t log2size) {
+    assert(log2size < 32);
     uint32_t size = (1 << log2size);
     binaryopcache.size = size;
     binaryopcache.data = (binaryopcache_entry_t*) malloc(size * sizeof(binaryopcache_entry_t));
@@ -57,7 +59,8 @@ void clear_binaryopcache() {
     }
 }
 
-void init_ternaryopcache(uint32_t log2size) {
+void init_ternaryopcache(uint64_t log2size) {
+    assert(log2size < 32);
     uint32_t size = (1 << log2size);
     ternaryopcache.size = size;
     ternaryopcache.data = (ternaryopcache_entry_t*) malloc(size * sizeof(ternaryopcache_entry_t));

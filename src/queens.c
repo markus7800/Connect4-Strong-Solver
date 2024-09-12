@@ -78,7 +78,7 @@ void queens(int N) {
 
 int main(int argc, char const *argv[]) {
 
-    uint32_t log2size = 28;
+    uint64_t log2size = 28;
     print_RAM_info(log2size);
 
     init_all(log2size);

@@ -54,15 +54,15 @@ typedef struct TernaryOpCache {
 
 extern ternaryopcache_t ternaryopcache;
 
-void init_unaryopcache(uint32_t log2size);
+void init_unaryopcache(uint64_t log2size);
 extern uint32_t unaryop_hash(nodeindex_t ix, uint8_t op);
 void clear_unaryopcache();
 
-void init_binaryopcache(uint32_t log2size);
+void init_binaryopcache(uint64_t log2size);
 extern uint32_t binaryop_hash(nodeindex_t ix1, nodeindex_t ix2, uint8_t op);
 void clear_binaryopcache();
 
-void init_ternaryopcache(uint32_t log2size);
+void init_ternaryopcache(uint64_t log2size);
 extern uint32_t ternaryop_hash(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, uint8_t op);
 void clear_ternaryopcache();
 

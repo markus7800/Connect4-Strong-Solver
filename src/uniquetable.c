@@ -3,9 +3,10 @@
 
 uniquetable_t uniquetable;
 
-void init_set(uniquetable_t* set, uint32_t log2size) {
-    uint32_t size = 1 << log2size;
-    set->mask = size - 1;
+void init_set(uniquetable_t* set, uint64_t log2size) {
+    assert(log2size <= 32);
+    uint64_t size = ((uint64_t) 1) << log2size;
+    set->mask = (uint32_t) (size - 1);
     set->buckets = (bucket_t*) malloc(size * sizeof(bucket_t));
     set->entries = (uniquetable_entry_t*) malloc(size * sizeof(uniquetable_entry_t));
     if (set->buckets == NULL || set->entries == NULL) {
@@ -14,20 +15,20 @@ void init_set(uniquetable_t* set, uint32_t log2size) {
     }
     set->size = size;
     set->count = 0;
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         set->buckets[i] = -1;
         set->entries[i].next = 0;
         set->entries[i].value = (nodeindex_t) -1;
     }
 }
-void init_uniquetable(uint32_t log2size) {
+void init_uniquetable(uint64_t log2size) {
     GC_TIME = 0;
     GC_MAX_FILLLEVEL = 0;
     init_set(&uniquetable, log2size);
 }
 
 void reset_set(uniquetable_t* set) {
-    for (int i = 0; i < set->size; i++) {
+    for (size_t i = 0; i < set->size; i++) {
         set->buckets[i] = -1;
         set->entries[i].next = 0;
         set->entries[i].value = (nodeindex_t) -1;
@@ -197,7 +198,7 @@ void gc(bool disable_rec, bool force) {
     nodeindex_t index;
 
     if (disable_rec) {
-        for (int i = 0; i < uniquetable.count; i++) {
+        for (size_t i = 0; i < uniquetable.count; i++) {
             entry = uniquetable.entries[i];
             index = entry.value;
             node = get_node(index);
@@ -207,12 +208,12 @@ void gc(bool disable_rec, bool force) {
         }
     }
 
-    for (int i = 0; i < uniquetable.size; i++) {
+    for (size_t i = 0; i < uniquetable.size; i++) {
         uniquetable.buckets[i] = -1;
     }
 
     int j = 0;
-    for (int i = 0; i < uniquetable.count; i++) {
+    for (size_t i = 0; i < uniquetable.count; i++) {
         entry = uniquetable.entries[i];
         index = entry.value;
         node = get_node(index);
@@ -230,8 +231,8 @@ void gc(bool disable_rec, bool force) {
     }
     double perc_before = (double) uniquetable.count / uniquetable.size * 100;
     double perc_after = (double) j / uniquetable.size * 100;
-    printf("GC decreased number of nodes from %d (%.2f%%) to %d (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
-    uniquetable.count = (uint32_t) j;
+    printf("GC decreased number of nodes from %llu (%.2f%%) to %d (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
+    uniquetable.count = (uint64_t) j;
 
     clear_unaryopcache();
     clear_binaryopcache();
@@ -249,7 +250,7 @@ void verify_uniquetable() {
     uniquetable_entry_t entry;
     bddnode_t* node;
     nodeindex_t index;
-    for (int i = 0; i < uniquetable.count; i++) {
+    for (size_t i = 0; i < uniquetable.count; i++) {
         entry = uniquetable.entries[i];
         node = get_node(entry.value);
         index = make(node->var, node->low, node->high);
@@ -279,22 +280,22 @@ void verify_uniquetable() {
 
 void print_nodes(bool statsonly) {
     double perc = (double) memorypool.num_nodes / memorypool.capacity * 100;
-    printf("Memorypool(num_nodes=%d (%.2f%%), capacity=%d, num_variables=%d)\n", memorypool.num_nodes, perc, memorypool.capacity, memorypool.num_variables);
-    printf("Uniquetable(count=%d, size=%d)\n", uniquetable.count, uniquetable.size);
+    printf("Memorypool(num_nodes=%llu (%.2f%%), capacity=%llu, num_variables=%d)\n", memorypool.num_nodes, perc, memorypool.capacity, memorypool.num_variables);
+    printf("Uniquetable(count=%llu, size=%llu)\n", uniquetable.count, uniquetable.size);
     if (statsonly) return;
 
     uniquetable_entry_t entry;
     bucket_t targetbucket;
     bddnode_t* node;
-    for (int i = 0; i < uniquetable.count; i++) {
+    for (size_t i = 0; i < uniquetable.count; i++) {
         if (i == 20) {
-            printf("Hiding %d nodes\n", uniquetable.count-20);
+            printf("Hiding %llu nodes\n", uniquetable.count-20);
             break;
         }
         entry = uniquetable.entries[i];
         node = get_node(entry.value);
         targetbucket = uniquetable.buckets[hash_bddnode(node) & uniquetable.mask];
-        printf("%d. Index(%d) -> ", i, entry.value);
+        printf("%zu. Index(%d) -> ", i, entry.value);
         print_bddnode(node);
         printf(" ... targetbucket=%d, next=%d\n", targetbucket, entry.next);
     }
@@ -305,7 +306,7 @@ void print_dot() {
     uniquetable_entry_t entry;
     nodeindex_t index;
     bddnode_t* node;
-    for (int i = 0; i < uniquetable.count; i++) {
+    for (size_t i = 0; i < uniquetable.count; i++) {
         entry = uniquetable.entries[i];
         index = entry.value;
         node = get_node(index);

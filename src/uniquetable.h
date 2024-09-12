@@ -24,14 +24,14 @@ typedef struct UniqueTable {
     uint32_t mask;
     bucket_t* buckets;
     uniquetable_entry_t* entries;
-    uint32_t size;
-    uint32_t count;
+    uint64_t size;
+    uint64_t count;
 } uniquetable_t;
 
 extern uniquetable_t uniquetable;
 
-void init_set(uniquetable_t* set, uint32_t log2size);
-void init_uniquetable(uint32_t log2size);
+void init_set(uniquetable_t* set, uint64_t log2size);
+void init_uniquetable(uint64_t log2size);
 void reset_set(uniquetable_t* set);
 
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix, bool inc_parentcount);

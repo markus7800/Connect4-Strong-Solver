@@ -15,42 +15,57 @@ else:
 print(f"mul={mul} off={off}")
 
 cnt = -1
-for width in range(1,12+1):
-    for height in range(1, 12+1):
-        if height + width > 12:
-            continue
+do_sub_12 = False
 
-        cnt += 1
-        if cnt % mul != off:
-            continue
+if do_sub_12:
+    for width in range(1,12+1):
+        for height in range(1, 12+1):
+            if height + width > 12:
+                continue
 
+            cnt += 1
+            if cnt % mul != off:
+                continue
+
+            print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
+            subprocess.run(["src/connect4.out", "27", str(width), str(height)], check=True, capture_output=True)
+            print("finished.")
+
+do_13 = False
+if do_13:
+    for width in range(1,12+1):
+        for height in range(1, 12+1):
+            if height + width != 13:
+                continue
+            cnt += 1
+            if cnt % mul != off:
+                continue
+
+            print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
+            subprocess.run(["src/connect4.out", "29", str(width), str(height)], check=False)
+            print("finished.")
+
+do_14 = False
+if do_14:
+    for width in range(1,13+1):
+        for height in range(1, 13+1):
+            if height + width != 14:
+                continue
+            cnt += 1
+            if cnt % mul != off:
+                continue
+
+            print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
+            with open(f"log_w{width}_h{height}.txt", "w") as f:
+                subprocess.run(["src/connect4.out", "30", str(width), str(height)], check=False, stdout=f, stderr=f)
+            print("finished.")
+
+redo_14 = True
+if redo_14:
+    for width, height in [(7,7),(6,8),(8,6)]:
         print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
-        # subprocess.run(["src/connect4.out", "27", str(width), str(height)], check=True, capture_output=True)
-        print("finished.")
-
-for width in range(1,12+1):
-    for height in range(1, 12+1):
-        if height + width != 13:
-            continue
-        cnt += 1
-        if cnt % mul != off:
-            continue
-
-        print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
-        # subprocess.run(["src/connect4.out", "29", str(width), str(height)], check=False)
-        print("finished.")
-
-exit()
-for width in range(1,12+1):
-    for height in range(1, 12+1):
-        if height + width != 14:
-            continue
-        cnt += 1
-        if cnt % mul != off:
-            continue
-
-        print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
-        # subprocess.run(["src/connect4.out", "30", str(width), str(height)], check=False)
+        with open(f"log_w{width}_h{height}.txt", "w") as f:
+            subprocess.run(["src/connect4.out", "32", str(width), str(height)], check=False, stdout=f, stderr=f)
         print("finished.")
 
 # results = pandas.read_csv("results.csv")

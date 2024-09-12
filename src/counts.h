@@ -14,7 +14,7 @@
 
 uint64_t satcount(nodeindex_t ix);
 
-uint64_t nodecount(nodeindex_t ix, uint32_t log2size);
+uint64_t nodecount(nodeindex_t ix, uint64_t log2size);
 uint64_t _nodecount(nodeindex_t ix, uniquetable_t* set);
 
 #endif
