@@ -383,6 +383,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if WRITE_TO_FILE
         if (f != NULL && d <= width*height) {
             fprintf(f, "%u, %u, %d, %llu, %llu, %.3f\n", width, height, d, cnt, bdd_nodecount, t);
+            fflush(f);
         }
 #endif
            
@@ -417,7 +418,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #endif
 
 int main(int argc, char const *argv[]) {
-
+    setbuf(stdout,NULL);
+    
     if (argc != 4) {
         perror("Wrong number of arguments supplied: connect4.out log2(tablesize) width height\n");
         return 1;

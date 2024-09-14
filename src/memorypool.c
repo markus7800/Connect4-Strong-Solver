@@ -17,7 +17,7 @@ void init_memorypool(uint64_t log2size) {
         perror("Could not allocate memorypool :(\n");
         assert(false);
     }
-    for (nodeindex_t i = 0; i < capacity; i++) {
+    for (uint64_t i = 0; i < capacity; i++) {
         memorypool.nodes[i].var = 0;
         memorypool.nodes[i].parentcount = 0;
         disable(&memorypool.nodes[i]);

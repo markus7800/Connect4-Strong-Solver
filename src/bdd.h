@@ -28,10 +28,13 @@ uint64_t print_RAM_info(uint64_t log2size) {
 
 void init_all(uint64_t log2size) {
     init_memorypool(log2size);
+    printf("Initialized memory pool.\n");
     init_uniquetable(log2size);
+    printf("Initialized unique table.\n");
     init_unaryopcache(log2size - 2);
     init_binaryopcache(log2size - 2);
     init_ternaryopcache(log2size - 2);
+    printf("Initialized caches.\n");
     create_zero_one();
 }
 
