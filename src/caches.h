@@ -8,6 +8,26 @@
 
 #include "node.h"
 
+// Three types of caches: One of unary, one for binary, and one for ternary operations.
+// AFTER DEALLOCATING A SINGLE NODE ALL CASHES MUST BE CLEARED!
+// The maximum size of caches is 2^31. By default caches have size memorypool.capacity / 4.
+
+// Probing pseudo code:
+// uint32_t cache_ix = <ARITY>op_hash(ix1,..., OP) & <ARITY>opcache.mask;
+// <ARITY>opcache_entry_t cacheentry = <ARITY>opcache.data[cache_ix];
+// if (cacheentry.arg1 == ix1 && ... && cacheentry.op == OP) {
+//     if (!isdisabled(get_node(cacheentry.result))) {
+//         return cacheentry.result;
+//     }
+// }
+// Since nodes can be disabled (but not yet deallocated) we have to check for it in probing
+
+// Storing pseudo code
+// <ARITY>opcache.data[cache_ix].arg1 = ix1;
+// ...
+// <ARITY>opcache.data[cache_ix].op = OP;
+// <ARITY>opcache.data[cache_ix].result = result_ix;
+
 typedef struct UnaryOpCacheEntry {
     nodeindex_t arg;
     uint8_t op;

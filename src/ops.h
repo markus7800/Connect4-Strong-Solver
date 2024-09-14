@@ -20,7 +20,10 @@
 #define EXISTS_OP 6
 #define IMAGE_OP 7
 
-
+// struct to define a set of variables
+// for caching we give each variable set an index by representing it internally as BDD(var1 and var2 and ...)
+// to keep this BDD alive, call finished_variablesset after completing setup
+// Variable sets should only be created after creating all variables
 typedef struct VariableSet {
     nodeindex_t index;
     bool* variables;
@@ -31,14 +34,22 @@ void add_variable(variable_set_t* variable_set, nodeindex_t variable);
 bool contains(variable_set_t* variable_set, bddnode_t* node);
 void finished_variablesset(variable_set_t* variable_set);
 
+
+// If the program is compiled with DISABLE_AFTER_OP=1,
+// then the arguments of BDD operations are disabled after the operation completed.
+// This allows optimsing GC (not having to iterate over all nodes to possilbe disable them)
+// TODO: this is broken (or cannot work) for image operation so gc(true,...) must be called
+// after image to ensure proper garbage collection.
 #ifndef DISABLE_AFTER_OP
 #define DISABLE_AFTER_OP 1
 #endif
+
 nodeindex_t and(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t or(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t not(nodeindex_t ix);
 nodeindex_t exists(nodeindex_t ix, variable_set_t* variable_set);
+// image is efficient implemenation of exists(and(ix1,ix2),variable_set)
 nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set);
 
 

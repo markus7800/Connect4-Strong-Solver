@@ -37,7 +37,6 @@ void reset_set(uniquetable_t* set) {
 }
 
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix, bool inc_parentcount) {
-
     bucket_t i = (bucket_t) uniquetable.count;
     uniquetable.count++;
     if (uniquetable.count == uniquetable.size) {
@@ -45,25 +44,72 @@ nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t targ
         assert(0);
     }
 
+    // consume node from memorypool
     nodeindex_t index = pop_index();
     bddnode_t* node = get_node(index);
 
+    // initialise node with var, low, high
     node->var = var;
     node->low = low;
     node->high = high;
     node->next = 0;
+    // increment the parent cound of low and high nodes if wanted
     if (inc_parentcount) {
         get_node(low)->parentcount++;
         get_node(high)->parentcount++;
     }
     
-    // store new node
+    // store new node at the end of entries
     uniquetable.entries[i].value = index;
+    // if a node was already stored at target_bucket_ix, we keep track of it with a singly linked list
     uniquetable.entries[i].next = uniquetable.buckets[target_bucket_ix];
+    // in the buckets array, the last added node is stored
     uniquetable.buckets[target_bucket_ix] = i;
 
     return index;
 }
+
+nodeindex_t allocate(variable_t var, nodeindex_t low, nodeindex_t high, bool inc_parentcount) {
+    uint32_t target_bucket_ix = hash_varlowhigh(var, low, high) & uniquetable.mask;
+    return add(var, low, high, target_bucket_ix, inc_parentcount);
+}
+
+nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
+    if (low == high) {
+        return low;
+    }
+    assert(var <= memorypool.num_variables);
+    assert(level_for_var(var) < level(get_node(low)));
+    assert(level_for_var(var) < level(get_node(high)));
+
+    uint32_t target_bucket_ix = hash_varlowhigh(var, low, high) & uniquetable.mask;
+    bucket_t b = uniquetable.buckets[target_bucket_ix];
+
+    uniquetable_entry_t entry;
+    nodeindex_t index;
+    bddnode_t* node;
+
+    // try to find existing node
+    // we traverse singly linked list until we find node
+    // the end of the list is marked by b == -1
+    while (b > 0) {
+        entry = uniquetable.entries[b];
+        index = entry.value;
+        node = get_node(index);
+        if (node->var == var && node->low == low && node->high == high) {
+            return entry.value;
+        }
+        b = entry.next;
+    }
+    if (uniquetable.count == uniquetable.size) {
+        perror("Unique table is too small :(\n");
+        assert(0);
+    }
+
+    // allocate new node
+    return add(var, low, high, target_bucket_ix, true);
+}
+
 
 void add_nodeindex(uniquetable_t* set, nodeindex_t index) {
     bddnode_t* node = get_node(index);
@@ -80,6 +126,7 @@ void add_nodeindex(uniquetable_t* set, nodeindex_t index) {
     set->entries[i].next = set->buckets[target_bucket_ix];
     set->buckets[target_bucket_ix] = i;
 }
+
 bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index) {
     uint32_t target_bucket_ix = hash_bddnode(get_node(query_index)) & set->mask;
     bucket_t b = set->buckets[target_bucket_ix];
@@ -98,50 +145,6 @@ bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index) {
     return false;
 }
 
-
-nodeindex_t allocate(variable_t var, nodeindex_t low, nodeindex_t high, bool inc_parentcount) {
-    uint32_t target_bucket_ix = hash_varlowhigh(var, low, high) & uniquetable.mask;
-    return add(var, low, high, target_bucket_ix, inc_parentcount);
-}
-
-nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
-    // printf("make(%d, %d, %d)\n", var, low, high);
-    // printf("low ");
-    // print_bddnode(get_node(low));
-    // printf("\nhigh ");
-    // print_bddnode(get_node(high));
-    // printf("\nnum_variables=%d, level(low)=%d level(high)=%d\n", memorypool.num_variables, level(get_node(low)), level(get_node(high)));
-    if (low == high) {
-        return low;
-    }
-    assert(var <= memorypool.num_variables);
-    assert(level_for_var(var) < level(get_node(low)));
-    assert(level_for_var(var) < level(get_node(high)));
-
-    uint32_t target_bucket_ix = hash_varlowhigh(var, low, high) & uniquetable.mask;
-    bucket_t b = uniquetable.buckets[target_bucket_ix];
-    uniquetable_entry_t entry;
-    nodeindex_t index;
-    bddnode_t* node;
-
-    // try to find existing node
-    while (b > 0) {
-        entry = uniquetable.entries[b];
-        index = entry.value;
-        node = get_node(index);
-        if (node->var == var && node->low == low && node->high == high) {
-            return entry.value;
-        }
-        b = entry.next;
-    }
-    if (uniquetable.count == uniquetable.size) {
-        perror("Unique table is too small :(\n");
-        assert(0);
-    }
-
-    // allocate new node
-    return add(var, low, high, target_bucket_ix, true);
-}
 
 // if node has not parent remove edges to low and high
 // recursively disable low and high
@@ -172,8 +175,6 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
     return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
 }
 
-// remove all nodes that do not have parent
-// to keep a specific root node alive (it does not have parents) call keepalive(node)
 
 double GC_TIME;
 double GC_MAX_FILLLEVEL;
@@ -197,6 +198,7 @@ void gc(bool disable_rec, bool force) {
     bddnode_t* node;
     nodeindex_t index;
 
+    // Iterate overall nodes an disable if possible
     if (disable_rec) {
         for (uint64_t i = 0; i < uniquetable.count; i++) {
             entry = uniquetable.entries[i];
@@ -208,16 +210,19 @@ void gc(bool disable_rec, bool force) {
         }
     }
 
+    // Reset all buckets
     for (uint64_t i = 0; i < uniquetable.size; i++) {
         uniquetable.buckets[i] = -1;
     }
 
+    // Remove all disable nodes from unique table
     uint64_t j = 0;
     for (uint64_t i = 0; i < uniquetable.count; i++) {
         entry = uniquetable.entries[i];
         index = entry.value;
         node = get_node(index);
         if (isconstant(node) || node->parentcount > 0) {
+            // Re-insert node
             assert(!isdisabled(node));
             target_bucket_ix = hash_bddnode(node) & uniquetable.mask;
             uniquetable.entries[j].value = index;
@@ -225,6 +230,7 @@ void gc(bool disable_rec, bool force) {
             uniquetable.buckets[target_bucket_ix] = j;
             j++;
         } else {
+            // Disable node and give back to memorypool
             disable(node);
             push_index(index);
         }
@@ -234,13 +240,12 @@ void gc(bool disable_rec, bool force) {
     printf("GC decreased number of nodes from %llu (%.2f%%) to %llu (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
     uniquetable.count = (uint64_t) j;
 
+    // clear caches
     clear_unaryopcache();
     clear_binaryopcache();
     clear_ternaryopcache();
 
-
     clock_gettime(CLOCK_REALTIME, &t1);
-
     GC_TIME += get_elapsed_time(t0, t1);
 }
 

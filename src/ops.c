@@ -20,7 +20,6 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
     uint32_t cache_ix = binaryop_hash(ix1, ix2, op) & binaryopcache.mask;
     binaryopcache_entry_t cacheentry = binaryopcache.data[cache_ix];
     if (cacheentry.arg1 == ix1 && cacheentry.arg2 == ix2 && cacheentry.op == op) {
-        // entries can be from current generation but were disabled after op
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -154,7 +153,6 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
     uint32_t cache_ix = binaryop_hash(ix, ix2, EXISTS_OP) & binaryopcache.mask;
     binaryopcache_entry_t cacheentry = binaryopcache.data[cache_ix];
     if (cacheentry.arg1 == ix && cacheentry.arg2 == ix2 && cacheentry.op == EXISTS_OP) {
-        // entries can be from current generation but were disabled after op
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -199,7 +197,6 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     uint32_t cache_ix = ternaryop_hash(ix1, ix2, ix3, IMAGE_OP) & ternaryopcache.mask;
     ternaryopcache_entry_t cacheentry = ternaryopcache.data[cache_ix];
     if (cacheentry.arg1 == ix1 && cacheentry.arg2 == ix2 && cacheentry.arg3 == ix3 && cacheentry.op == IMAGE_OP) {
-        // entries can be from current generation but were disabled after op
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -224,7 +221,6 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
 
     nodeindex_t new_u;
     if (contains(variable_set, z)) {
-        // maybe if we do proper or(l,h) here with GC then we do not have to do disable_rec in gc()?, but is also maybe a bad idea?
         new_u = apply_binary(l, h, OR_OP);
     } else {
         new_u = make(z->var, l, h);

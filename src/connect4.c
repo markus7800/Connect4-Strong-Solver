@@ -191,7 +191,6 @@ nodeindex_t apply_board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
     uint32_t cache_ix = binaryop_hash(ix1, ix2, CONNECT4_OR) & binaryopcache.mask;
     binaryopcache_entry_t cacheentry = binaryopcache.data[cache_ix];
     if (cacheentry.arg1 == ix1 && cacheentry.arg2 == ix2 && cacheentry.op == CONNECT4_OR) {
-        // entries can be from current generation but were disabled after op
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -419,7 +418,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL);
-    
+
     if (argc != 4) {
         perror("Wrong number of arguments supplied: connect4.out log2(tablesize) width height\n");
         return 1;
