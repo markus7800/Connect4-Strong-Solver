@@ -4,7 +4,13 @@
 
 #include "bdd.h"
 
+/*
+Solves the n-queens puzzle
+https://en.wikipedia.org/wiki/Eight_queens_puzzle
+*/
+
 void queens(int N) {
+    // Create all variables
     nodeindex_t X[N][N];
 
     for (int i = 0; i < N; i++) {
@@ -13,9 +19,10 @@ void queens(int N) {
         }
     }
 
+    // bdd representing all solutions by performing AND over constraints 
     nodeindex_t bdd = ONEINDEX;
 
-
+    // Constraint 0: there has to be atleast one queen per row
     nodeindex_t e;
     for (int i = 0; i < N; i++) {
         e = ZEROINDEX;
@@ -34,30 +41,38 @@ void queens(int N) {
             b = ONEINDEX;
             c = ONEINDEX;
             d = ONEINDEX;
+            // Constraint 1: there must be atmost one queen per row
             for (int l = 0; l < N; l++) {
                 if (l != j) {
                     a = and(a, or(not(X[i][j]), not(X[i][l])));
                 }
             }
+            // Constraint 2: there must be atmost one queen per column
             for (int k = 0; k < N; k++) {
                 if (k != i) {
                     b = and(b, or(not(X[i][j]), not(X[k][j])));
                 }
             }
+            // Constraint 3: there must be atmost one queen ascending diagonal
             for (int k = 0; k < N; k++) {
                 ll = k - i + j;
                 if (0 <= ll && ll < N && (k != i)) {
                     c = and(c, or(not(X[i][j]), not(X[k][ll])));
                 }
             }
+            // Constraint 4: there must be atmost one queen per descending diagonal
             for (int k = 0; k < N; k++) {
                 ll = i + j - k;
                 if (0 <= ll && ll < N && (k != i)) {
                     c = and(c, or(not(X[i][j]), not(X[k][ll])));
                 }
             }
+
+            // and over all constraints
             bdd = and(bdd, and(a, and(b, and(c, d))));
         }
+
+        // perform GC if there are too many nodes allocated
         keepalive(get_node(bdd));
         gc(false, false);
         undo_keepalive(get_node(bdd));
@@ -67,9 +82,12 @@ void queens(int N) {
 
     print_nodes(true);
     bddnode_t* root = get_node(bdd);
+
+    // perform final (forced) GC
     keepalive(root);
     gc(true, true);
     undo_keepalive(root);
+
     print_nodes(true);
 
     printf("Satcount: %llu\n", satcount(bdd));
