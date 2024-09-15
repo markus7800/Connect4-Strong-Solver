@@ -73,7 +73,7 @@ void queens(int N) {
 
             // perform GC if there are too many nodes allocated
             keepalive(get_node(bdd));
-            gc(true, false);
+            gc(false, false);
             undo_keepalive(get_node(bdd));
             cnt++;
             printf("%d. Current number of nodes %llu\n", cnt, memorypool.num_nodes);

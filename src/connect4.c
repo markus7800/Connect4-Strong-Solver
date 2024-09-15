@@ -180,7 +180,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
             if (gc_level == 2) {
                 printf("  COL %d GC: ", col);
                 keepalive(get_node(current));
-                gc(true,true);
+                gc(false, true);
                 undo_keepalive(get_node(current));
             }
         }
@@ -188,7 +188,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
             // if we need to be even more aggressive with GC, we could move this in the loop
             printf("  COL %u GC: ", width);
             keepalive(get_node(current));
-            gc(true,true);
+            gc(false, true);
             undo_keepalive(get_node(current));
         }
     }
@@ -209,7 +209,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         if (gc_level) {
             printf("  ROW %u GC: ", height);
             keepalive(get_node(current));
-            gc(true,true);
+            gc(false, true);
             undo_keepalive(get_node(current));
         }
     }
@@ -230,7 +230,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         if (gc_level) {
             printf("  DIAG1 GC: ");
             keepalive(get_node(current));
-            gc(true,true);
+            gc(false, true);
             undo_keepalive(get_node(current));
         }
 
@@ -249,7 +249,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         if (gc_level) {
             printf("  DIAG2 GC: ");
             keepalive(get_node(current));
-            gc(true,true);
+            gc(false, true);
             undo_keepalive(get_node(current));
         }
     }
