@@ -70,41 +70,51 @@ void queens(int N) {
 
             // and over all constraints
             bdd = and(bdd, and(a, and(b, and(c, d))));
+
+            // perform GC if there are too many nodes allocated
+            keepalive(get_node(bdd));
+            gc(true, false);
+            undo_keepalive(get_node(bdd));
+            cnt++;
+            printf("%d. Current number of nodes %llu\n", cnt, memorypool.num_nodes);
         }
-
-        // perform GC if there are too many nodes allocated
-        keepalive(get_node(bdd));
-        gc(false, false);
-        undo_keepalive(get_node(bdd));
-        cnt++;
-        printf("%d. Current number of nodes %d\n", cnt, memorypool.num_nodes);
     }
-
-    print_nodes(true);
-    bddnode_t* root = get_node(bdd);
-
-    // perform final (forced) GC
-    keepalive(root);
-    gc(true, true);
-    undo_keepalive(root);
-
-    print_nodes(true);
 
     printf("Satcount: %llu\n", satcount(bdd));
 }
 
 
-int main(int argc, char const *argv[]) {
+#ifndef ENTER_TO_CONTINUE
+#define ENTER_TO_CONTINUE 1
+#endif
 
-    uint64_t log2size = 28;
+int main(int argc, char const *argv[]) {
+    setbuf(stdout,NULL); // do not buffer stdout
+
+    if (argc != 3) {
+        perror("Wrong number of arguments supplied: queens.out log2(tablesize) N\n");
+        return 1;
+    }
+    char * succ;
+    uint32_t N = (uint32_t) strtoul(argv[2], &succ, 10);
+    printf("Queens(%u)", N);
+
+    uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
+
     print_RAM_info(log2size);
+
+#if ENTER_TO_CONTINUE
+    printf("\nPress enter to continue ...");
+    char enter = 0;
+    while (enter != '\r' && enter != '\n') { enter = (char) getchar(); }
+#endif
 
     init_all(log2size);
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
 
-    queens(12);
+    queens(N);
     
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
