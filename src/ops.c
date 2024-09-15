@@ -78,42 +78,42 @@ nodeindex_t apply_not(nodeindex_t ix) {
 
 nodeindex_t and(nodeindex_t ix1, nodeindex_t ix2) {
     nodeindex_t res = apply_binary(ix1, ix2, AND_OP);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix1));
-        disable_node_rec(get_node(ix2));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix1));
+    disable_node_rec(get_node(ix2));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }
 nodeindex_t or(nodeindex_t ix1, nodeindex_t ix2) {
     nodeindex_t res = apply_binary(ix1, ix2, OR_OP);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix1));
-        disable_node_rec(get_node(ix2));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix1));
+    disable_node_rec(get_node(ix2));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }
 nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2) {
     nodeindex_t res = apply_binary(ix1, ix2, IFF_OP);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix1));
-        disable_node_rec(get_node(ix2));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix1));
+    disable_node_rec(get_node(ix2));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }
 
 nodeindex_t not(nodeindex_t ix) {
     nodeindex_t res = apply_not(ix);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }
 
@@ -178,11 +178,11 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
 
 nodeindex_t exists(nodeindex_t ix, variable_set_t* variable_set) {
     nodeindex_t res = apply_exists(ix, variable_set);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }
 
@@ -222,6 +222,12 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     nodeindex_t new_u;
     if (contains(variable_set, z)) {
         new_u = apply_binary(l, h, OR_OP);
+#if DISABLE_AFTER_OP
+        keepalive(get_node(new_u));
+        disable_node_rec(get_node(l));
+        disable_node_rec(get_node(h));
+        undo_keepalive(get_node(new_u));
+#endif
     } else {
         new_u = make(z->var, l, h);
     }
@@ -237,11 +243,11 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
 
 nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set) {
     nodeindex_t res = apply_image(ix1, ix2, variable_set);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix1));
-        disable_node_rec(get_node(ix2));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix1));
+    disable_node_rec(get_node(ix2));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }

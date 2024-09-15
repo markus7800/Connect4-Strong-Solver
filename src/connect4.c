@@ -307,12 +307,12 @@ nodeindex_t apply_board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
 }
 nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
     nodeindex_t res = apply_board0_board1_or(ix1, ix2);
-    if (DISABLE_AFTER_OP) {
-        keepalive(get_node(res));
-        disable_node_rec(get_node(ix1));
-        disable_node_rec(get_node(ix2));
-        undo_keepalive(get_node(res));
-    }
+#if DISABLE_AFTER_OP
+    keepalive(get_node(res));
+    disable_node_rec(get_node(ix1));
+    disable_node_rec(get_node(ix2));
+    undo_keepalive(get_node(res));
+#endif
     return res;
 }
 
@@ -500,6 +500,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     } 
 
     printf("\nTotal number of positions for width=%u x height=%u board: %llu\n", width, height, total);
+    printf("\nFinished in %.3f seconds\n", total_t);
 
 
 #if FULLBDD
@@ -507,7 +508,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // also count number of positions of full BDD (satcount), has to match `total` count
     reset_set(&nodecount_set);
     bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
-    printf("BDD(%llu) with satcount=%llu\n", bdd_nodecount, connect4_satcount(full_bdd));
+    cnt = connect4_satcount(full_bdd);
+    printf("BDD(%llu) with satcount=%llu\n", bdd_nodecount, cnt);
     undo_keepalive(get_node(full_bdd));
 #if WRITE_TO_FILE
     // write info to file
@@ -584,7 +586,6 @@ int main(int argc, char const *argv[]) {
     
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
-    printf("\nFinished in %.3f seconds\n", t);
     double gc_perc = GC_TIME / t * 100;
     printf("GC time: %.3f seconds (%.2f%%)\n", GC_TIME, gc_perc);
     printf("GC max fill-level: %.2f %%\n", GC_MAX_FILLLEVEL*100);

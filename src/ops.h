@@ -37,9 +37,10 @@ void finished_variablesset(variable_set_t* variable_set);
 
 // If the program is compiled with DISABLE_AFTER_OP=1,
 // then the arguments of BDD operations are disabled after the operation completed.
-// This allows optimsing GC (not having to iterate over all nodes to possilbe disable them)
-// TODO: this is broken (or cannot work) for image operation so gc(true,...) must be called
-// after image to ensure proper garbage collection.
+// This allows optimsing GC (not having to iterate over all nodes to possible disable them)
+// i.e. calling gc(false,...)
+// CAUTION: if you do not manually keep the arguments alive
+// and try to use them after the operation, a segfault will happen
 #ifndef DISABLE_AFTER_OP
 #define DISABLE_AFTER_OP 1
 #endif

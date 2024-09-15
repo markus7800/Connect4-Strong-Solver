@@ -84,8 +84,7 @@ void undo_keepalive(bddnode_t* node);
 // If disable_rec = false, then only nodes that are already disabled are deallocated.
 // If disable_rec = true, then gc will iterate over all nodes and disable them if possible.
 // If the program is compiled with DISABLE_AFTER_OP=1, then it may be sufficient to 
-// call with disable_rec since all unused root nodes are already disabled after an operation.
-// However, this does not seem to work for the image operation (FIXME)
+// call with disable_rec=false since all unused root nodes are already disabled after an operation.
 // Also clears all caches. (Deallocating nodes means giving back the index to the memorypool.
 // If this index is still in some cache we can get segfault)
 void gc(bool disable_rec, bool force);

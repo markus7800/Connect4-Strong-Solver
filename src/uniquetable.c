@@ -200,14 +200,17 @@ void gc(bool disable_rec, bool force) {
 
     // Iterate overall nodes an disable if possible
     if (disable_rec) {
+        uint64_t n_disabled = 0;
         for (uint64_t i = 0; i < uniquetable.count; i++) {
             entry = uniquetable.entries[i];
             index = entry.value;
             node = get_node(index);
             if (!isconstant(node) && !isdisabled(node) && node->parentcount == 0) {
                 disable_node_rec(node);
+                n_disabled += 1;
             }
         }
+        printf("%llu disabled ... ", n_disabled);
     }
 
     // Reset all buckets
