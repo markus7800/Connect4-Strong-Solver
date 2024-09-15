@@ -418,6 +418,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     struct timespec t0, t1;
     double t;
+    double total_t = 0;
 
     int gc_level;
     for (int d = 1; d <= width*height+1; d++) {
@@ -475,12 +476,14 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         cnt = connect4_satcount(current);
         total += cnt;
         
-        clock_gettime(CLOCK_REALTIME, &t1);
 
         // count number of nodes in current BDD
-        t = get_elapsed_time(t0, t1);
         reset_set(&nodecount_set);
         bdd_nodecount = _nodecount(current, &nodecount_set);
+
+        clock_gettime(CLOCK_REALTIME, &t1);
+        t = get_elapsed_time(t0, t1);
+        total_t += t;
 
         // print info
         printf("Ply %d/%d: BDD(%llu) %llu in %.3f seconds\n", d, width*height, bdd_nodecount, cnt, t);
@@ -503,8 +506,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // count number of nodes in full BDD
     // also count number of positions of full BDD (satcount), has to match `total` count
     reset_set(&nodecount_set);
-    printf("BDD(%llu) with satcount=%llu\n", _nodecount(full_bdd, &nodecount_set), connect4_satcount(full_bdd));
+    bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
+    printf("BDD(%llu) with satcount=%llu\n", bdd_nodecount, connect4_satcount(full_bdd));
     undo_keepalive(get_node(full_bdd));
+#if WRITE_TO_FILE
+    // write info to file
+    if (f != NULL) {
+        fprintf(f, "%u, %u, TOTAL, %llu, %llu, %.3f\n", width, height, cnt, bdd_nodecount, total_t);
+        fflush(f);
+    }
+#endif
 #endif
 
     // deallocate nodecount set
