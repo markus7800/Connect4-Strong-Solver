@@ -213,7 +213,7 @@ void gc(bool disable_rec, bool force) {
                 n_disabled += 1;
             }
         }
-        printf("%llu disabled ... ", n_disabled);
+        printf("%"PRIu64" disabled ... ", n_disabled);
     }
 
     // Reset all buckets
@@ -243,7 +243,7 @@ void gc(bool disable_rec, bool force) {
     }
     double perc_before = (double) uniquetable.count / uniquetable.size * 100;
     double perc_after = (double) j / uniquetable.size * 100;
-    printf("decreased number of nodes from %llu (%.2f%%) to %llu (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
+    printf("decreased number of nodes from %"PRIu64" (%.2f%%) to %"PRIu64" (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
     uniquetable.count = (uint64_t) j;
 
     // clear caches
@@ -291,8 +291,8 @@ void verify_uniquetable() {
 
 void print_nodes(bool statsonly) {
     double perc = (double) memorypool.num_nodes / memorypool.capacity * 100;
-    printf("Memorypool(num_nodes=%llu (%.2f%%), capacity=%llu, num_variables=%d)\n", memorypool.num_nodes, perc, memorypool.capacity, memorypool.num_variables);
-    printf("Uniquetable(count=%llu, size=%llu)\n", uniquetable.count, uniquetable.size);
+    printf("Memorypool(num_nodes=%"PRIu64" (%.2f%%), capacity=%"PRIu64", num_variables=%d)\n", memorypool.num_nodes, perc, memorypool.capacity, memorypool.num_variables);
+    printf("Uniquetable(count=%"PRIu64", size=%"PRIu64")\n", uniquetable.count, uniquetable.size);
     if (statsonly) return;
 
     uniquetable_entry_t entry;
@@ -300,13 +300,13 @@ void print_nodes(bool statsonly) {
     bddnode_t* node;
     for (uint64_t i = 0; i < uniquetable.count; i++) {
         if (i == 20) {
-            printf("Hiding %llu nodes\n", uniquetable.count-20);
+            printf("Hiding %"PRIu64" nodes\n", uniquetable.count-20);
             break;
         }
         entry = uniquetable.entries[i];
         node = get_node(entry.value);
         targetbucket = uniquetable.buckets[hash_bddnode(node) & uniquetable.mask];
-        printf("%llu. Index(%d) -> ", i, entry.value);
+        printf("%"PRIu64". Index(%d) -> ", i, entry.value);
         print_bddnode(node);
         printf(" ... targetbucket=%d, next=%d\n", targetbucket, entry.next);
     }

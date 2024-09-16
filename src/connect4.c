@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <time.h>
 
 #include "bdd.h"
@@ -186,7 +187,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         }
         if (gc_level == 1) {
             // if we need to be even more aggressive with GC, we could move this in the loop
-            printf("  COL %u GC: ", width);
+            printf("  COL %"PRIu32" GC: ", width);
             keepalive(get_node(current));
             gc(true, true);
             undo_keepalive(get_node(current));
@@ -207,7 +208,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
             }
         }
         if (gc_level) {
-            printf("  ROW %u GC: ", height);
+            printf("  ROW %"PRIu32" GC: ", height);
             keepalive(get_node(current));
             gc(true, true);
             undo_keepalive(get_node(current));
@@ -391,17 +392,17 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t current = connect4_start(stm0, X, width, height);
     uint64_t cnt = connect4_satcount(current);
     bdd_nodecount = _nodecount(current, &nodecount_set);
-    printf("Ply 0/%d: BDD(%llu) %llu\n", width*height, bdd_nodecount, cnt);
+    printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
     total += cnt;
 
 #if WRITE_TO_FILE
     // Write header and ply 0 to file
     char filename[50];
-    sprintf(filename, "results_ply_w%u_h%u.csv", width, height);
+    sprintf(filename, "results_ply_w%"PRIu32"_h%"PRIu32".csv", width, height);
     FILE* f = fopen(filename, "w");
     fprintf(f, "width,height,ply,poscount,nodecount,time\n");
     if (f != NULL) {
-        fprintf(f, "%u, %u, %d, %llu, %llu, %.3f\n", width, height, 0, cnt, bdd_nodecount, 0.0);
+        fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %.3f\n", width, height, 0, cnt, bdd_nodecount, 0.0);
     }
 #endif
 
@@ -480,13 +481,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         total_t += t;
 
         // print info
-        printf("Ply %d/%d: BDD(%llu) %llu in %.3f seconds\n", d, width*height, bdd_nodecount, cnt, t);
+        printf("Ply %d/%d: BDD(%"PRIu64") %"PRIu64" in %.3f seconds\n", d, width*height, bdd_nodecount, cnt, t);
 
 
 #if WRITE_TO_FILE
         // write info to file
         if (f != NULL && d <= width*height) {
-            fprintf(f, "%u, %u, %d, %llu, %llu, %.3f\n", width, height, d, cnt, bdd_nodecount, t);
+            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %.3f\n", width, height, d, cnt, bdd_nodecount, t);
             fflush(f);
         }
 #endif
@@ -500,19 +501,19 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     reset_set(&nodecount_set);
     bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
     cnt = connect4_satcount(full_bdd);
-    printf("\nFULLBDD(%llu) with satcount = %llu\n", bdd_nodecount, cnt);
+    printf("\nFULLBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
     undo_keepalive(get_node(full_bdd));
 #if WRITE_TO_FILE
     // write info to file
     if (f != NULL) {
-        fprintf(f, "%u, %u, TOTAL, %llu, %llu, %.3f\n", width, height, cnt, bdd_nodecount, total_t);
+        fprintf(f, "%"PRIu32", %"PRIu32", TOTAL, %"PRIu64", %"PRIu64", %.3f\n", width, height, cnt, bdd_nodecount, total_t);
         fflush(f);
     }
 #endif
 #endif
 
 
-    printf("\nTotal number of positions for width=%u x height=%u board: %llu\n", width, height, total);
+    printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
     printf("\nFinished in %.3f seconds.\n", total_t);
 
     // deallocate nodecount set
@@ -554,7 +555,7 @@ int main(int argc, char const *argv[]) {
     char * succ;
     uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
     uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
-    printf("Connect4: width=%u x height=%u board\n", width, height);
+    printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
 
     uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
 
@@ -590,13 +591,13 @@ int main(int argc, char const *argv[]) {
 #if WRITE_TO_FILE
     // write result to file
     char filename[50];
-    sprintf(filename, "results_w%u_h%u.csv", width, height);
+    sprintf(filename, "results_w%"PRIu32"_h%"PRIu32".csv", width, height);
     FILE* f = fopen(filename, "w");
     fprintf(f, "width,height,count,time,GC,bytes,usage,log2tbsize\n");
     if (f == NULL) {
         perror("Error opening file");
     } else {
-        fprintf(f, "%u, %u, %llu, %.3f, %.4f, %llu, %.4f, %llu\n", width, height, count, t, gc_perc/100, bytes, GC_MAX_FILLLEVEL,log2size);
+        fprintf(f, "%"PRIu32", %"PRIu32", %"PRIu64", %.3f, %.4f, %"PRIu64", %.4f, %"PRIu64"\n", width, height, count, t, gc_perc/100, bytes, GC_MAX_FILLLEVEL,log2size);
     }
     fclose(f);
 #endif

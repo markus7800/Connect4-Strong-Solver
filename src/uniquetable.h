@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <time.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "caches.h"
 #include "node.h"

@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "bdd.h"
 
@@ -76,11 +77,11 @@ void queens(int N) {
             gc(true, false);
             undo_keepalive(get_node(bdd));
             cnt++;
-            printf("%d. Current number of nodes %llu\n", cnt, memorypool.num_nodes);
+            printf("%d. Current number of nodes %"PRIu64"\n", cnt, memorypool.num_nodes);
         }
     }
 
-    printf("Satcount: %llu\n", satcount(bdd));
+    printf("Satcount: %"PRIu64"\n", satcount(bdd));
 }
 
 
@@ -97,7 +98,7 @@ int main(int argc, char const *argv[]) {
     }
     char * succ;
     uint32_t N = (uint32_t) strtoul(argv[2], &succ, 10);
-    printf("Queens(%u)", N);
+    printf("Queens(%"PRIu32")", N);
 
     uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
 

@@ -53,7 +53,6 @@ void push_index(nodeindex_t index) {
 }
 
 inline bddnode_t* get_node(nodeindex_t index) {
-    // printf("get_node(%u) vs %u\n", index, (nodeindex_t) -1);
     assert(index != (nodeindex_t) -1);
     return &memorypool.nodes[index];
 }
