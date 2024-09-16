@@ -13,7 +13,12 @@ void init_set(uniquetable_t* set, uint64_t log2size) {
         perror("Could not allocate set :(\n");
         assert(0);
     }
-    set->size = size;
+    // we do not want to allocate (nodeindex_t) -1 == MAX(uint32_t) in case of log2size = 32
+    if (log2size == 32) {
+        set->size = size-1;
+    } else {
+        set->size = size;
+    }
     set->count = 0;
     for (uint64_t i = 0; i < size; i++) {
         set->buckets[i] = -1;
@@ -37,7 +42,7 @@ void reset_set(uniquetable_t* set) {
 }
 
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix, bool inc_parentcount) {
-    bucket_t i = (bucket_t) uniquetable.count;
+    uint64_t i = uniquetable.count;
     uniquetable.count++;
     if (uniquetable.count == uniquetable.size) {
         perror("Unique table is too small :(\n");
@@ -101,10 +106,6 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
         }
         b = entry.next;
     }
-    if (uniquetable.count == uniquetable.size) {
-        perror("Unique table is too small :(\n");
-        assert(0);
-    }
 
     // allocate new node
     return add(var, low, high, target_bucket_ix, true);
@@ -115,7 +116,7 @@ void add_nodeindex(uniquetable_t* set, nodeindex_t index) {
     bddnode_t* node = get_node(index);
     uint32_t target_bucket_ix = hash_bddnode(node) & set->mask;
 
-    bucket_t i = (bucket_t) set->count;
+    uint64_t i = set->count;
     set->count++;
     if (set->count == set->size) {
         perror("Set is too small :(\n");

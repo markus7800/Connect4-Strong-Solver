@@ -1,7 +1,7 @@
 CC = clang
 
 WRITE_TO_FILE = 1      # write results to file?
-ENTER_TO_CONTINUE = 1  # should require to press enter to start?
+ENTER_TO_CONTINUE = 0  # should require to press enter to start?
 FULLBDD = 0            # compute a BDD encoding all positions (OR over all BDDs for single plies)
 
 connect4:
