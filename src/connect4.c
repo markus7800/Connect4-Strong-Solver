@@ -493,9 +493,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
            
     } 
 
-    printf("\nTotal number of positions for width=%u x height=%u board: %llu\n", width, height, total);
-    printf("\nFinished in %.3f seconds\n", total_t);
-
 
 #if FULLBDD
     // count number of nodes in full BDD
@@ -503,7 +500,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     reset_set(&nodecount_set);
     bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
     cnt = connect4_satcount(full_bdd);
-    printf("BDD(%llu) with satcount=%llu\n", bdd_nodecount, cnt);
+    printf("\nFULLBDD(%llu) with satcount = %llu\n", bdd_nodecount, cnt);
     undo_keepalive(get_node(full_bdd));
 #if WRITE_TO_FILE
     // write info to file
@@ -513,6 +510,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     }
 #endif
 #endif
+
+
+    printf("\nTotal number of positions for width=%u x height=%u board: %llu\n", width, height, total);
+    printf("\nFinished in %.3f seconds.\n", total_t);
 
     // deallocate nodecount set
     free(nodecount_set.buckets);
