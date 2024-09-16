@@ -69,8 +69,6 @@ bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index);
 // If a node has no parents and is not already disabled,
 // disables node, decrements the parent count of low and high,
 // and recursively calls disable_node_rec on them.
-// If the program is compiled with DISABLE_AFTER_OP=1,
-// then the arguments of BDD operations are disabled after the operation completed.
 void disable_node_rec(bddnode_t* node);
 
 // artificially increments the parent count of the node
@@ -83,8 +81,6 @@ void undo_keepalive(bddnode_t* node);
 // This behaviour can be overwritten by setting force = true.
 // If disable_rec = false, then only nodes that are already disabled are deallocated.
 // If disable_rec = true, then gc will iterate over all nodes and disable them if possible.
-// If the program is compiled with DISABLE_AFTER_OP=1, then it may be sufficient to 
-// call with disable_rec=false since all unused root nodes are already disabled after an operation.
 // Also clears all caches. (Deallocating nodes means giving back the index to the memorypool.
 // If this index is still in some cache we can get segfault)
 void gc(bool disable_rec, bool force);

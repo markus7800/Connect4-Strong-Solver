@@ -73,7 +73,7 @@ void queens(int N) {
 
             // perform GC if there are too many nodes allocated
             keepalive(get_node(bdd));
-            gc(false, false);
+            gc(true, false);
             undo_keepalive(get_node(bdd));
             cnt++;
             printf("%d. Current number of nodes %llu\n", cnt, memorypool.num_nodes);
@@ -118,7 +118,7 @@ int main(int argc, char const *argv[]) {
     
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
-    printf("in %.3f seconds\n", t);
+    printf("Finished in %.3f seconds\n", t);
     double gc_perc = GC_TIME / t * 100;
     printf("GC time: %.3f seconds (%.2f%%)\n", GC_TIME, gc_perc);
 

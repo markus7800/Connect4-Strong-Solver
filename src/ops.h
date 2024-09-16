@@ -34,17 +34,6 @@ void add_variable(variable_set_t* variable_set, nodeindex_t variable);
 bool contains(variable_set_t* variable_set, bddnode_t* node);
 void finished_variablesset(variable_set_t* variable_set);
 
-
-// If the program is compiled with DISABLE_AFTER_OP=1,
-// then the arguments of BDD operations are disabled after the operation completed.
-// This allows optimsing GC (not having to iterate over all nodes to possible disable them)
-// i.e. calling gc(false,...)
-// CAUTION: if you do not manually keep the arguments alive
-// and try to use them after the operation, a segfault will happen
-#ifndef DISABLE_AFTER_OP
-#define DISABLE_AFTER_OP 1
-#endif
-
 nodeindex_t and(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t or(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2);

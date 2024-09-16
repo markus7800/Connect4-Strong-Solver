@@ -180,7 +180,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
             if (gc_level == 2) {
                 printf("  COL %d GC: ", col);
                 keepalive(get_node(current));
-                gc(false, true);
+                gc(true, true);
                 undo_keepalive(get_node(current));
             }
         }
@@ -188,7 +188,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
             // if we need to be even more aggressive with GC, we could move this in the loop
             printf("  COL %u GC: ", width);
             keepalive(get_node(current));
-            gc(false, true);
+            gc(true, true);
             undo_keepalive(get_node(current));
         }
     }
@@ -209,7 +209,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         if (gc_level) {
             printf("  ROW %u GC: ", height);
             keepalive(get_node(current));
-            gc(false, true);
+            gc(true, true);
             undo_keepalive(get_node(current));
         }
     }
@@ -230,7 +230,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         if (gc_level) {
             printf("  DIAG1 GC: ");
             keepalive(get_node(current));
-            gc(false, true);
+            gc(true, true);
             undo_keepalive(get_node(current));
         }
 
@@ -249,7 +249,7 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         if (gc_level) {
             printf("  DIAG2 GC: ");
             keepalive(get_node(current));
-            gc(false, true);
+            gc(true, true);
             undo_keepalive(get_node(current));
         }
     }
@@ -307,12 +307,6 @@ nodeindex_t apply_board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
 }
 nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
     nodeindex_t res = apply_board0_board1_or(ix1, ix2);
-#if DISABLE_AFTER_OP
-    keepalive(get_node(res));
-    disable_node_rec(get_node(ix1));
-    disable_node_rec(get_node(ix2));
-    undo_keepalive(get_node(res));
-#endif
     return res;
 }
 
