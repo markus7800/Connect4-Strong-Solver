@@ -15,7 +15,11 @@ else:
 print(f"mul={mul} off={off}")
 
 cnt = -1
-do_sub_12 = False
+
+do_sub_12 = True
+do_13 = True
+do_14 = True
+do_14_big = True
 
 if do_sub_12:
     for width in range(1,12+1):
@@ -28,10 +32,10 @@ if do_sub_12:
                 continue
 
             print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
-            subprocess.run(["src/connect4.out", "27", str(width), str(height)], check=True, capture_output=True)
+            with open(f"log_w{width}_h{height}.txt", "w") as f:
+                subprocess.run(["src/connect4.out", "27", str(width), str(height)], check=False, stdout=f, stderr=f)
             print("finished.")
 
-do_13 = False
 if do_13:
     for width in range(1,12+1):
         for height in range(1, 12+1):
@@ -42,15 +46,23 @@ if do_13:
                 continue
 
             print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
-            subprocess.run(["src/connect4.out", "29", str(width), str(height)], check=False)
+            with open(f"log_w{width}_h{height}.txt", "w") as f:
+                subprocess.run(["src/connect4.out", "29", str(width), str(height)], check=False, stdout=f, stderr=f)
             print("finished.")
 
-do_14 = False
 if do_14:
-    for width in range(1,13+1):
-        for height in range(1, 13+1):
-            if height + width != 14:
-                continue
+    for (width, height) in [
+        (1, 13),
+        (2, 12),
+        (3, 11),
+        (4, 10),
+        (8, 6),
+        (9, 5),
+        (10, 4),
+        (11, 3),
+        (12, 2),
+        (13, 1)
+        ]:
             cnt += 1
             if cnt % mul != off:
                 continue
@@ -60,14 +72,15 @@ if do_14:
                 subprocess.run(["src/connect4.out", "30", str(width), str(height)], check=False, stdout=f, stderr=f)
             print("finished.")
 
-redo_14 = True
-if redo_14:
-    for width, height in [(7,7),(6,8),(8,6)]:
+if do_14_big:
+    cnt = -1
+    for width, height, log2tbsize in [(5, 9, 31), (7, 7, 31), (6, 8, 32)]:
+        cnt += 1
+        if cnt % min(mul,2) != off:
+            continue
+
         print(f"{cnt}. Count for width={width} x height={height} ... ", end="", flush=True)
         with open(f"log_w{width}_h{height}.txt", "w") as f:
-            subprocess.run(["src/connect4.out", "32", str(width), str(height)], check=False, stdout=f, stderr=f)
+            subprocess.run(["src/connect4.out",  str(log2tbsize), str(width), str(height)], check=False, stdout=f, stderr=f)
         print("finished.")
 
-# results = pandas.read_csv("results.csv")
-# results = results[['width', 'height', 'count']]
-# results.pivot(index='height', columns='width', values='count').convert_dtypes()
