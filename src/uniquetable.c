@@ -188,6 +188,8 @@ void gc(bool disable_rec, bool force) {
     }
     if (force) {
         printf("Forced GC started ... ");
+    } else {
+        printf("GC started ... ");
     }
 
     struct timespec t0, t1;
@@ -241,7 +243,7 @@ void gc(bool disable_rec, bool force) {
     }
     double perc_before = (double) uniquetable.count / uniquetable.size * 100;
     double perc_after = (double) j / uniquetable.size * 100;
-    printf("GC decreased number of nodes from %llu (%.2f%%) to %llu (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
+    printf("decreased number of nodes from %llu (%.2f%%) to %llu (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
     uniquetable.count = (uint64_t) j;
 
     // clear caches
