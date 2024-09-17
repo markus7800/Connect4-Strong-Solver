@@ -34,6 +34,11 @@ void add_variable(variable_set_t* variable_set, nodeindex_t variable);
 bool contains(variable_set_t* variable_set, bddnode_t* node);
 void finished_variablesset(variable_set_t* variable_set);
 
+
+#ifndef IN_OP_GC
+#define IN_OP_GC 1
+#endif
+
 nodeindex_t and(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t or(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2);
