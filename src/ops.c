@@ -1,6 +1,11 @@
 
 #include "ops.h"
 
+#if IN_OP_GC
+#define IN_OP_GC_keepalive(ix) keepalive(get_node(ix)) 
+#else
+#define IN_OP_GC_keepalive(ix) ;
+#endif
 
 void in_op_gc(uint8_t op) {
     uint64_t prev_num_nodes = memorypool.num_nodes;
@@ -57,24 +62,23 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
     nodeindex_t h;
     variable_t var;
     if (level(u1) < level(u2)) {
-        l = apply_binary(u1->low, ix2, op); keepalive(get_node(l));
-        h = apply_binary(u1->high, ix2, op); keepalive(get_node(h));
+        l = apply_binary(u1->low, ix2, op); IN_OP_GC_keepalive(l);
+        h = apply_binary(u1->high, ix2, op); IN_OP_GC_keepalive(h);
         var = u1->var;
     } else if (level(u1) > level(u2)) {
-        l = apply_binary(ix1, u2->low, op); keepalive(get_node(l));
-        h = apply_binary(ix1, u2->high, op); keepalive(get_node(h));
+        l = apply_binary(ix1, u2->low, op); IN_OP_GC_keepalive(l);
+        h = apply_binary(ix1, u2->high, op); IN_OP_GC_keepalive(h);
         var = u2->var;
     } else {
-        l = apply_binary(u1->low, u2->low, op); keepalive(get_node(l));
-        h = apply_binary(u1->high, u2->high, op); keepalive(get_node(h));
+        l = apply_binary(u1->low, u2->low, op); IN_OP_GC_keepalive(l);
+        h = apply_binary(u1->high, u2->high, op); IN_OP_GC_keepalive(h);
         var = u1->var;
     }
 
     nodeindex_t u = make(var, l, h);
 
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-
 #if IN_OP_GC
+    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
     keepalive(get_node(u));
     in_op_gc(op);
     undo_keepalive(get_node(u));
@@ -102,14 +106,13 @@ nodeindex_t apply_not(nodeindex_t ix) {
         }
     }
     
-    nodeindex_t l = apply_not(u->low); keepalive(get_node(l));
-    nodeindex_t h = apply_not(u->high); keepalive(get_node(h));
+    nodeindex_t l = apply_not(u->low); IN_OP_GC_keepalive(l);
+    nodeindex_t h = apply_not(u->high); IN_OP_GC_keepalive(h);
 
     nodeindex_t new_u = make(u->var, l, h);
 
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-
 #if IN_OP_GC
+    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
     keepalive(get_node(new_u));
     in_op_gc(NOT_OP);
     undo_keepalive(get_node(new_u));
@@ -189,8 +192,8 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
         }
     }
     
-    nodeindex_t l = apply_exists(u->low, variable_set); keepalive(get_node(l));
-    nodeindex_t h = apply_exists(u->high, variable_set); keepalive(get_node(h));
+    nodeindex_t l = apply_exists(u->low, variable_set); IN_OP_GC_keepalive(l);
+    nodeindex_t h = apply_exists(u->high, variable_set); IN_OP_GC_keepalive(h);
 
     nodeindex_t new_u;
     if (contains(variable_set, u)) {
@@ -199,9 +202,8 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
         new_u = make(u->var, l, h);
     }
 
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-
 #if IN_OP_GC
+    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
     keepalive(get_node(new_u));
     in_op_gc(EXISTS_OP);
     undo_keepalive(get_node(new_u));
@@ -242,16 +244,16 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     nodeindex_t h;
     bddnode_t* z;
     if (level(u1) < level(u2)) {
-        l = apply_image(u1->low, ix2, variable_set); keepalive(get_node(l));
-        h = apply_image(u1->high, ix2, variable_set); keepalive(get_node(h));
+        l = apply_image(u1->low, ix2, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image(u1->high, ix2, variable_set); IN_OP_GC_keepalive(h);
         z = u1;
     } else if (level(u1) > level(u2)) {
-        l = apply_image(ix1, u2->low, variable_set); keepalive(get_node(l));
-        h = apply_image(ix1, u2->high, variable_set); keepalive(get_node(h));
+        l = apply_image(ix1, u2->low, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image(ix1, u2->high, variable_set); IN_OP_GC_keepalive(h);
         z = u2;
     } else {
-        l = apply_image(u1->low, u2->low, variable_set); keepalive(get_node(l));
-        h = apply_image(u1->high, u2->high, variable_set); keepalive(get_node(h));
+        l = apply_image(u1->low, u2->low, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image(u1->high, u2->high, variable_set); IN_OP_GC_keepalive(h);
         z = u1;
     }
 
@@ -261,9 +263,9 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     } else {
         new_u = make(z->var, l, h);
     }
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
 
 #if IN_OP_GC
+    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
     keepalive(get_node(new_u));
     in_op_gc(IMAGE_OP);
     undo_keepalive(get_node(new_u));
