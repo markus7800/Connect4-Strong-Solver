@@ -74,7 +74,7 @@ if do_14:
 
 if do_14_big:
     cnt = -1
-    for width, height, log2tbsize in [(5, 9, 31), (7, 7, 31), (6, 8, 32)]:
+    for width, height, log2tbsize in [(5, 9, 31), (7, 7, 31)]:
         cnt += 1
         if cnt % min(mul,2) != off:
             continue
@@ -83,4 +83,6 @@ if do_14_big:
         with open(f"log_w{width}_h{height}.txt", "w") as f:
             subprocess.run(["src/connect4.out",  str(log2tbsize), str(width), str(height)], check=False, stdout=f, stderr=f)
         print("finished.")
+
+# (6, 8, 32) does not work
 

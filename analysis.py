@@ -18,9 +18,14 @@ p = results.pivot(index="height", columns="width", values="count")
 p = p.convert_dtypes()
 p = p.applymap(lambda x: f"{int(x):,}" if not pd.isna(x) else "N/A")
 p.index.name = "height/width"
+failed = pd.read_csv(folder + "/" + "results_ply_w6_h8.csv")
+failed_lower_bound = failed["poscount"].sum()
+p.loc[8,6] = f">{int(failed_lower_bound):,}"
 p
+
 # %%
 print(p.to_markdown(tablefmt="github", index=True, stralign="right"))
+
 
 # %%
 import datetime
