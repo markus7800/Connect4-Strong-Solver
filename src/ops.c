@@ -14,17 +14,17 @@ void in_op_gc(uint8_t op) {
         printf("!!IN_OP GC: ");
         switch (op) {
         case AND_OP:
-            printf("(and) ");
+            printf("(and) "); break;
         case OR_OP:
-            printf("(or) ");
+            printf("(or) "); break;
         case IFF_OP:
-            printf("(iff) ");
+            printf("(iff) "); break;
         case NOT_OP:
-            printf("(not) ");
+            printf("(not) "); break;
         case EXISTS_OP:
-            printf("(exists) ");
+            printf("(exists) "); break;
         case IMAGE_OP:
-            printf("(image) ");
+            printf("(image) "); break;
         }
         gc(true, true);
         if (memorypool.num_nodes == prev_num_nodes) {

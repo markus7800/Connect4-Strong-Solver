@@ -417,10 +417,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     int gc_level;
     for (int d = 1; d <= width*height+1; d++) {
+        printf("Ply %d/%d:", d, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
 
         // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
         gc_level = (d >= 10) + (d >= 25);
+        if (gc_level) printf("\n");
 
         // first substract all terminal positions and then perform image operatoin
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
@@ -465,6 +467,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             gc(true, true);
             undo_keepalive(get_node(current));
         }
+
+        // count number of nodes in current full BDD
+        reset_set(&nodecount_set);
+        bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
+        printf(" FullBDD(%"PRIu64"),", bdd_nodecount);
 #endif
 
         // count the number of positions at ply
@@ -481,7 +488,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         total_t += t;
 
         // print info
-        printf("Ply %d/%d: BDD(%"PRIu64") %"PRIu64" in %.3f seconds\n", d, width*height, bdd_nodecount, cnt, t);
+        printf(" PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
 
 
 #if WRITE_TO_FILE
@@ -501,7 +508,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     reset_set(&nodecount_set);
     bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
     cnt = connect4_satcount(full_bdd);
-    printf("\nFULLBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
+    printf("\nFullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
     undo_keepalive(get_node(full_bdd));
 #if WRITE_TO_FILE
     // write info to file
@@ -565,6 +572,9 @@ int main(int argc, char const *argv[]) {
         printf("Computes full BDD.\n");
     } else {
         printf("Does not compute full BDD.\n");
+    }
+    if (IN_OP_GC) {
+        printf("Performs GC during ops.\n");
     }
 
 #if ENTER_TO_CONTINUE
