@@ -1,0 +1,2 @@
+width,height,count,time,GC_perc,log2_tbsize,bytes_alloc,max_fill_level,max_nodes_alloc
+5, 5, 69763700, 36.381, 0.7221, 27, 6845104128, 0.009165, 1230084
