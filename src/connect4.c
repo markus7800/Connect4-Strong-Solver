@@ -5,10 +5,6 @@
 
 #include "bdd.h"
 
-#include "connect4_default_encoding.c"
-
-
-
 #define CONNECT4_SAT_OP 7
 
 uint64_t _connect4_satcount(nodeindex_t ix) {
@@ -111,6 +107,16 @@ nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
 #define WRITE_TO_FILE 1
 #endif
 
+#ifndef COMPRESSED_ENCODING
+#define COMPRESSED_ENCODING 1
+#endif
+
+#if COMPRESSED_ENCODING
+#include "connect4_compressed_encoding.c"
+#else
+#include "connect4_default_encoding.c"
+#endif
+
 
 uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Create all variables
@@ -119,11 +125,20 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t stm0 = create_variable();
     nodeindex_t stm1 = create_variable();
     
-    nodeindex_t (**X)[2][2];
-    X = malloc(width * sizeof(*X));
-    for (int col = 0; col < width; col++) {
-        X[col] = malloc(height * sizeof(*X[col]));
-    }
+    #if !COMPRESSED_ENCODING
+        nodeindex_t (**X)[2][2];
+        X = malloc(width * sizeof(*X));
+        for (int col = 0; col < width; col++) {
+            X[col] = malloc(height * sizeof(*X[col]));
+        }
+    #else
+        nodeindex_t (**X)[2];
+        X = malloc(width * sizeof(*X));
+        for (int col = 0; col < width; col++) {
+            X[col] = malloc((height+1) * sizeof(*X[col]));
+        }
+
+    #endif
 
     initialise_variables(X, width, height);
     
@@ -198,11 +213,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // roles of board0 and board1 switch
         if ((d % 2) == 1) {
-            current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
+            // current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
             current = image(current, trans0, &vars_board0);
 
         } else {
-            current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
+            // current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
             current = image(current, trans1, &vars_board1);
         }
 
