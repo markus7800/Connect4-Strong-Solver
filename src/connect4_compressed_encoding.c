@@ -113,7 +113,7 @@ nodeindex_t connect4_start(nodeindex_t stm0, nodeindex_t (**X)[2], uint32_t widt
 }
 
 nodeindex_t is_valid_cell(nodeindex_t (**X)[2], uint32_t height, int col, int row, int board) {
-    nodeindex_t a = X[col][row][board];
+    nodeindex_t a = ONEINDEX;
     for (int r = row+1; r < height + 1; r++) {
         a = and(a, not(X[col][r][board]));
     }

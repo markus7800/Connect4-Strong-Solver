@@ -213,11 +213,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // roles of board0 and board1 switch
         if ((d % 2) == 1) {
-            // current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
+            current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
             current = image(current, trans0, &vars_board0);
 
         } else {
-            // current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
+            current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
             current = image(current, trans1, &vars_board1);
         }
 
