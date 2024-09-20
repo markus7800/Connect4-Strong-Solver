@@ -315,6 +315,9 @@ nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
 #define FULLBDD 1
 #endif
 
+#ifndef ALLOW_ROW_ORDER
+#define ALLOW_ROW_ORDER 0
+#endif
 
 #ifndef WRITE_TO_FILE
 #define WRITE_TO_FILE 1
@@ -332,10 +335,25 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     X = malloc(width * sizeof(*X));
     for (int col = 0; col < width; col++) {
         X[col] = malloc(height * sizeof(*X[col]));
+    }
+
+    if (!ALLOW_ROW_ORDER || width >= height) {
+        for (int col = 0; col < width; col++) {
+            for (int row = 0; row < height; row++) {
+                for (int player = 0; player < 2; player++) {
+                    for (int board = 0; board < 2; board++) {
+                        X[col][row][player][board] = create_variable();
+                    }
+                }
+            }
+        }
+    } else {
         for (int row = 0; row < height; row++) {
-            for (int player = 0; player < 2; player++) {
-                for (int board = 0; board < 2; board++) {
-                    X[col][row][player][board] = create_variable();
+            for (int col = 0; col < width; col++) {
+                for (int player = 0; player < 2; player++) {
+                    for (int board = 0; board < 2; board++) {
+                        X[col][row][player][board] = create_variable();
+                    }
                 }
             }
         }
@@ -577,6 +595,12 @@ int main(int argc, char const *argv[]) {
         printf("Performs GC during ops.\n");
     }
 
+    if (!ALLOW_ROW_ORDER || width >= height) {
+        printf("Column order.\n");
+    } else {
+        printf("Row order.\n");
+    }
+
 #if ENTER_TO_CONTINUE
     printf("\nPress enter to continue ...");
     char enter = 0;
@@ -594,7 +618,11 @@ int main(int argc, char const *argv[]) {
     double t = get_elapsed_time(t0, t1);
     double gc_perc = GC_TIME / t * 100;
     printf("GC time: %.3f seconds (%.2f%%)\n", GC_TIME, gc_perc);
-    printf("GC max fill-level: %.2f %%\n", GC_MAX_FILLLEVEL*100);
+
+    double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
+    if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
+    printf("GC max fill-level: %.2f %%\n", GC_MAX_FILL_LEVEL*100);
+    printf("GC max number of allocated nodes: %"PRIu64"\n", GC_MAX_NODES_ALLOC);
 
     free_all();
 
@@ -603,11 +631,12 @@ int main(int argc, char const *argv[]) {
     char filename[50];
     sprintf(filename, "results_w%"PRIu32"_h%"PRIu32".csv", width, height);
     FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,count,time,GC,bytes,usage,log2tbsize\n");
+    fprintf(f, "width,height,count,time,GC_perc,log2_tbsize,bytes_alloc,max_fill_level,max_nodes_alloc\n");
     if (f == NULL) {
         perror("Error opening file");
     } else {
-        fprintf(f, "%"PRIu32", %"PRIu32", %"PRIu64", %.3f, %.4f, %"PRIu64", %.4f, %"PRIu64"\n", width, height, count, t, gc_perc/100, bytes, GC_MAX_FILLLEVEL,log2size);
+        fprintf(f, "%"PRIu32", %"PRIu32", %"PRIu64", %.3f, %.4f, %"PRIu64", %"PRIu64", %f, %"PRIu64"\n",
+        width, height, count, t, gc_perc/100, log2size, bytes, GC_MAX_FILL_LEVEL, GC_MAX_NODES_ALLOC);
     }
     fclose(f);
 #endif

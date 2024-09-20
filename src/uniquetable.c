@@ -28,7 +28,8 @@ void init_set(uniquetable_t* set, uint64_t log2size) {
 }
 void init_uniquetable(uint64_t log2size) {
     GC_TIME = 0;
-    GC_MAX_FILLLEVEL = 0;
+    GC_MAX_FILL_LEVEL = 0;
+    GC_MAX_NODES_ALLOC = 0;
     init_set(&uniquetable, log2size);
 }
 
@@ -178,10 +179,11 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
 
 
 double GC_TIME;
-double GC_MAX_FILLLEVEL;
+double GC_MAX_FILL_LEVEL;
+uint64_t GC_MAX_NODES_ALLOC;
 void gc(bool disable_rec, bool force) {
     double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
-    if (fill_level > GC_MAX_FILLLEVEL) { GC_MAX_FILLLEVEL = fill_level; }
+    if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
 
     if (!force && fill_level < 0.5) {
         return;

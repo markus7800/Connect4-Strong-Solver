@@ -92,7 +92,9 @@ double get_elapsed_time(struct timespec t0, struct timespec t1);
 // Keeps track of the the time spent garbage collecting.
 extern double GC_TIME;
 // Keeps track of the maximum fill level of the unique table
-extern double GC_MAX_FILLLEVEL;
+extern double GC_MAX_FILL_LEVEL;
+// Keeps track of the maximum number of allocated nodes
+extern uint64_t GC_MAX_NODES_ALLOC;
 
 // checks if properties of BDD hold
 void verify_uniquetable();
