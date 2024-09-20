@@ -113,11 +113,11 @@ nodeindex_t connect4_start(nodeindex_t stm0, nodeindex_t (**X)[2], uint32_t widt
 }
 
 nodeindex_t is_valid_cell(nodeindex_t (**X)[2], uint32_t height, int col, int row, int board) {
-    nodeindex_t a = ONEINDEX;
+    nodeindex_t a = ZEROINDEX;
     for (int r = row+1; r < height + 1; r++) {
-        a = and(a, not(X[col][r][board]));
+        a = or(a, X[col][r][board]);
     }
-    return not(a);
+    return a;
 }
 
 // Subtracts all positions from current which are terminal, i.e. four in a row, column or diagonal
