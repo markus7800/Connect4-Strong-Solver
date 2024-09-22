@@ -1,11 +1,11 @@
 CC = clang
 
-WRITE_TO_FILE = 1      # write results to file?
-ENTER_TO_CONTINUE = 0  # should require to press enter to start?
-FULLBDD = 0            # compute a BDD encoding all positions (OR over all BDDs for single plies)
-IN_OP_GC = 0		   # should GC be performed during ops?
-ALLOW_ROW_ORDER = 0    # should order by row if height > width?
-COMPRESSED_ENCODING = 0 
+WRITE_TO_FILE = 1       # write results to file?
+ENTER_TO_CONTINUE = 0   # should require to press enter to start?
+FULLBDD = 0             # compute a BDD encoding all positions (OR over all BDDs for single plies)
+IN_OP_GC = 0		    # should GC be performed during ops?
+ALLOW_ROW_ORDER = 1     # should order by row if height > width?
+COMPRESSED_ENCODING = 0 # use compressed Connect4 encoding?
 
 CFLAGS = -O3 -flto -Wall -O3
 

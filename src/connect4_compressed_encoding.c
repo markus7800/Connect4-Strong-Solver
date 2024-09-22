@@ -1,4 +1,4 @@
-
+#include "bdd.h"
 
 void initialise_variables(nodeindex_t (**X)[2], uint32_t width, uint32_t height) {
     // Second, cells: order column, row, player, board
