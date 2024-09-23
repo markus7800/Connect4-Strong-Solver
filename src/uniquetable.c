@@ -70,7 +70,7 @@ nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t targ
     // if a node was already stored at target_bucket_ix, we keep track of it with a singly linked list
     uniquetable.entries[i].next = uniquetable.buckets[target_bucket_ix];
     // in the buckets array, the last added node is stored
-    uniquetable.buckets[target_bucket_ix] = i;
+    uniquetable.buckets[target_bucket_ix] = i; // TODO: bucket_t is only int32!!!!
 
     return index;
 }

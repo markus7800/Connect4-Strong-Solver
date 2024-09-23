@@ -7,7 +7,9 @@ IN_OP_GC = 0		    # should GC be performed during ops?
 ALLOW_ROW_ORDER = 1     # should order by row if height > width?
 COMPRESSED_ENCODING = 0 # use compressed Connect4 encoding?
 
-CFLAGS = -O3 -flto -Wall -O3
+BDDFILES = caches.c counts.c memorypool.c node.c ops.c uniquetable.c
+
+CFLAGS = -O3 -flto -Wall -march=native
 
 C4FLAGS = \
 -DFULLBDD=$(FULLBDD) \
@@ -21,10 +23,13 @@ QFLAGS = \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE)
 
 connect4:
-	$(CC) connect4.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(C4FLAGS) -o connect4.out
+	$(CC) $(BDDFILES) connect4.c  $(CFLAGS) $(C4FLAGS) -o connect4.out
+
+connect4-perft:
+	$(CC) $(BDDFILES) set.c connect4_perft.c -o perft.out $(CFLAGS)
 
 queens:
-	$(CC) queens.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(QFLAGS) -o queens.out
+	$(CC) $(BDDFILES) queens.c $(CFLAGS) $(QFLAGS) -o queens.out
 
 clean:
 	rm connect4.out

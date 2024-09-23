@@ -47,5 +47,7 @@ nodeindex_t exists(nodeindex_t ix, variable_set_t* variable_set);
 // image is efficient implemenation of exists(and(ix1,ix2),variable_set)
 nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set);
 
+nodeindex_t or_conjunction_fast(nodeindex_t ix, uint64_t conjunction);
+bool is_sat(nodeindex_t ix, uint64_t assignment);
 
 #endif

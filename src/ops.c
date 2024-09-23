@@ -286,3 +286,103 @@ nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set
     undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2));
     return res;
 }
+
+bool var_is_high(uint64_t conjunction, variable_t v) {
+    return (conjunction >> (v - 1)) & 0b1;
+}
+
+nodeindex_t alts[255];
+nodeindex_t old_path[255];
+
+#define DEBUG_OR_CONJ_FAST 0
+nodeindex_t or_conjunction_fast(nodeindex_t ix, uint64_t conjunction) {
+    
+    variable_t b = memorypool.num_variables;
+
+    bddnode_t* u;
+    nodeindex_t current_ix = ix;
+    
+    u = get_node(current_ix);
+    int k = 0;
+    for (variable_t v = 1; v <= b; v++) {
+        if (!isconstant(u) && u->var == v) {
+
+            old_path[k] = current_ix;
+            k++;
+
+            if (DEBUG_OR_CONJ_FAST) printf("var_is_high(%d)=%d\n", v, var_is_high(conjunction, v));
+            if (var_is_high(conjunction, v)) {
+                alts[v] = u->low;
+                current_ix = u->high;
+            } else {
+                alts[v] = u->high;
+                current_ix = u->low;
+            }
+            u = get_node(current_ix);
+        } else {
+            alts[v] = current_ix;
+        }
+    }
+
+    assert(isconstant(u));
+
+    current_ix = ONEINDEX;
+    nodeindex_t low;
+    nodeindex_t high;
+
+    int i = k - 1;
+    bddnode_t* o;
+    nodeindex_t alt = ZEROINDEX;
+
+    for (variable_t v = b; v > 0; v--) {
+        if (i > 0 && get_node(old_path[i-1])->var == v) {
+            i--; 
+        }
+        if (i >= 0) {
+            o = get_node(old_path[i]);
+            if (o->var == v) {
+                alt = var_is_high(conjunction, o->var) ? o->low : o->high;
+            } else if (o->var > v) {
+                alt = old_path[i];
+            } else {
+                alt = ZEROINDEX;
+            }
+        }
+        assert(alt == alts[v]);
+
+        if (var_is_high(conjunction, v)) {
+            low = alts[v];
+            high = current_ix;
+        } else {
+            low = current_ix;
+            high = alts[v];
+        }
+        // if (alts[v] == current_ix) {
+        //     continue; 
+        // }
+        current_ix = make(v, low, high);
+        if (DEBUG_OR_CONJ_FAST) printf("make(%d, %u, %u)=%u\n", v, low, high, current_ix);
+    }
+    if (DEBUG_OR_CONJ_FAST) printf("return %u\n", current_ix);
+
+    for (int j = 0; j < k; j++) {
+        o = get_node(old_path[j]);
+        if (o->parentcount == 0) {
+            get_node(o->low)->parentcount--;
+            get_node(o->high)->parentcount--;
+            disable(o);
+        }
+    }
+
+    return current_ix;
+
+}
+
+bool is_sat(nodeindex_t ix, uint64_t assignment) {
+    bddnode_t* u = get_node(ix);
+    while (!isconstant(u)) {
+        ix = var_is_high(assignment, u->var) ? u->high : u->low;
+        u = get_node(ix);
+    }
+    return isone(u);
+}

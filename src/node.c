@@ -44,6 +44,13 @@ inline bool isconstant(bddnode_t* node) {
 inline nodeindex_t constant(bddnode_t* node) {
     return node->low;
 }
+inline bool isone(bddnode_t* node) {
+    return constant(node) == 1;
+}
+inline bool iszero(bddnode_t* node) {
+    return constant(node) == 0;
+}
+
 inline variable_t level_for_var(variable_t var) {
     if (var == 0) {
         return memorypool.num_variables + 1;

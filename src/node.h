@@ -39,6 +39,8 @@ extern bool isdisabled(bddnode_t* node);
 // they are marked by var == 0 and low == high == value
 extern bool isconstant(bddnode_t* node);
 extern nodeindex_t constant(bddnode_t* node);
+extern bool isone(bddnode_t* node);
+extern bool iszero(bddnode_t* node);
 
 // the level orders the variables, constant variables 0 and 1 are last
 extern variable_t level_for_var(variable_t var);

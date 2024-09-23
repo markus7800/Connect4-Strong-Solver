@@ -2,3 +2,4 @@
 *.txt
 .vscode/
 lambda_dump
+*.DS_Store
