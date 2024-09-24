@@ -280,7 +280,7 @@ uint64_t perft_set(uint64_t player, uint64_t mask, int ply, int depth) {
 
 
 uint64_t perft_bdd(uint64_t player, uint64_t mask, int ply, int depth) {
-    set_t* set = &sets[ply];
+    // set_t* set = &sets[ply];
 
     nodeindex_t bdd = bdds[ply];
     uint64_t hash = position_hash(player, mask); //ply % 2 == 1 ? position_hash(player, mask) : position_hash(player ^ mask, mask);
@@ -290,7 +290,7 @@ uint64_t perft_bdd(uint64_t player, uint64_t mask, int ply, int depth) {
         return 0;
     } else {
         bdds[ply] = push_hash(bdd, hash);
-        assert(contains_hash(bdds[ply], hash));
+        // assert(contains_hash(bdds[ply], hash));
         // assert(!has_value(set, hash));
         // add_value(set, hash);
     }
@@ -337,8 +337,7 @@ uint64_t perft_bdd(uint64_t player, uint64_t mask, int ply, int depth) {
 int _main() {
     init_all(26);
 
-    create_variable();
-    create_variable();
+    memorypool.num_nodes = 2;
 
     nodeindex_t bdd = ZEROINDEX;
 
@@ -371,7 +370,7 @@ int main() {
     u_int64_t mask = 0;
     uint64_t nodes;
 
-    int depth = 5;
+    int depth = 9;
 
     // clock_gettime(CLOCK_REALTIME, &t0);
     // nodes = perft(player, mask, depth);
@@ -379,9 +378,9 @@ int main() {
     // printf("perft %d: ", depth);
     // print_elapsed(nodes, t0, t1);
 
-    for (int ply = 0; ply < WIDTH*HEIGHT; ply++) {
-        init_hashset(&sets[ply], 25);
-    }
+    // for (int ply = 0; ply < WIDTH*HEIGHT; ply++) {
+    //     init_hashset(&sets[ply], 25);
+    // }
     // printf("hashset size: %"PRIu64"\n", sets[0].size);
 
     // clock_gettime(CLOCK_REALTIME, &t0);
@@ -398,10 +397,8 @@ int main() {
 
     init_all(28);
 
-    for (variable_t v = 1; v <= WIDTH*HEIGHT; v++) {
-        create_variable();
-    }
-    for (int ply = 0; ply < WIDTH*HEIGHT+1; ply++) {
+    memorypool.num_variables = (WIDTH+1)*HEIGHT;
+    for (int ply = 0; ply < WIDTH*HEIGHT; ply++) {
         bdds[ply] = ZEROINDEX;
     }
     clock_gettime(CLOCK_REALTIME, &t0);
