@@ -280,7 +280,15 @@ uint64_t perft_set(uint64_t player, uint64_t mask, int ply, int depth) {
 
 
 uint64_t perft_bdd(uint64_t player, uint64_t mask, int ply, int depth) {
-    // set_t* set = &sets[ply];
+    if (2 * uniquetable.count > uniquetable.size) {
+        for (int i = 0; i < WIDTH*HEIGHT; i++) {
+            keepalive(get_node(bdds[i]));
+        }
+        gc(true, true);
+        for (int i = 0; i < WIDTH*HEIGHT; i++) {
+            undo_keepalive(get_node(bdds[i]));
+        }
+    }
 
     nodeindex_t bdd = bdds[ply];
     uint64_t hash = position_hash(player, mask); //ply % 2 == 1 ? position_hash(player, mask) : position_hash(player ^ mask, mask);
@@ -370,7 +378,7 @@ int main() {
     u_int64_t mask = 0;
     uint64_t nodes;
 
-    int depth = 9;
+    int depth = 12;
 
     // clock_gettime(CLOCK_REALTIME, &t0);
     // nodes = perft(player, mask, depth);

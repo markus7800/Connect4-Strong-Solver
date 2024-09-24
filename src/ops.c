@@ -292,7 +292,6 @@ bool var_is_high(uint64_t conjunction, variable_t v) {
 }
 
 nodeindex_t alts[255];
-nodeindex_t old_path[255];
 
 #define DEBUG_OR_CONJ_FAST 0
 nodeindex_t or_conjunction_fast(nodeindex_t ix, uint64_t conjunction) {
@@ -303,13 +302,8 @@ nodeindex_t or_conjunction_fast(nodeindex_t ix, uint64_t conjunction) {
     nodeindex_t current_ix = ix;
     
     u = get_node(current_ix);
-    int k = 0;
     for (variable_t v = 1; v <= b; v++) {
         if (!isconstant(u) && u->var == v) {
-
-            old_path[k] = current_ix;
-            k++;
-
             if (DEBUG_OR_CONJ_FAST) printf("var_is_high(%d)=%d\n", v, var_is_high(conjunction, v));
             if (var_is_high(conjunction, v)) {
                 alts[v] = u->low;
@@ -330,26 +324,9 @@ nodeindex_t or_conjunction_fast(nodeindex_t ix, uint64_t conjunction) {
     nodeindex_t low;
     nodeindex_t high;
 
-    int i = k - 1;
-    bddnode_t* o;
-    nodeindex_t alt = ZEROINDEX;
-
+    uint64_t node_count = uniquetable.count;
+    bool create = false;
     for (variable_t v = b; v > 0; v--) {
-        if (i > 0 && get_node(old_path[i-1])->var == v) {
-            i--; 
-        }
-        if (i >= 0) {
-            o = get_node(old_path[i]);
-            if (o->var == v) {
-                alt = var_is_high(conjunction, o->var) ? o->low : o->high;
-            } else if (o->var > v) {
-                alt = old_path[i];
-            } else {
-                alt = ZEROINDEX;
-            }
-        }
-        assert(alt == alts[v]);
-
         if (var_is_high(conjunction, v)) {
             low = alts[v];
             high = current_ix;
@@ -357,22 +334,17 @@ nodeindex_t or_conjunction_fast(nodeindex_t ix, uint64_t conjunction) {
             low = current_ix;
             high = alts[v];
         }
-        // if (alts[v] == current_ix) {
-        //     continue; 
-        // }
-        current_ix = make(v, low, high);
+        if (!create) {
+            current_ix = make(v, low, high);
+            create = (uniquetable.count > node_count); // did we create new node?
+        } else {
+            // we can allocate without checking, we know there is no such node
+            current_ix = allocate(v, low, high, true);
+        }
+        
         if (DEBUG_OR_CONJ_FAST) printf("make(%d, %u, %u)=%u\n", v, low, high, current_ix);
     }
     if (DEBUG_OR_CONJ_FAST) printf("return %u\n", current_ix);
-
-    for (int j = 0; j < k; j++) {
-        o = get_node(old_path[j]);
-        if (o->parentcount == 0) {
-            get_node(o->low)->parentcount--;
-            get_node(o->high)->parentcount--;
-            disable(o);
-        }
-    }
 
     return current_ix;
 
