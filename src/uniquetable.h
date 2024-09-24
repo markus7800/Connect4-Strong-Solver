@@ -13,18 +13,18 @@
 #include "node.h"
 #include "memorypool.h"
 
-typedef int32_t bucket_t;
+typedef uint32_t bucket_t;
 
 typedef struct UniqueTableEntry {
     bucket_t next;
     nodeindex_t value;
 } uniquetable_entry_t;
 
-// Implementation of a hash map that can store up to 2^32 entries
+// Implementation of a hash map that can store up to 2^32 - 1 entries
 // The entries of the hash map are node indices (nodeindex_t)
 typedef struct UniqueTable {
     uint32_t mask;                // mask for indexing into buckets
-    bucket_t* buckets;            // array of buckets
+    bucket_t* buckets;            // array of buckets, index into entries MAX(uint_32) == (bucket_t) -1 denotes end of linked list
     uniquetable_entry_t* entries; // array for storing the entries, new entries are always stored at the end
     uint64_t size;                // number of entries that can be stored in the hash map
     uint64_t count;               // number of entries currently stored

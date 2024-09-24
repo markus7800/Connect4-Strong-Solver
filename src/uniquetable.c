@@ -14,6 +14,7 @@ void init_set(uniquetable_t* set, uint64_t log2size) {
         assert(0);
     }
     // we do not want to allocate (nodeindex_t) -1 == MAX(uint32_t) in case of log2size = 32
+    // also (bucket_t) -1 == MAX(uint32_t) is special value declaring end of linked lists
     if (log2size == 32) {
         set->size = size-1;
     } else {
@@ -21,7 +22,7 @@ void init_set(uniquetable_t* set, uint64_t log2size) {
     }
     set->count = 0;
     for (uint64_t i = 0; i < size; i++) {
-        set->buckets[i] = -1;
+        set->buckets[i] = (bucket_t) -1;
         set->entries[i].next = 0;
         set->entries[i].value = (nodeindex_t) -1;
     }
@@ -35,7 +36,7 @@ void init_uniquetable(uint64_t log2size) {
 
 void reset_set(uniquetable_t* set) {
     for (uint64_t i = 0; i < set->size; i++) {
-        set->buckets[i] = -1;
+        set->buckets[i] = (bucket_t) -1;
         set->entries[i].next = 0;
         set->entries[i].value = (nodeindex_t) -1;
     }
@@ -70,6 +71,8 @@ nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t targ
     // if a node was already stored at target_bucket_ix, we keep track of it with a singly linked list
     uniquetable.entries[i].next = uniquetable.buckets[target_bucket_ix];
     // in the buckets array, the last added node is stored
+    // is guaranteed to be differnent from (bucket_t) -1, because the maximum number of elements is MAX(uint_32)-1
+    // note that target_bucket_ix may be MAX(uint_32). Then uniquetable.buckets[MAX(uint_32)] is a valid bucket, but less than MAX(uint_32)
     uniquetable.buckets[target_bucket_ix] = i;
 
     return index;
@@ -98,7 +101,7 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
     // try to find existing node
     // we traverse singly linked list until we find node
     // the end of the list is marked by b == -1
-    while (b > 0) {
+    while (b != (bucket_t) -1) {
         entry = uniquetable.entries[b];
         index = entry.value;
         node = get_node(index);
@@ -136,7 +139,7 @@ bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index) {
     nodeindex_t index;
 
     // try to find existing node
-    while (b > 0) {
+    while (b != (bucket_t) -1) {
         entry = set->entries[b];
         index = entry.value;
         if (query_index == index) {
@@ -220,7 +223,7 @@ void gc(bool disable_rec, bool force) {
 
     // Reset all buckets
     for (uint64_t i = 0; i < uniquetable.size; i++) {
-        uniquetable.buckets[i] = -1;
+        uniquetable.buckets[i] = (bucket_t) -1;
     }
 
     // Remove all disable nodes from unique table
