@@ -1,5 +1,9 @@
 #include "bdd.h"
 
+#ifndef ALLOW_ROW_ORDER
+#define ALLOW_ROW_ORDER 0
+#endif
+
 void initialise_variables(nodeindex_t (**X)[2], uint32_t width, uint32_t height) {
     // Second, cells: order column, row, player, board
     if (!ALLOW_ROW_ORDER || width >= height) {

@@ -23,6 +23,9 @@ QFLAGS = \
 connect4:
 	$(CC) connect4.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(C4FLAGS) -o connect4.out
 
+connect4-solve:
+	$(CC) connect4_solve.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(C4FLAGS) -o connect4.out
+
 queens:
 	$(CC) queens.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(QFLAGS) -o queens.out
 

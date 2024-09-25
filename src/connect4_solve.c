@@ -1,0 +1,331 @@
+
+#include <stdio.h>
+#include <inttypes.h>
+#include <time.h>
+
+#include "bdd.h"
+
+#include "connect4_ops.c"
+
+#ifndef FULLBDD
+#define FULLBDD 1
+#endif
+
+#ifndef WRITE_TO_FILE
+#define WRITE_TO_FILE 1
+#endif
+
+#ifndef COMPRESSED_ENCODING
+#define COMPRESSED_ENCODING 0
+#endif
+
+#if COMPRESSED_ENCODING
+#include "connect4_compressed_encoding.c"
+#else
+#include "connect4_default_encoding.c"
+#endif
+
+
+uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
+    // Create all variables
+
+    // First, side-to-move
+    nodeindex_t stm0 = create_variable();
+    nodeindex_t stm1 = create_variable();
+    
+    #if !COMPRESSED_ENCODING
+        nodeindex_t (**X)[2][2];
+        X = malloc(width * sizeof(*X));
+        for (int col = 0; col < width; col++) {
+            X[col] = malloc(height * sizeof(*X[col]));
+        }
+    #else
+        nodeindex_t (**X)[2];
+        X = malloc(width * sizeof(*X));
+        for (int col = 0; col < width; col++) {
+            X[col] = malloc((height+1) * sizeof(*X[col]));
+        }
+
+    #endif
+
+    initialise_variables(X, width, height);
+    
+
+    // Construct variable sets for existential qualifier
+    // one for board0 and one for board1
+    variable_set_t vars_board0;
+    variable_set_t vars_board1;
+    init_variableset(&vars_board0);
+    init_variableset(&vars_board1);
+    initialise_variable_sets(X, stm0, stm1, width, height, &vars_board0, &vars_board1);
+    finished_variablesset(&vars_board0);
+    finished_variablesset(&vars_board1);
+
+    // Compute trans relation by performing OR over all possible moves
+    // One for the case when current ply is encoded by board0 and next ply by board1,
+    // and one for the case when the roles are switched
+    nodeindex_t trans0 = get_trans(X, stm0, stm1, width, height, 0);
+    nodeindex_t trans1 = get_trans(X, stm0, stm1, width, height, 1);
+    // We always want to keep the trans relations alive (prevent GC)
+    keepalive(get_node(trans0));
+    keepalive(get_node(trans1));
+
+    // Phiu, first GC run.
+    printf("  INIT GC: ");
+    gc(true, true);
+
+    // We reuse the set to count the number of nodes in a BDD
+    uniquetable_t nodecount_set;
+    init_set(&nodecount_set, log2size-1);
+
+    uint64_t total = 0;
+    uint64_t bdd_nodecount;
+
+    // PLY 0:
+    nodeindex_t current = connect4_start(stm0, X, width, height);
+    uint64_t cnt = connect4_satcount(current);
+    bdd_nodecount = _nodecount(current, &nodecount_set);
+    printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
+    total += cnt;
+
+
+    struct timespec t0, t1;
+    double t;
+    double total_t = 0;
+
+    nodeindex_t* bdd_per_ply = (nodeindex_t*) malloc((width*height+1)*sizeof(nodeindex_t));
+    assert(bdd_per_ply != NULL);
+    keepalive(get_node(current));
+    bdd_per_ply[0] = current;
+
+
+    int gc_level;
+    for (int ply = 1; ply <= width*height; ply++) {
+        printf("Ply %d/%d:", ply, width*height);
+        clock_gettime(CLOCK_REALTIME, &t0);
+
+        // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
+        gc_level = 0; //(d >= 10) + (d >= 25);
+        if (gc_level) printf("\n");
+
+        // first substract all terminal positions and then perform image operatoin
+        // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
+        // roles of board0 and board1 switch
+        if ((ply % 2) == 1) {
+            // current is board0
+            current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
+            // trans0 is board0 -> board1
+            current = image(current, trans0, &vars_board0);
+            // current is now board1
+        } else {
+            // current is board1
+            current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
+            // trans1 is board1 -> board0
+            current = image(current, trans1, &vars_board1);
+            // current is now board0
+        }
+        keepalive(get_node(current));
+        bdd_per_ply[ply] = current;
+
+        if (gc_level) {
+            printf("  IMAGE GC: ");
+            keepalive(get_node(current));
+            gc(true, true);
+            undo_keepalive(get_node(current));
+        }
+
+        // count the number of positions at ply
+        cnt = connect4_satcount(current);
+        total += cnt;
+        
+
+        // count number of nodes in current BDD
+        reset_set(&nodecount_set);
+        bdd_nodecount = _nodecount(current, &nodecount_set);
+
+        clock_gettime(CLOCK_REALTIME, &t1);
+        t = get_elapsed_time(t0, t1);
+        total_t += t;
+
+        // print info
+        printf(" PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
+
+           
+    } 
+
+    nodeindex_t win = ZEROINDEX;
+    nodeindex_t draw = ZEROINDEX;
+    nodeindex_t lost = ZEROINDEX;
+
+    nodeindex_t next_win = ZEROINDEX;
+    nodeindex_t next_draw = ZEROINDEX;
+    nodeindex_t next_lost = ZEROINDEX;
+
+    uint64_t term_cnt;
+    uint64_t win_cnt;
+    uint64_t draw_cnt;
+    uint64_t lost_cnt;
+
+    nodeindex_t term;
+    nodeindex_t win_pre_image;
+
+    int end_ply = width*height;
+    current = bdd_per_ply[end_ply];
+    cnt = connect4_satcount(current);
+    reset_set(&nodecount_set);
+    bdd_nodecount = _nodecount(current, &nodecount_set);
+    if ((end_ply % 2) == 1) {
+        term = connect4_intersect_term(current, 1, 0, X, width, height, 0);
+    } else {
+        term = connect4_intersect_term(current, 0, 1, X, width, height, 0);
+    }
+
+    // win = term;
+    // draw = and(current, not(win));
+    // lost = ZEROINDEX;
+    lost = term;
+    draw = and(current, not(term));
+    win = ZEROINDEX;
+
+    term_cnt = connect4_satcount(term);
+    win_cnt = connect4_satcount(win);
+    draw_cnt = connect4_satcount(draw);
+    lost_cnt = connect4_satcount(lost);
+
+    printf("%d. BDD(%"PRIu64"): win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", end_ply, bdd_nodecount, win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
+
+    next_win = win;
+    next_draw = draw;
+    next_lost = lost;
+
+    // bdd_per_ply[ply % 2] is board0
+    // bdd_per_ply[ply % 2 + 1] is board1
+    for (int ply = width*height-1; ply >= 0; ply--) {
+        current = bdd_per_ply[ply];
+        cnt = connect4_satcount(current);
+        reset_set(&nodecount_set);
+        bdd_nodecount = _nodecount(current, &nodecount_set);
+
+        if ((ply % 2) == 1) {
+            // current is board1, next_win is board0
+            term = connect4_intersect_term(current, 1, 0, X, width, height, 0);
+            current = connect4_substract_term(current, 1, 0, X, width, height, 0);
+            win = and(current, image(trans1, next_lost, &vars_board0));
+            current = and(current, not(win));
+            draw = and(current, image(trans1, next_draw, &vars_board0));
+            lost = or(and(current, not(draw)), term);
+        } else {
+            // current is board0
+            term = connect4_intersect_term(current, 0, 1, X, width, height, 0);
+            current = connect4_substract_term(current, 0, 1, X, width, height, 0);
+            win = and(current, image(trans0, next_lost, &vars_board1));
+            current = and(current, not(win));
+            draw = and(current, image(trans0, next_draw, &vars_board1));
+            lost = or(and(current, not(draw)), term);
+        }
+
+        term_cnt = connect4_satcount(term);
+        win_cnt = connect4_satcount(win);
+        draw_cnt = connect4_satcount(draw);
+        lost_cnt = connect4_satcount(lost);
+
+        printf("%d. BDD(%"PRIu64"): win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", ply, bdd_nodecount, win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
+
+        assert((win_cnt + draw_cnt + lost_cnt) == cnt);
+
+        next_win = win;
+        next_draw = draw;
+        next_lost = lost;
+    }
+
+
+
+    printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
+    printf("\nFinished in %.3f seconds.\n", total_t);
+
+    // deallocate nodecount set
+    free(nodecount_set.buckets);
+    free(nodecount_set.entries);
+
+    // deallocate variables
+    for (int col = 0; col < width; col++) {
+        free(X[col]);
+    }
+    free(X);
+
+    gc(true, true);
+
+    return total;
+}
+
+#ifndef ENTER_TO_CONTINUE
+#define ENTER_TO_CONTINUE 1
+#endif
+
+/*
+Run with connect4.out log2(tablesize) width height
+Where width x height is the board size.
+Note that 2*(2*width*height + 1) has to be less than 256
+log2(tablesize) is the log2 of the number of nodes that can be allocated.
+i.e. we have 2 << log2(tablesize) allocatable nodes
+*/
+int main(int argc, char const *argv[]) {
+    setbuf(stdout,NULL); // do not buffer stdout
+
+    if (argc != 4) {
+        perror("Wrong number of arguments supplied: connect4.out log2(tablesize) width height\n");
+        return 1;
+    }
+    char * succ;
+    uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
+    uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
+    printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
+
+    uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
+
+    uint64_t bytes = print_RAM_info(log2size);
+
+
+    if (IN_OP_GC) {
+        printf("Performs GC during ops.\n");
+    }
+
+    if (!ALLOW_ROW_ORDER || width >= height) {
+        printf("Column order.\n");
+    } else {
+        printf("Row order.\n");
+    }
+
+    if (COMPRESSED_ENCODING) {
+        printf("Compressed encoding.\n");
+    } else {
+        printf("Default encoding.\n");
+    }
+
+#if ENTER_TO_CONTINUE
+    printf("\nPress enter to continue ...");
+    char enter = 0;
+    while (enter != '\r' && enter != '\n') { enter = (char) getchar(); }
+#endif
+
+    init_all(log2size);
+    
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_REALTIME, &t0);
+
+    uint64_t count = connect4(width, height, log2size);
+    
+    clock_gettime(CLOCK_REALTIME, &t1);
+    double t = get_elapsed_time(t0, t1);
+    double gc_perc = GC_TIME / t * 100;
+    printf("GC time: %.3f seconds (%.2f%%)\n", GC_TIME, gc_perc);
+
+    double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
+    if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
+    printf("GC max fill-level: %.2f %%\n", GC_MAX_FILL_LEVEL*100);
+    printf("GC max number of allocated nodes: %"PRIu64"\n", GC_MAX_NODES_ALLOC);
+
+    free_all();
+
+    return 0;
+}

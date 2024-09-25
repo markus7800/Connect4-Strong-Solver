@@ -50,6 +50,10 @@ COL, ROW, PLAYER, BOARD, var, level
 
 #include "bdd.h"
 
+#ifndef ALLOW_ROW_ORDER
+#define ALLOW_ROW_ORDER 0
+#endif
+
 void initialise_variables(nodeindex_t (**X)[2][2], uint32_t width, uint32_t height) {
     // Second, cells: order column, row, player, board
     if (!ALLOW_ROW_ORDER || width >= height) {
@@ -173,8 +177,9 @@ nodeindex_t connect4_start(nodeindex_t stm0, nodeindex_t (**X)[2][2], uint32_t w
 
 // Subtracts all positions from current which are terminal, i.e. four in a row, column or diagonal
 // Substraction is performed iteratively and also performs GC.
-nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
+nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level, bool substract) {
     nodeindex_t a;
+    nodeindex_t intersection = ZEROINDEX;
     // COLUMN
     if (height >= 4) {
         for (int col = 0; col < width; col++) {
@@ -184,8 +189,13 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
                 for (int i = 0; i < 4; i++) {
                     a = and(a, X[col][row + i][player][board]);
                 }
-                // substract from current
-                current = and(current, not(a));
+                if (substract) {
+                    // substract from current
+                    current = and(current, not(a));
+                } else {
+                    // add to intersection
+                    intersection = or(intersection, and(current, a));
+                }
             }
             if (gc_level == 2) {
                 printf("  COL %d GC: ", col);
@@ -212,8 +222,13 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
                 for (int i = 0; i < 4; i++) {
                     a = and(a, X[col + i][row][player][board]);
                 }
-                // substract from current
-                current = and(current, not(a));
+                if (substract) {
+                    // substract from current
+                    current = and(current, not(a));
+                } else {
+                    // add to intersection
+                    intersection = or(intersection, and(current, a));
+                }
             }
         }
         if (gc_level) {
@@ -233,8 +248,13 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
                 for (int i = 0; i < 4; i++) {
                     a = and(a, X[col + i][row + i][player][board]);
                 }
-                // substract from current
-                current = and(current, not(a));
+                if (substract) {
+                    // substract from current
+                    current = and(current, not(a));
+                } else {
+                    // add to intersection
+                    intersection = or(intersection, and(current, a));
+                }
             }
         }
         if (gc_level) {
@@ -252,8 +272,13 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
                 for (int i = 0; i < 4; i++) {
                     a = and(a, X[col - i][row + i][player][board]);
                 }
-                // substract from current
-                current = and(current, not(a));
+                if (substract) {
+                    // substract from current
+                    current = and(current, not(a));
+                } else {
+                    // add to intersection
+                    intersection = or(intersection, and(current, a));
+                }
             }
         }
         if (gc_level) {
@@ -264,5 +289,16 @@ nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, 
         }
     }
 
-    return current;
+    if (substract) {
+        return current;
+    } else {
+        return intersection;
+    }
+}
+
+inline nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
+    return connect4_substract_or_intersect_term(current, board, player, X, width, height, gc_level, true);
+}
+inline nodeindex_t connect4_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
+    return connect4_substract_or_intersect_term(current, board, player, X, width, height, gc_level, false);
 }
