@@ -73,6 +73,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Phiu, first GC run.
     printf("  INIT GC: ");
     gc(true, true);
+    uint64_t num_nodes_pre_comp = uniquetable.count;
 
     // We reuse the set to count the number of nodes in a BDD
     uniquetable_t nodecount_set;
@@ -95,7 +96,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     nodeindex_t* bdd_per_ply = (nodeindex_t*) malloc((width*height+1)*sizeof(nodeindex_t));
     assert(bdd_per_ply != NULL);
-    keepalive(get_node(current));
+    keepalive_ix(current);
     bdd_per_ply[0] = current;
 
 
@@ -105,7 +106,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         clock_gettime(CLOCK_REALTIME, &t0);
 
         // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
-        gc_level = 0; //(d >= 10) + (d >= 25);
+        gc_level = (ply >= 10) + (ply >= 25);
         if (gc_level) printf("\n");
 
         // first substract all terminal positions and then perform image operatoin
@@ -124,14 +125,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             current = image(current, trans1, &vars_board1);
             // current is now board0
         }
-        keepalive(get_node(current));
+        keepalive_ix(current);
         bdd_per_ply[ply] = current;
 
         if (gc_level) {
             printf("  IMAGE GC: ");
-            keepalive(get_node(current));
             gc(true, true);
-            undo_keepalive(get_node(current));
         }
 
         // count the number of positions at ply
@@ -153,9 +152,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
            
     } 
 
+    printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
+
     nodeindex_t win, draw, lost, term;
 
-    nodeindex_t next_win = ZEROINDEX, next_draw = ZEROINDEX, next_lost = ZEROINDEX;
+    nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
 
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
 
@@ -163,13 +164,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t trans;
     variable_set_t* vars_board;
 
+    printf("\n\nRetrograde analysis:\n\n");
+
     // bdd_per_ply[ply % 2] is board0
     // bdd_per_ply[ply % 2 + 1] is board1
     for (int ply = width*height; ply >= 0; ply--) {
+        printf("Ply %d/%d:", ply, width*height);
+        gc_level = 1; //(ply >= 10) + (ply >= 25);
+
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
-        reset_set(&nodecount_set);
-        bdd_nodecount = _nodecount(current, &nodecount_set);
 
         if ((ply % 2) == 1) {
             // current is board1
@@ -185,10 +189,18 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             trans = trans0;
         }
 
+        // keepalive_ix(next_draw); keepalive_ix(next_lost);
+
         term = connect4_intersect_term(current, board, player, X, width, height, 0);
+        term_cnt = connect4_satcount(term);
+        // keepalive_ix(term);
         current = connect4_substract_term(current, board, player, X, width, height, 0);
+
         win = and(current, image(trans, next_lost, vars_board));
+        // undo_keepalive_ix(next_lost);
         current = and(current, not(win));
+        win_cnt = connect4_satcount(win);
+
         if (ply == width*height) {
             draw = current;
         } else {
@@ -196,26 +208,40 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             // and there are no moves oven when no post-condition is placed (next_draw=ONE_INDEX)
             draw = and(current, image(trans, next_draw, vars_board));
         }
-        lost = or(and(current, not(draw)), term);
-
-        term_cnt = connect4_satcount(term);
-        win_cnt = connect4_satcount(win);
         draw_cnt = connect4_satcount(draw);
-        lost_cnt = connect4_satcount(lost);
+        // undo_keepalive_ix(next_draw);
 
-        printf("%d. BDD(%"PRIu64"): win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", ply, bdd_nodecount, win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
+        lost = or(and(current, not(draw)), term);
+        lost_cnt = connect4_satcount(lost);
+        // undo_keepalive_ix(term);
+
+
+        printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
 
         assert((win_cnt + draw_cnt + lost_cnt) == cnt);
 
-        next_win = win;
         next_draw = draw;
         next_lost = lost;
+
+        undo_keepalive_ix(bdd_per_ply[ply]);
+
+        if (gc_level) {
+            keepalive_ix(next_draw); keepalive_ix(next_lost);
+            printf("  PLY GC: ");
+            gc(true, true);
+            undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
+        }
+
     }
 
-
-
-    printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
-    printf("\nFinished in %.3f seconds.\n", total_t);
+    printf("DEINIT GC: ");
+    gc(true, true);
+    uint64_t num_nodes_post_comp = uniquetable.count;
+    if (num_nodes_post_comp != num_nodes_pre_comp) {
+        prinf("Potential memory leak: num_nodes_pre_comp=%"PRIu64" vs num_nodes_pre_comp=%"PRIu64"\n", num_nodes_post_comp, num_nodes_pre_comp);
+    } else {
+        printf("No memory leak detected :)\n");
+    }
 
     // deallocate nodecount set
     free(nodecount_set.buckets);
@@ -226,8 +252,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         free(X[col]);
     }
     free(X);
-
-    gc(true, true);
 
     return total;
 }
@@ -292,6 +316,9 @@ int main(int argc, char const *argv[]) {
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
     double gc_perc = GC_TIME / t * 100;
+    
+    printf("\nFinished in %.3f seconds.\n", t);
+
     printf("GC time: %.3f seconds (%.2f%%)\n", GC_TIME, gc_perc);
 
     double fill_level = (double) memorypool.num_nodes / memorypool.capacity;

@@ -168,12 +168,19 @@ void disable_node_rec(bddnode_t* node) {
     }
 }
 // increment parent count which does not come from real parent to keep alive
-void keepalive(bddnode_t* node) {
+inline void keepalive(bddnode_t* node) {
     node->parentcount++;
 }
-void undo_keepalive(bddnode_t* node) {
+inline void undo_keepalive(bddnode_t* node) {
     node->parentcount--;
 }
+inline void keepalive_ix(nodeindex_t ix) {
+    keepalive(get_node(ix));
+}
+inline void undo_keepalive_ix(nodeindex_t ix) {
+    undo_keepalive(get_node(ix));
+}
+
 
 
 double get_elapsed_time(struct timespec t0, struct timespec t1) {

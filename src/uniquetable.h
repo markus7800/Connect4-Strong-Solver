@@ -74,8 +74,10 @@ void disable_node_rec(bddnode_t* node);
 
 // artificially increments the parent count of the node
 // to prevent it from getting deallocated when calling gc
-void keepalive(bddnode_t* node);
-void undo_keepalive(bddnode_t* node);
+extern void keepalive(bddnode_t* node);
+extern void undo_keepalive(bddnode_t* node);
+extern  void keepalive_ix(nodeindex_t ix);
+extern void undo_keepalive_ix(nodeindex_t ix);
 
 // Perform garbage collection.
 // By default gc is only performed if the unique table is filled more than 50%.
