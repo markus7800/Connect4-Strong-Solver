@@ -153,76 +153,50 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
            
     } 
 
-    nodeindex_t win = ZEROINDEX;
-    nodeindex_t draw = ZEROINDEX;
-    nodeindex_t lost = ZEROINDEX;
+    nodeindex_t win, draw, lost, term;
 
-    nodeindex_t next_win = ZEROINDEX;
-    nodeindex_t next_draw = ZEROINDEX;
-    nodeindex_t next_lost = ZEROINDEX;
+    nodeindex_t next_win = ZEROINDEX, next_draw = ZEROINDEX, next_lost = ZEROINDEX;
 
-    uint64_t term_cnt;
-    uint64_t win_cnt;
-    uint64_t draw_cnt;
-    uint64_t lost_cnt;
+    uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
 
-    nodeindex_t term;
-    nodeindex_t win_pre_image;
-
-    int end_ply = width*height;
-    current = bdd_per_ply[end_ply];
-    cnt = connect4_satcount(current);
-    reset_set(&nodecount_set);
-    bdd_nodecount = _nodecount(current, &nodecount_set);
-    if ((end_ply % 2) == 1) {
-        term = connect4_intersect_term(current, 1, 0, X, width, height, 0);
-    } else {
-        term = connect4_intersect_term(current, 0, 1, X, width, height, 0);
-    }
-
-    // win = term;
-    // draw = and(current, not(win));
-    // lost = ZEROINDEX;
-    lost = term;
-    draw = and(current, not(term));
-    win = ZEROINDEX;
-
-    term_cnt = connect4_satcount(term);
-    win_cnt = connect4_satcount(win);
-    draw_cnt = connect4_satcount(draw);
-    lost_cnt = connect4_satcount(lost);
-
-    printf("%d. BDD(%"PRIu64"): win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", end_ply, bdd_nodecount, win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
-
-    next_win = win;
-    next_draw = draw;
-    next_lost = lost;
+    int board, player;
+    nodeindex_t trans;
+    variable_set_t* vars_board;
 
     // bdd_per_ply[ply % 2] is board0
     // bdd_per_ply[ply % 2 + 1] is board1
-    for (int ply = width*height-1; ply >= 0; ply--) {
+    for (int ply = width*height; ply >= 0; ply--) {
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
         reset_set(&nodecount_set);
         bdd_nodecount = _nodecount(current, &nodecount_set);
 
         if ((ply % 2) == 1) {
-            // current is board1, next_win is board0
-            term = connect4_intersect_term(current, 1, 0, X, width, height, 0);
-            current = connect4_substract_term(current, 1, 0, X, width, height, 0);
-            win = and(current, image(trans1, next_lost, &vars_board0));
-            current = and(current, not(win));
-            draw = and(current, image(trans1, next_draw, &vars_board0));
-            lost = or(and(current, not(draw)), term);
+            // current is board1
+            board = 1;
+            player = 0;
+            vars_board = &vars_board0;
+            trans = trans1;
         } else {
             // current is board0
-            term = connect4_intersect_term(current, 0, 1, X, width, height, 0);
-            current = connect4_substract_term(current, 0, 1, X, width, height, 0);
-            win = and(current, image(trans0, next_lost, &vars_board1));
-            current = and(current, not(win));
-            draw = and(current, image(trans0, next_draw, &vars_board1));
-            lost = or(and(current, not(draw)), term);
+            board = 0;
+            player = 1;
+            vars_board = &vars_board1;
+            trans = trans0;
         }
+
+        term = connect4_intersect_term(current, board, player, X, width, height, 0);
+        current = connect4_substract_term(current, board, player, X, width, height, 0);
+        win = and(current, image(trans, next_lost, vars_board));
+        current = and(current, not(win));
+        if (ply == width*height) {
+            draw = current;
+        } else {
+            // if ply == width*height then board is full
+            // and there are no moves oven when no post-condition is placed (next_draw=ONE_INDEX)
+            draw = and(current, image(trans, next_draw, vars_board));
+        }
+        lost = or(and(current, not(draw)), term);
 
         term_cnt = connect4_satcount(term);
         win_cnt = connect4_satcount(win);
