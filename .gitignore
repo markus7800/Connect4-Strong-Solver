@@ -2,3 +2,5 @@
 *.txt
 .vscode/
 lambda_dump
+*.bin
+*.DS_Store
