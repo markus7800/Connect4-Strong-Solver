@@ -7,6 +7,8 @@
 #include "node.h"
 #include "ops.h"
 #include "uniquetable.h"
+#include "save.h"
+#include "nodeindexmap.h"
 
 #include <stdio.h>
 #include <time.h>

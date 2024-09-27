@@ -77,6 +77,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Phiu, first GC run.
     printf("  INIT GC: ");
     gc(true, true);
+    uint64_t num_nodes_pre_comp = uniquetable.count;
 
     // We reuse the set to count the number of nodes in a BDD
     uniquetable_t nodecount_set;
@@ -214,11 +215,31 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         fflush(f);
     }
 #endif
+    _safe_to_file(full_bdd, "full_bdd.bin", &nodecount_set);
+    gc(true, true);
+
+    nodeindexmap_t map;
+    init_map(&map, log2size-1);
+    nodeindex_t bddfull_from_file = _read_from_file("full_bdd.bin", &map);
+
+    reset_set(&nodecount_set);
+    bdd_nodecount = _nodecount(bddfull_from_file, &nodecount_set);
+    cnt = connect4_satcount(bddfull_from_file);
+    printf("\nRead from file: FullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
 #endif
 
 
     printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
     printf("\nFinished in %.3f seconds.\n", total_t);
+
+    printf("DEINIT GC: ");
+    gc(true, true);
+    uint64_t num_nodes_post_comp = uniquetable.count;
+    if (num_nodes_post_comp != num_nodes_pre_comp) {
+        printf("Potential memory leak: num_nodes_pre_comp=%"PRIu64" vs num_nodes_pre_comp=%"PRIu64"\n", num_nodes_post_comp, num_nodes_pre_comp);
+    } else {
+        printf("No memory leak detected.\n");
+    }
 
     // deallocate nodecount set
     free(nodecount_set.buckets);

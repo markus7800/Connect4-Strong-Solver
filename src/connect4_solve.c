@@ -269,7 +269,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     if (num_nodes_post_comp != num_nodes_pre_comp) {
         printf("Potential memory leak: num_nodes_pre_comp=%"PRIu64" vs num_nodes_pre_comp=%"PRIu64"\n", num_nodes_post_comp, num_nodes_pre_comp);
     } else {
-        printf("No memory leak detected :)\n");
+        printf("No memory leak detected.\n");
     }
 
     // deallocate nodecount set

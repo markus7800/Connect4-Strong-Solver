@@ -9,6 +9,8 @@ COMPRESSED_ENCODING = 0 # use compressed Connect4 encoding?
 
 CFLAGS = -O3 -flto -Wall -O3
 
+BDDFILES = caches.c counts.c memorypool.c node.c ops.c uniquetable.c save.c nodeindexmap.c
+
 C4FLAGS = \
 -DFULLBDD=$(FULLBDD) \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE) \
@@ -21,13 +23,13 @@ QFLAGS = \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE)
 
 connect4:
-	$(CC) connect4.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(C4FLAGS) -o connect4.out
+	$(CC) connect4.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4.out
 
 connect4-solve:
-	$(CC) connect4_solve.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(C4FLAGS) -o connect4.out
+	$(CC) connect4_solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4.out
 
 queens:
-	$(CC) queens.c caches.c counts.c memorypool.c node.c ops.c uniquetable.c $(CFLAGS) $(QFLAGS) -o queens.out
+	$(CC) queens.c $(BDDFILES) $(CFLAGS) $(QFLAGS) -o queens.out
 
 clean:
 	rm connect4.out
