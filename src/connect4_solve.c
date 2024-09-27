@@ -82,6 +82,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t total = 0;
     uint64_t bdd_nodecount;
 
+    printf("\n\nReachable states computation:\n\n");
+    
     // PLY 0:
     nodeindex_t current = connect4_start(stm0, X, width, height);
     uint64_t cnt = connect4_satcount(current);
@@ -154,6 +156,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
 
+    printf("\nFinished computing reachable states in %.3f seconds.\n", total_t);
+
     nodeindex_t win, draw, lost, term;
 
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
@@ -161,7 +165,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
 
     int board, player;
-    nodeindex_t trans;
+    nodeindex_t trans, win_pre_img;
     variable_set_t* vars_board;
 
     printf("\n\nRetrograde analysis:\n\n");
@@ -170,7 +174,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // bdd_per_ply[ply % 2 + 1] is board1
     for (int ply = width*height; ply >= 0; ply--) {
         printf("Ply %d/%d:", ply, width*height);
-        gc_level = 1; //(ply >= 10) + (ply >= 25);
+        gc_level = (ply >= 10) + (ply >= 25);
+        if (gc_level) printf("\n");
 
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
@@ -189,17 +194,38 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             trans = trans0;
         }
 
-        // keepalive_ix(next_draw); keepalive_ix(next_lost);
-
-        term = connect4_intersect_term(current, board, player, X, width, height, 0);
+        keepalive_ix(next_draw); keepalive_ix(next_lost);
+        term = connect4_intersect_term(current, board, player, X, width, height, gc_level);
         term_cnt = connect4_satcount(term);
-        // keepalive_ix(term);
-        current = connect4_substract_term(current, board, player, X, width, height, 0);
+        undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
 
-        win = and(current, image(trans, next_lost, vars_board));
-        // undo_keepalive_ix(next_lost);
-        current = and(current, not(win));
+        keepalive_ix(next_draw); keepalive_ix(next_lost); keepalive_ix(term);
+        current = connect4_substract_term(current, board, player, X, width, height, gc_level);
+        undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost); undo_keepalive_ix(term);
+
+        win_pre_img = image(trans, next_lost, vars_board);
+        if (gc_level) {
+            keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current); keepalive_ix(win_pre_img);
+            printf("  WIN 1 GC: "); gc(true, true);
+            undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(win_pre_img);
+        }
+    
+        win = and(current, win_pre_img);
         win_cnt = connect4_satcount(win);
+        if (gc_level) {
+            keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current); keepalive_ix(win);
+            printf("  WIN 2 GC: "); gc(true, true);
+            undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(win);
+        }
+
+
+        current = and(current, not(win));
+
+        if (gc_level) {
+            keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current);
+            printf("  WIN 3 GC: "); gc(true, true);
+            undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current);
+        }
 
         if (ply == width*height) {
             draw = current;
@@ -209,16 +235,17 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             draw = and(current, image(trans, next_draw, vars_board));
         }
         draw_cnt = connect4_satcount(draw);
-        // undo_keepalive_ix(next_draw);
+
+
+        if (gc_level) {
+            keepalive_ix(draw); keepalive_ix(term); keepalive_ix(current);
+            printf("  DRAW GC: "); gc(true, true);
+            undo_keepalive_ix(draw); undo_keepalive_ix(term); undo_keepalive_ix(current);
+        }
 
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
-        // undo_keepalive_ix(term);
 
-
-        printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
-
-        assert((win_cnt + draw_cnt + lost_cnt) == cnt);
 
         next_draw = draw;
         next_lost = lost;
@@ -227,10 +254,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         if (gc_level) {
             keepalive_ix(next_draw); keepalive_ix(next_lost);
-            printf("  PLY GC: ");
-            gc(true, true);
+            printf("  PLY GC: "); gc(true, true);
             undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
         }
+        
+        assert((win_cnt + draw_cnt + lost_cnt) == cnt);
+        printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
 
     }
 
@@ -238,7 +267,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     gc(true, true);
     uint64_t num_nodes_post_comp = uniquetable.count;
     if (num_nodes_post_comp != num_nodes_pre_comp) {
-        prinf("Potential memory leak: num_nodes_pre_comp=%"PRIu64" vs num_nodes_pre_comp=%"PRIu64"\n", num_nodes_post_comp, num_nodes_pre_comp);
+        printf("Potential memory leak: num_nodes_pre_comp=%"PRIu64" vs num_nodes_pre_comp=%"PRIu64"\n", num_nodes_post_comp, num_nodes_pre_comp);
     } else {
         printf("No memory leak detected :)\n");
     }

@@ -199,17 +199,17 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
             }
             if (gc_level == 2) {
                 printf("  COL %d GC: ", col);
-                keepalive(get_node(current));
+                keepalive_ix(current); keepalive_ix(intersection);
                 gc(true, true);
-                undo_keepalive(get_node(current));
+                undo_keepalive_ix(current); undo_keepalive_ix(intersection);
             }
         }
         if (gc_level == 1) {
             // if we need to be even more aggressive with GC, we could move this in the loop
             printf("  COL %"PRIu32" GC: ", width);
-            keepalive(get_node(current));
+            keepalive_ix(current); keepalive_ix(intersection);
             gc(true, true);
-            undo_keepalive(get_node(current));
+            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
         }
     }
 
@@ -233,9 +233,9 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
         }
         if (gc_level) {
             printf("  ROW %"PRIu32" GC: ", height);
-            keepalive(get_node(current));
+            keepalive_ix(current); keepalive_ix(intersection);
             gc(true, true);
-            undo_keepalive(get_node(current));
+            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
         }
     }
 
@@ -259,9 +259,9 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
         }
         if (gc_level) {
             printf("  DIAG1 GC: ");
-            keepalive(get_node(current));
+            keepalive_ix(current); keepalive_ix(intersection);
             gc(true, true);
-            undo_keepalive(get_node(current));
+            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
         }
 
         // DIAG descending
@@ -283,9 +283,9 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
         }
         if (gc_level) {
             printf("  DIAG2 GC: ");
-            keepalive(get_node(current));
+            keepalive_ix(current); keepalive_ix(intersection);
             gc(true, true);
-            undo_keepalive(get_node(current));
+            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
         }
     }
 
