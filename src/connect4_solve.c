@@ -16,7 +16,7 @@
 #endif
 
 #ifndef COMPRESSED_ENCODING
-#define COMPRESSED_ENCODING 0
+#define COMPRESSED_ENCODING 1
 #endif
 
 #if COMPRESSED_ENCODING
@@ -163,6 +163,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     printf("\nFinished computing reachable states in %.3f seconds.\n", total_t);
 
+    printf("\n\nRetrograde analysis:\n\n");
+
+    nodeindexmap_t map;
+    init_map(&map, log2size-1);
+    variable_t board_varmap[256];
+    board_varmap[0] = 0; board_varmap[1] = 1;
+    for (size_t v = 2; v <= 255; v++) {
+        board_varmap[v] = (v + 1) / 2;
+    }
+
     nodeindex_t win, draw, lost, term;
 
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
@@ -173,14 +183,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t trans, win_pre_img;
     variable_set_t* vars_board;
 
-    printf("\n\nRetrograde analysis:\n\n");
 
     // bdd_per_ply[ply % 2] is board0
     // bdd_per_ply[ply % 2 + 1] is board1
     for (int ply = width*height; ply >= 0; ply--) {
-        printf("Ply %d/%d:", ply, width*height);
+        printf("Ply %d/%d:\n", ply, width*height);
         gc_level = (ply >= 10) + (ply >= 25);
-        if (gc_level) printf("\n");
+        // if (gc_level) printf("\n");
 
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
@@ -220,7 +229,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_win.bin", width, height, ply);
-        _safe_to_file(win, filename, &nodecount_set);
+        _safe_to_file_with_varmap(win, filename, &map, board_varmap);
 #endif
 
         if (gc_level) {
@@ -247,7 +256,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         draw_cnt = connect4_satcount(draw);
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.bin", width, height, ply);
-        _safe_to_file(draw, filename, &nodecount_set);
+        _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
 #endif
 
         if (gc_level) {
@@ -260,7 +269,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         lost_cnt = connect4_satcount(lost);
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.bin", width, height, ply);
-        _safe_to_file(lost, filename, &nodecount_set);
+        _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
 #endif
 
         next_draw = draw;
@@ -326,7 +335,7 @@ int main(int argc, char const *argv[]) {
 
     uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
 
-    uint64_t bytes = print_RAM_info(log2size);
+    print_RAM_info(log2size);
 
 
     if (IN_OP_GC) {
@@ -356,7 +365,7 @@ int main(int argc, char const *argv[]) {
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
 
-    uint64_t count = connect4(width, height, log2size);
+    connect4(width, height, log2size);
     
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);

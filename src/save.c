@@ -18,7 +18,7 @@ uint64_t _collect_nodes_into_map(nodeindex_t ix, nodeindexmap_t* map) {
     }
 }
 
-void _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
+void _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t* map, variable_t varmap[256]) {
     FILE* f = fopen(filename, "wb"); // write binary file
     if (f == NULL) {
         assert(0);
@@ -26,24 +26,29 @@ void _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
 
     // children come before parent, root last
     reset_map(map);
-    add_key_value(map, ZEROINDEX, ZEROINDEX);
-    add_key_value(map, ONEINDEX, ONEINDEX);
+    if (root != ONEINDEX)
+        add_key_value(map, ZEROINDEX, ZEROINDEX);
+    if (root != ZEROINDEX)
+        add_key_value(map, ONEINDEX, ONEINDEX);
     _collect_nodes_into_map(root, map);
+
 
     nodeindexmap_entry_t entry;
     bddnode_t* node;
     nodeindex_t low, high;
+    variable_t var;
     unsigned char buffer[9];
     for (uint64_t i = 0; i < map->count; i++) {
         entry = map->entries[i];
         node = get_node(entry.key); // get for key
         assert(entry.value == i);
+        var = varmap[node->var];
         low = get_value_for_key(map, node->low);
         high = get_value_for_key(map, node->high);
         // we mapped nodeindex such that it correspond to the position in entries
         // thus the nodes are in order of their index and we do not need to store the nodeindex anymore
         // memcpy(&buffer[0], &entry.value, 4);
-        memcpy(&buffer[0], &node->var, 1);
+        memcpy(&buffer[0], &var, 1);
         memcpy(&buffer[1], &low, 4);
         memcpy(&buffer[5], &high, 4);
         fwrite(buffer, sizeof(buffer), 1, f);
@@ -51,6 +56,13 @@ void _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
     }
     fclose(f);
     printf("  Wrote %"PRIu64" nodes to file %s.\n", map->count, filename);
+}
+void _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
+    variable_t varmap[256];
+    for (size_t v = 0; v <= 255; v++) {
+        varmap[v] = v;
+    }
+    _safe_to_file_with_varmap(root, filename, map, varmap);
 }
 
 
