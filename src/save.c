@@ -26,6 +26,7 @@ void _safe_to_file(nodeindex_t root, char* filename, uniquetable_t* set) {
         // printf("Write %"PRIu32" %"PRIu32" %"PRIu32" %"PRIu32"\n", entry.value, node->var, node->low, node->high);
     }
     fclose(f);
+    printf("  Wrote %"PRIu64" nodes to file %s.\n", set->count, filename);
 }
 
 

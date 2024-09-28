@@ -25,6 +25,10 @@
 #include "connect4_default_encoding.c"
 #endif
 
+#ifndef SAVE_BDD_TO_DISK
+#define SAVE_BDD_TO_DISK 1
+#endif
+
 
 uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Create all variables
@@ -95,6 +99,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     struct timespec t0, t1;
     double t;
     double total_t = 0;
+    char filename[50];
 
     nodeindex_t* bdd_per_ply = (nodeindex_t*) malloc((width*height+1)*sizeof(nodeindex_t));
     assert(bdd_per_ply != NULL);
@@ -212,12 +217,17 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     
         win = and(current, win_pre_img);
         win_cnt = connect4_satcount(win);
+
+#if SAVE_BDD_TO_DISK
+        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_win.bin", width, height, ply);
+        _safe_to_file(win, filename, &nodecount_set);
+#endif
+
         if (gc_level) {
             keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current); keepalive_ix(win);
             printf("  WIN 2 GC: "); gc(true, true);
             undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(win);
         }
-
 
         current = and(current, not(win));
 
@@ -235,7 +245,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             draw = and(current, image(trans, next_draw, vars_board));
         }
         draw_cnt = connect4_satcount(draw);
-
+#if SAVE_BDD_TO_DISK
+        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.bin", width, height, ply);
+        _safe_to_file(draw, filename, &nodecount_set);
+#endif
 
         if (gc_level) {
             keepalive_ix(draw); keepalive_ix(term); keepalive_ix(current);
@@ -245,7 +258,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
-
+#if SAVE_BDD_TO_DISK
+        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.bin", width, height, ply);
+        _safe_to_file(lost, filename, &nodecount_set);
+#endif
 
         next_draw = draw;
         next_lost = lost;

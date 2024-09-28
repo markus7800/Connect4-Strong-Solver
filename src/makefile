@@ -26,7 +26,7 @@ connect4:
 	$(CC) connect4.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4.out
 
 connect4-solve:
-	$(CC) connect4_solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4.out
+	$(CC) connect4_solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4_solve.out
 
 queens:
 	$(CC) queens.c $(BDDFILES) $(CFLAGS) $(QFLAGS) -o queens.out
