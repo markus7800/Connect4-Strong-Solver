@@ -26,8 +26,7 @@ void _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t*
 
     // children come before parent, root last
     reset_map(map);
-    if (root != ONEINDEX)
-        add_key_value(map, ZEROINDEX, ZEROINDEX);
+    add_key_value(map, ZEROINDEX, ZEROINDEX);
     if (root != ZEROINDEX)
         add_key_value(map, ONEINDEX, ONEINDEX);
     _collect_nodes_into_map(root, map);
