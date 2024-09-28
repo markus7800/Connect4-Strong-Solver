@@ -26,11 +26,11 @@ typedef struct NodeIndexMap {
 } nodeindexmap_t;
 
 uint32_t hash_32(uint32_t a);
-
 void add_key_value(nodeindexmap_t* map, nodeindex_t key, nodeindex_t value);
-
+bool has_key(nodeindexmap_t* set, nodeindex_t key);
 nodeindex_t get_value_for_key(nodeindexmap_t* map, nodeindex_t key);
 
 void init_map(nodeindexmap_t* map, uint64_t log2size);
+void reset_map(nodeindexmap_t* map);
 
 #endif

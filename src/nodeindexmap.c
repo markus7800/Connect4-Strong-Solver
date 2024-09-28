@@ -27,6 +27,22 @@ void add_key_value(nodeindexmap_t* map, nodeindex_t key, nodeindex_t value) {
     map->buckets[target_bucket_ix] = i;
 }
 
+bool has_key(nodeindexmap_t* set, nodeindex_t key) {
+    uint32_t target_bucket_ix = hash_32(key) & set->mask;
+    bucket_t b = set->buckets[target_bucket_ix];
+    nodeindexmap_entry_t entry;
+
+    // try to find existing node
+    while (b != (bucket_t) -1) {
+        entry = set->entries[b];
+        if (key == entry.key) {
+            return true;
+        }
+        b = entry.next;
+    }
+    return false;
+}
+
 nodeindex_t get_value_for_key(nodeindexmap_t* set, nodeindex_t key) {
     uint32_t target_bucket_ix = hash_32(key) & set->mask;
     bucket_t b = set->buckets[target_bucket_ix];
@@ -59,7 +75,17 @@ void init_map(nodeindexmap_t* map, uint64_t log2size) {
     for (uint64_t i = 0; i < size; i++) {
         map->buckets[i] = (bucket_t) -1;
         map->entries[i].next = 0;
-        map->entries[i].value = 0;
-        map->entries[i].key = 0;
+        map->entries[i].value = (nodeindex_t) -1;
+        map->entries[i].key = (nodeindex_t) -1;
     }
+}
+
+void reset_map(nodeindexmap_t* map) {
+    for (uint64_t i = 0; i < map->size; i++) {
+        map->buckets[i] = (bucket_t) -1;
+        map->entries[i].next = 0;
+        map->entries[i].value = (nodeindex_t) -1;
+        map->entries[i].key = (nodeindex_t) -1;
+    }
+    map->count = 0;
 }

@@ -215,17 +215,17 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         fflush(f);
     }
 #endif
-    // _safe_to_file(full_bdd, "full_bdd.bin", &nodecount_set);
-    // gc(true, true);
+    nodeindexmap_t map;
+    init_map(&map, log2size-1);
+    _safe_to_file(full_bdd, "full_bdd.bin", &map);
+    gc(true, true);
 
-    // nodeindexmap_t map;
-    // init_map(&map, log2size-1);
-    // nodeindex_t bddfull_from_file = _read_from_file("full_bdd.bin", &map);
+    nodeindex_t bddfull_from_file = _read_from_file("full_bdd.bin", &map);
 
-    // reset_set(&nodecount_set);
-    // bdd_nodecount = _nodecount(bddfull_from_file, &nodecount_set);
-    // cnt = connect4_satcount(bddfull_from_file);
-    // printf("\nRead from file: FullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
+    reset_set(&nodecount_set);
+    bdd_nodecount = _nodecount(bddfull_from_file, &nodecount_set);
+    cnt = connect4_satcount(bddfull_from_file);
+    printf("\nRead from file: FullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
 #endif
 
 

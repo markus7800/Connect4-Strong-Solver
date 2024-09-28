@@ -35,16 +35,13 @@ uint64_t _nodecount(nodeindex_t ix, uniquetable_t* set) {
     if (has_nodeindex(set, ix)) {
         return 0;
     }
+    add_nodeindex(set, ix);
+
     bddnode_t* u = get_node(ix);
     if (isconstant(u)) {
-        add_nodeindex(set, ix);
         return 1;
-    } else {
-        // children before node
-        uint64_t cnt = 1 + _nodecount(u->low, set) + _nodecount(u->high, set);
-        add_nodeindex(set, ix);
-        return cnt;
     }
+    return 1 + _nodecount(u->low, set) + _nodecount(u->high, set);
 }
 
 uint64_t nodecount(nodeindex_t ix, uint64_t log2size) {

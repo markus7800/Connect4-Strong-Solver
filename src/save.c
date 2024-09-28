@@ -2,31 +2,55 @@
 #include <stdio.h>
 #include <string.h> // memcpy
 
-void _safe_to_file(nodeindex_t root, char* filename, uniquetable_t* set) {
+uint64_t _collect_nodes_into_map(nodeindex_t ix, nodeindexmap_t* map) {
+    if (has_key(map, ix)) {
+        return 0;
+    }
+    bddnode_t* u = get_node(ix);
+    if (isconstant(u)) {
+        add_key_value(map, ix, (nodeindex_t) map->count);
+        return 1;
+    } else {
+        // children before node
+        uint64_t cnt = 1 + _collect_nodes_into_map(u->low, map) + _collect_nodes_into_map(u->high, map);
+        add_key_value(map, ix, (nodeindex_t) map->count);
+        return cnt;
+    }
+}
+
+void _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
     FILE* f = fopen(filename, "wb"); // write binary file
     if (f == NULL) {
         assert(0);
     }
 
     // children come before parent, root last
-    reset_set(set);
-    _nodecount(root, set);
+    reset_map(map);
+    add_key_value(map, ZEROINDEX, ZEROINDEX);
+    add_key_value(map, ONEINDEX, ONEINDEX);
+    _collect_nodes_into_map(root, map);
 
-    uniquetable_entry_t entry;
+    nodeindexmap_entry_t entry;
     bddnode_t* node;
-    unsigned char buffer[13];
-    for (uint64_t i = 0; i < set->count; i++) {
-        entry = set->entries[i];
-        node = get_node(entry.value);
-        memcpy(&buffer[0], &entry.value, 4);
-        memcpy(&buffer[4], &node->var, 1);
-        memcpy(&buffer[5], &node->low, 4);
-        memcpy(&buffer[9], &node->high, 4);
+    nodeindex_t low, high;
+    unsigned char buffer[9];
+    for (uint64_t i = 0; i < map->count; i++) {
+        entry = map->entries[i];
+        node = get_node(entry.key); // get for key
+        assert(entry.value == i);
+        low = get_value_for_key(map, node->low);
+        high = get_value_for_key(map, node->high);
+        // we mapped nodeindex such that it correspond to the position in entries
+        // thus the nodes are in order of their index and we do not need to store the nodeindex anymore
+        // memcpy(&buffer[0], &entry.value, 4);
+        memcpy(&buffer[0], &node->var, 1);
+        memcpy(&buffer[1], &low, 4);
+        memcpy(&buffer[5], &high, 4);
         fwrite(buffer, sizeof(buffer), 1, f);
         // printf("Write %"PRIu32" %"PRIu32" %"PRIu32" %"PRIu32"\n", entry.value, node->var, node->low, node->high);
     }
     fclose(f);
-    printf("  Wrote %"PRIu64" nodes to file %s.\n", set->count, filename);
+    printf("  Wrote %"PRIu64" nodes to file %s.\n", map->count, filename);
 }
 
 
@@ -36,25 +60,29 @@ nodeindex_t _read_from_file(char* filename, nodeindexmap_t* map) {
         assert(0);
     }
 
+    reset_map(map);
     add_key_value(map, ZEROINDEX, ZEROINDEX);
     add_key_value(map, ONEINDEX, ONEINDEX);
 
-    unsigned char buffer[13];
+    unsigned char buffer[9];
     nodeindex_t src_ix, dst_ix;
 
     nodeindex_t low, high;
     variable_t var;
 
+    // nodes are in order of their index
+    src_ix = 0;
     while (fread(buffer, sizeof(buffer), 1, f) == 1) {
-        memcpy(&src_ix, &buffer[0], 4);
-        memcpy(&var, &buffer[4], 1);
-        memcpy(&low, &buffer[5], 4);
-        memcpy(&high, &buffer[9], 4);
+        memcpy(&var, &buffer[0], 1);
+        memcpy(&low, &buffer[1], 4);
+        memcpy(&high, &buffer[5], 4);
         // printf("Read %"PRIu32" %"PRIu32" %"PRIu32" %"PRIu32"\n", src_ix, var, low, high);
 
         dst_ix = make(var, get_value_for_key(map, low), get_value_for_key(map, high));
         add_key_value(map, src_ix, dst_ix);
         // printf("Map %"PRIu32" -> %"PRIu32"\n", src_ix, dst_ix);
+
+        src_ix++;
     }
     return dst_ix;
 }
