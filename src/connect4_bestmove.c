@@ -1,5 +1,12 @@
 #include "bdd.h"
-#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h> // close
+#include <fcntl.h> // open
+#include <sys/mman.h> // mmap
+#include <sys/stat.h> // file size
+#include <string.h> // memcpy
+
 
 #ifndef COMPRESSED_ENCODING
 #define COMPRESSED_ENCODING 1
@@ -8,7 +15,6 @@
 #ifndef ALLOW_ROW_ORDER
 #define ALLOW_ROW_ORDER 0
 #endif
-
 
 void read_all_bdd_binaries(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t bdd;
@@ -225,8 +231,6 @@ int probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint64
         }
     }
 
-
-    // printf("Ply %d:\n", ply);
     for (int i = 0; i < 3; i++) {
         if (i==0) {
             suffix = "lost";
@@ -242,14 +246,102 @@ int probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint64
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
         bdd = _read_from_file(filename, &map);
 
-        // reset_set(&nodecount_set);
-        // bdd_nodecount = _nodecount(bdd, &nodecount_set);
-        // sat_cnt = satcount(bdd);
-        // printf("  Read from file %s: BDD(%"PRIu64") with satcount = %"PRIu64"\n", filename, bdd_nodecount, sat_cnt);
         *sat_ptr = is_sat(bdd, bitvector);
     }
-    // printf("win=%d draw=%d lost=%d\n", win_sat, draw_sat, lost_sat);
     assert((win_sat + draw_sat + lost_sat) == 1);
+
+    free(bitvector);
+
+    if (win_sat) return 1;
+    if (draw_sat) return 0;
+    return -1;
+}
+
+typedef struct MMapBBDNode {
+    variable_t var;       // variable 1 to 255
+    nodeindex_t low;      // index to low node
+    nodeindex_t high;     // index to high node
+} mmapbddnode_t;
+
+void get_mmap_node(char* map, nodeindex_t ix, mmapbddnode_t* node) {
+    uint64_t i = ((uint64_t) ix) * 9;
+
+    memcpy(&node->var, &map[i], 1);
+    memcpy(&node->low, &map[i+1], 4);
+    memcpy(&node->high, &map[i+5], 4);
+}
+
+bool is_sat_mmap(char* map, nodeindex_t ix, bool* bitvector) {
+    mmapbddnode_t u;
+    get_mmap_node(map, ix, &u);
+    // printf("MMAP root: ix=%"PRIu32" var=%d low=%"PRIu32" high=%"PRIu32" \n", ix, u.var, u.low, u.high);
+    while (u.var != 0) {
+        ix = bitvector[u.var] ? u.high : u.low;
+        get_mmap_node(map, ix, &u);
+        // printf("MMAP node: ix=%"PRIu32" var=%d low=%"PRIu32" high=%"PRIu32" \n", ix, u.var, u.low, u.high);
+    }
+    return u.low == 1;
+}
+
+int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
+
+    char filename[50];
+    struct stat st;
+    char* suffix;
+
+    bool win_sat, draw_sat, lost_sat;
+    bool* sat_ptr;
+
+    int ply = get_ply(board, stm, width, height);
+    bool* bitvector = (bool*) malloc(sizeof(bool) * ((height+1)*width + 1 + 1));
+    bitvector[1] = *stm;
+    int k = 2;
+    for (int col=0; col<width; col++) {
+        for (int row=0; row<height+1; row++) {
+            bitvector[k] = board[col][row];
+            k++;
+        }
+    }
+
+    for (int i = 0; i < 3; i++) {
+        if (i==0) {
+            suffix = "lost";
+            sat_ptr = &lost_sat;
+        } else if (i==1) {
+            suffix = "draw";
+            sat_ptr = &draw_sat;
+        } else {
+            suffix = "win";
+            sat_ptr = &win_sat;
+        }
+
+        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+        stat(filename, &st);
+        // printf("File size: %lld - %lld\n", st.st_size, st.st_size / 9);
+
+        uint32_t nodecount = st.st_size / 9;
+        char* map;
+
+        int fd = open(filename, O_RDONLY);
+        if (fd == -1) {
+            perror("Error opening file for reading");
+            exit(EXIT_FAILURE);
+        }
+
+        map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        if (map == MAP_FAILED) {
+            close(fd);
+            perror("Error mmapping the file");
+            exit(EXIT_FAILURE);
+        }
+
+        nodeindex_t bbd = nodecount-1;
+
+        *sat_ptr = is_sat_mmap(map, bbd, bitvector);
+
+        close(fd);
+    }
+    // assert((win_sat + draw_sat + lost_sat) == 1);
 
     free(bitvector);
 
@@ -313,7 +405,8 @@ int main(int argc, char const *argv[]) {
             if (is_legal_move(board, stm, width, height, move)) {
                 play_column(board, stm, width, height, move);
                 print_board(board, stm, width, height);
-                res = -probe_board(board, stm, width, height, log2size);
+                // res = -probe_board(board, stm, width, height, log2size);
+                res = -probe_board_mmap(board, stm, width, height);
                 printf("move %d is %d\n\n", move, res);
                 undo_play_column(board, stm, width, height, move);
             }
