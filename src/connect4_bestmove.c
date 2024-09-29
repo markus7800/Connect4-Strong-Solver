@@ -153,6 +153,13 @@ void play_column(bool** board, bool* stm, uint32_t width, uint32_t height, int c
     board[col][row+1] = true;
     *stm = !(*stm);
 }
+void undo_play_column(bool** board, bool* stm, uint32_t width, uint32_t height, int col) {
+    int row = height+1;
+    while (!board[col][row]) row--;
+    board[col][row] = false;
+    board[col][row-1] = true;
+    *stm = !(*stm);
+}
 
 int get_ply(bool** board, bool* stm, uint32_t width, uint32_t height) {
     int ply = 0;
@@ -165,7 +172,10 @@ int get_ply(bool** board, bool* stm, uint32_t width, uint32_t height) {
 }
 
 void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
-    int cnt = 0;
+
+    char stm_c = *stm ? 'x' : 'o';
+    bool term = is_terminal(board, stm, width, height);
+    int cnt = get_ply(board, stm, width, height);
     printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", width, height);
     for (int i = height-1; i>= 0; i--) {
         for (int j = 0; j < width; j++) {
@@ -180,13 +190,14 @@ void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
                 printf(" .");
             }
         }
+        if (i == 0) printf("  is terminal: %d", term);
+        if (i == 1) printf("  side to move: %c", stm_c);
+        if (i == 2) printf("  stones played: %d", cnt);
         printf("\n");
     }
-    char stm_c = *stm ? 'x' : 'o';
-    bool term = is_terminal(board, stm, width, height);
-    printf("stones played: %d\nside to move: %c\nis terminal: %d\n", cnt, stm_c, term);
+    // printf("stones played: %d\nside to move: %c\n\n", cnt, stm_c, term);
 }
-void probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint64_t log2size) {
+int probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t bdd;
 
     nodeindexmap_t map;
@@ -195,7 +206,7 @@ void probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint6
     uniquetable_t nodecount_set;
     init_set(&nodecount_set, log2size-1);
 
-    uint64_t bdd_nodecount, sat_cnt;
+    // uint64_t bdd_nodecount, sat_cnt;
 
     char filename[50];
     char* suffix;
@@ -215,7 +226,7 @@ void probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint6
     }
 
 
-    printf("Ply %d:\n", ply);
+    // printf("Ply %d:\n", ply);
     for (int i = 0; i < 3; i++) {
         if (i==0) {
             suffix = "lost";
@@ -231,15 +242,20 @@ void probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint6
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
         bdd = _read_from_file(filename, &map);
 
-        reset_set(&nodecount_set);
-        bdd_nodecount = _nodecount(bdd, &nodecount_set);
-        sat_cnt = satcount(bdd);
-        printf("  Read from file %s: BDD(%"PRIu64") with satcount = %"PRIu64"\n", filename, bdd_nodecount, sat_cnt);
+        // reset_set(&nodecount_set);
+        // bdd_nodecount = _nodecount(bdd, &nodecount_set);
+        // sat_cnt = satcount(bdd);
+        // printf("  Read from file %s: BDD(%"PRIu64") with satcount = %"PRIu64"\n", filename, bdd_nodecount, sat_cnt);
         *sat_ptr = is_sat(bdd, bitvector);
     }
-    printf("win=%d draw=%d lost=%d\n", win_sat, draw_sat, lost_sat);
+    // printf("win=%d draw=%d lost=%d\n", win_sat, draw_sat, lost_sat);
+    assert((win_sat + draw_sat + lost_sat) == 1);
 
     free(bitvector);
+
+    if (win_sat) return 1;
+    if (draw_sat) return 0;
+    return -1;
 }
 
 int main(int argc, char const *argv[]) {
@@ -289,7 +305,21 @@ int main(int argc, char const *argv[]) {
     print_board(board, stm, width, height);
 
 
-    probe_board(board, stm, width, height, log2size);
+    int res = probe_board(board, stm, width, height, log2size);
+    printf("Position is %d\n\n", res);
+
+    if (!is_terminal(board, stm, width, height)) {
+        for (move = 0; move < width; move++) {
+            if (is_legal_move(board, stm, width, height, move)) {
+                play_column(board, stm, width, height, move);
+                print_board(board, stm, width, height);
+                res = -probe_board(board, stm, width, height, log2size);
+                printf("move %d is %d\n\n", move, res);
+                undo_play_column(board, stm, width, height, move);
+            }
+        }
+    }
+
 
     // read_all_bdd_binaries(width, height, log2size);
 
