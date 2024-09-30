@@ -70,7 +70,7 @@ bool is_sat(nodeindex_t ix, bool* bitvector) {
 
 
 bool is_played_cell(bool** board, uint32_t height, int col, int row) {
-    for (int r = row+1; r < height + 1; r++) {
+    for (int r = row+1; r < height+1; r++) {
         if (board[col][r]) {
             return true;
         }
@@ -145,11 +145,11 @@ bool is_terminal(bool** board, bool* stm, uint32_t width, uint32_t height) {
 }
 
 bool is_legal_move(bool** board, bool* stm, uint32_t width, uint32_t height, int col) {
-    return !(board[col][height+1]);
+    return !(board[col][height]);
 }
 
 void play_column(bool** board, bool* stm, uint32_t width, uint32_t height, int col) {
-    if (board[col][height+1]) {
+    if (board[col][height]) {
         perror("Cannot play column.");
         return;
     }
@@ -191,7 +191,6 @@ void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
                 } else {
                     printf(" o");
                 }
-                cnt++;
             } else {
                 printf(" .");
             }
@@ -392,12 +391,14 @@ int main(int argc, char const *argv[]) {
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (int) (moveseq[i] - '0');
         assert(0 <= move && move < width);
+        assert(is_legal_move(board, stm, width, height, move));
         play_column(board, stm, width, height, move);
     }
     print_board(board, stm, width, height);
 
 
-    int res = probe_board(board, stm, width, height, log2size);
+    // int res = probe_board(board, stm, width, height, log2size);
+    int res = probe_board_mmap(board, stm, width, height);
     printf("Position is %d\n\n", res);
 
     if (!is_terminal(board, stm, width, height)) {
