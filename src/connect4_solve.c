@@ -80,8 +80,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t num_nodes_pre_comp = uniquetable.count;
 
     // We reuse the set to count the number of nodes in a BDD
-    uniquetable_t nodecount_set;
-    init_set(&nodecount_set, log2size-1);
+    nodeindexmap_t map;
+    init_map(&map, log2size-1);
 
     uint64_t total = 0;
     uint64_t bdd_nodecount;
@@ -91,7 +91,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // PLY 0:
     nodeindex_t current = connect4_start(stm0, X, width, height);
     uint64_t cnt = connect4_satcount(current);
-    bdd_nodecount = _nodecount(current, &nodecount_set);
+    bdd_nodecount = _collect_nodes_into_map(current, &map);
     printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
     total += cnt;
 
@@ -146,8 +146,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         
 
         // count number of nodes in current BDD
-        reset_set(&nodecount_set);
-        bdd_nodecount = _nodecount(current, &nodecount_set);
+        reset_map(&map);
+        bdd_nodecount = _collect_nodes_into_map(current, &map);;
 
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
@@ -165,8 +165,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     printf("\n\nRetrograde analysis:\n\n");
 
-    nodeindexmap_t map;
-    init_map(&map, log2size-1);
     variable_t board_varmap[256];
     board_varmap[0] = 0; board_varmap[1] = 1;
     for (size_t v = 2; v <= 255; v++) {
@@ -183,13 +181,19 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t trans, win_pre_img;
     variable_set_t* vars_board;
 
+#if WRITE_TO_FILE
+    sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32".csv", width, height);
+    FILE* f = fopen(filename, "w");
+    fprintf(f, "width,height,ply,wincount,drawcount,lostcount,time\n");
+#endif
+
 
     // bdd_per_ply[ply % 2] is board0
     // bdd_per_ply[ply % 2 + 1] is board1
     for (int ply = width*height; ply >= 0; ply--) {
         printf("Ply %d/%d:\n", ply, width*height);
+        clock_gettime(CLOCK_REALTIME, &t0);
         gc_level = (ply >= 10) + (ply >= 25);
-        // if (gc_level) printf("\n");
 
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
@@ -286,6 +290,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         assert((win_cnt + draw_cnt + lost_cnt) == cnt);
         printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
 
+        clock_gettime(CLOCK_REALTIME, &t1);
+        t = get_elapsed_time(t0, t1);
+        total_t += t;
+
+#if WRITE_TO_FILE
+        if (f != NULL) {
+            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %"PRIu64", %.3f\n", width, height, ply, win_cnt, draw_cnt, lost_cnt, t);
+            fflush(f);
+        }
+#endif
     }
 
     printf("DEINIT GC: ");
@@ -297,9 +311,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         printf("No memory leak detected.\n");
     }
 
-    // deallocate nodecount set
-    free(nodecount_set.buckets);
-    free(nodecount_set.entries);
+    // deallocate map
+    free(map.buckets);
+    free(map.entries);
 
     // deallocate variables
     for (int col = 0; col < width; col++) {
