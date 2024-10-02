@@ -332,10 +332,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 make connect4-solve ALLOW_ROW_ORDER=0 COMPRESSED_ENCODING=1 WRITE_TO_FILE=1 SAVE_BDD_TO_DISK=1
 */
 int main(int argc, char const *argv[]) {
-    uint32_t a = 0xc831cd78;
-    printf("hash=%"PRIu32"\n", hash_32(a));
-    return 0;
-
     setbuf(stdout,NULL); // do not buffer stdout
 
     if (argc != 4) {
