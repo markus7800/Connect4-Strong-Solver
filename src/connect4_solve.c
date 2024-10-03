@@ -288,11 +288,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
         
         assert((win_cnt + draw_cnt + lost_cnt) == cnt);
-        printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64"\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt);
-
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         total_t += t;
+
+        printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64" in %.3f seconds\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt, t);
 
 #if WRITE_TO_FILE
         if (f != NULL) {
