@@ -14,18 +14,6 @@ else:
     exit()
 print(f"mul={mul} off={off}")
 
-# make ALLOW_ROW_ORDER=0
-# folder = "no_row_order"
-
-# make ALLOW_ROW_ORDER=1
-# folder = "row_order"
-
-# make ALLOW_ROW_ORDER=1 COMPRESSED_ENCODING=1
-# folder = "compressed_row_order"
-
-# make ALLOW_ROW_ORDER=0 COMPRESSED_ENCODING=1
-# folder = "compressed_no_row_order"
-
 folder = sys.argv[1]
 
 os.mkdir(folder)
@@ -45,7 +33,7 @@ do_pd_clean_up = True
 if do_sub_12:
     for width in range(1,12+1):
         for height in range(1, 12+1):
-            if height + width > 6:
+            if height + width > 12:
                 continue
 
             cnt += 1
@@ -95,7 +83,7 @@ if do_14:
 
 if do_14_big:
     cnt = -1
-    for width, height, log2tbsize in [(5, 9, 31), (7, 7, 31)]:
+    for width, height, log2tbsize in [(5, 9, 31), (7, 7, 31), (6, 8, 31)]:
         cnt += 1
         if cnt % min(mul,2) != off:
             continue
@@ -105,28 +93,4 @@ if do_14_big:
             subprocess.run(["../src/connect4.out",  str(log2tbsize), str(width), str(height)], check=False, stdout=f, stderr=f)
         print("finished.")
 
-# (6, 8, 32) does not work
-
-if do_pd_clean_up:
-    import pandas as pd
-    frames = []
-    for file in os.listdir("."):
-        if file.startswith("results_w"):
-            frames.append(pd.read_csv(file))
-            os.remove(file)
-    results = pd.concat(frames)
-    results = results.sort_values(["width", "height"])
-    results = results.reset_index().drop("index", axis=1)
-    results.to_csv("all_results.csv", index=False)
-
-    frames = []
-    for file in os.listdir("."):
-        if file.startswith("results_ply_w"):
-            frames.append(pd.read_csv(file))
-            os.rename(file, "ply/" + file)
-        
-    results = pd.concat(frames)
-    results = results.sort_values(["width", "height"])
-    results = results.reset_index().drop("index", axis=1)
-    results.to_csv("all_results_ply.csv", index=False)
 
