@@ -1,12 +1,15 @@
-#include "bdd.h"
+// #include "bdd.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <assert.h>
 #include <unistd.h> // close
 #include <fcntl.h> // open
 #include <sys/mman.h> // mmap
 #include <sys/stat.h> // file size
 #include <string.h> // memcpy
-
 
 #ifndef COMPRESSED_ENCODING
 #define COMPRESSED_ENCODING 1
@@ -16,57 +19,57 @@
 #define ALLOW_ROW_ORDER 0
 #endif
 
-void read_all_bdd_binaries(uint32_t width, uint32_t height, uint64_t log2size) {
-    nodeindex_t bdd;
+// void read_all_bdd_binaries(uint32_t width, uint32_t height, uint64_t log2size) {
+//     nodeindex_t bdd;
 
-    nodeindexmap_t map;
-    init_map(&map, log2size-1);
+//     nodeindexmap_t map;
+//     init_map(&map, log2size-1);
 
-    uniquetable_t nodecount_set;
-    init_set(&nodecount_set, log2size-1);
+//     uniquetable_t nodecount_set;
+//     init_set(&nodecount_set, log2size-1);
 
-    uint64_t bdd_nodecount, sat_cnt;
+//     uint64_t bdd_nodecount, sat_cnt;
 
-    char filename[50];
-    char* suffix;
+//     char filename[50];
+//     char* suffix;
 
-    uint64_t win_cnt, draw_cnt, lost_cnt;
-    uint64_t* cnt_ptr;
-    for (int ply = 0; ply <= width*height; ply++) {
-        for (int i = 0; i < 3; i++) {
-            if (i==0) {
-                suffix = "lost";
-                cnt_ptr = &lost_cnt;
-            } else if (i==1) {
-                suffix = "draw";
-                cnt_ptr = &draw_cnt;
-            } else {
-                suffix = "win";
-                cnt_ptr = &win_cnt;
-            }
+//     uint64_t win_cnt, draw_cnt, lost_cnt;
+//     uint64_t* cnt_ptr;
+//     for (int ply = 0; ply <= width*height; ply++) {
+//         for (int i = 0; i < 3; i++) {
+//             if (i==0) {
+//                 suffix = "lost";
+//                 cnt_ptr = &lost_cnt;
+//             } else if (i==1) {
+//                 suffix = "draw";
+//                 cnt_ptr = &draw_cnt;
+//             } else {
+//                 suffix = "win";
+//                 cnt_ptr = &win_cnt;
+//             }
 
-            sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-            bdd = _read_from_file(filename, &map);
+//             sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+//             bdd = _read_from_file(filename, &map);
 
-            reset_set(&nodecount_set);
-            bdd_nodecount = _nodecount(bdd, &nodecount_set);
-            sat_cnt = satcount(bdd);
-            printf("  Read from file %s: BDD(%"PRIu64") with satcount = %"PRIu64"\n", filename, bdd_nodecount, sat_cnt);
-            *cnt_ptr = sat_cnt;
-        }
-        printf("%d. win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64"\n", ply, win_cnt, draw_cnt, lost_cnt);
+//             reset_set(&nodecount_set);
+//             bdd_nodecount = _nodecount(bdd, &nodecount_set);
+//             sat_cnt = satcount(bdd);
+//             printf("  Read from file %s: BDD(%"PRIu64") with satcount = %"PRIu64"\n", filename, bdd_nodecount, sat_cnt);
+//             *cnt_ptr = sat_cnt;
+//         }
+//         printf("%d. win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64"\n", ply, win_cnt, draw_cnt, lost_cnt);
 
-    }
-}
+//     }
+// }
 
-bool is_sat(nodeindex_t ix, bool* bitvector) {
-    bddnode_t* u = get_node(ix);
-    while (!isconstant(u)) {
-        ix = bitvector[u->var] ? u->high : u->low;
-        u = get_node(ix);
-    }
-    return constant(u) == 1;
-}
+// bool is_sat(nodeindex_t ix, bool* bitvector) {
+//     bddnode_t* u = get_node(ix);
+//     while (!isconstant(u)) {
+//         ix = bitvector[u->var] ? u->high : u->low;
+//         u = get_node(ix);
+//     }
+//     return constant(u) == 1;
+// }
 
 
 bool is_played_cell(bool** board, uint32_t height, int col, int row) {
@@ -177,7 +180,7 @@ int get_ply(bool** board, bool* stm, uint32_t width, uint32_t height) {
     return ply;
 }
 
-void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
+void print_board(bool** board, bool* stm, uint32_t width, uint32_t height, int highlight_col) {
 
     char stm_c = *stm ? 'x' : 'o';
     bool term = is_terminal(board, stm, width, height);
@@ -185,6 +188,7 @@ void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
     printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", width, height);
     for (int i = height-1; i>= 0; i--) {
         for (int j = 0; j < width; j++) {
+            if (j == highlight_col) printf("\033[95m");
             if (is_played_cell(board, height, j, i)) {
                 if (board[j][i]) {
                     printf(" x");
@@ -194,6 +198,7 @@ void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
             } else {
                 printf(" .");
             }
+            if (j == highlight_col) printf("\033[0m");
         }
         if (i == 0) printf("  is terminal: %d", term);
         if (i == 1) printf("  side to move: %c", stm_c);
@@ -202,59 +207,67 @@ void print_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
     }
     // printf("stones played: %d\nside to move: %c\n\n", cnt, stm_c, term);
 }
-int probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint64_t log2size) {
-    nodeindex_t bdd;
 
-    nodeindexmap_t map;
-    init_map(&map, log2size-1);
+// int probe_board(bool** board, bool* stm, uint32_t width, uint32_t height, uint64_t log2size) {
+//     nodeindex_t bdd;
 
-    uniquetable_t nodecount_set;
-    init_set(&nodecount_set, log2size-1);
+//     nodeindexmap_t map;
+//     init_map(&map, log2size-1);
 
-    // uint64_t bdd_nodecount, sat_cnt;
+//     uniquetable_t nodecount_set;
+//     init_set(&nodecount_set, log2size-1);
 
-    char filename[50];
-    char* suffix;
+//     // uint64_t bdd_nodecount, sat_cnt;
 
-    bool win_sat, draw_sat, lost_sat;
-    bool* sat_ptr;
+//     char filename[50];
+//     char* suffix;
 
-    int ply = get_ply(board, stm, width, height);
-    bool* bitvector = (bool*) malloc(sizeof(bool) * ((height+1)*width + 1 + 1));
-    bitvector[1] = *stm;
-    int k = 2;
-    for (int col=0; col<width; col++) {
-        for (int row=0; row<height+1; row++) {
-            bitvector[k] = board[col][row];
-            k++;
-        }
-    }
+//     bool win_sat, draw_sat, lost_sat;
+//     bool* sat_ptr;
 
-    for (int i = 0; i < 3; i++) {
-        if (i==0) {
-            suffix = "lost";
-            sat_ptr = &lost_sat;
-        } else if (i==1) {
-            suffix = "draw";
-            sat_ptr = &draw_sat;
-        } else {
-            suffix = "win";
-            sat_ptr = &win_sat;
-        }
+//     int ply = get_ply(board, stm, width, height);
+//     bool* bitvector = (bool*) malloc(sizeof(bool) * ((height+1)*width + 1 + 1));
+//     bitvector[1] = *stm;
+//     int k = 2;
+//     for (int col=0; col<width; col++) {
+//         for (int row=0; row<height+1; row++) {
+//             bitvector[k] = board[col][row];
+//             k++;
+//         }
+//     }
 
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-        bdd = _read_from_file(filename, &map);
+//     for (int i = 0; i < 3; i++) {
+//         if (i==0) {
+//             suffix = "lost";
+//             sat_ptr = &lost_sat;
+//         } else if (i==1) {
+//             suffix = "draw";
+//             sat_ptr = &draw_sat;
+//         } else {
+//             suffix = "win";
+//             sat_ptr = &win_sat;
+//         }
 
-        *sat_ptr = is_sat(bdd, bitvector);
-    }
-    assert((win_sat + draw_sat + lost_sat) == 1);
+//         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+//         bdd = _read_from_file(filename, &map);
 
-    free(bitvector);
+//         *sat_ptr = is_sat(bdd, bitvector);
+//     }
+//     assert((win_sat + draw_sat + lost_sat) == 1);
 
-    if (win_sat) return 1;
-    if (draw_sat) return 0;
-    return -1;
-}
+//     free(bitvector);
+
+//     if (win_sat) return 1;
+//     if (draw_sat) return 0;
+//     return -1;
+// }
+
+typedef uint32_t nodeindex_t;
+// the special nodes 0 and 1 will always be stored at index 0 and 1 respectively
+#define ZEROINDEX 0
+#define ONEINDEX 1
+
+typedef uint8_t variable_t;
 
 typedef struct MMapBBDNode {
     variable_t var;       // variable 1 to 255
@@ -289,7 +302,9 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
     char* suffix;
 
     bool win_sat, draw_sat, lost_sat;
+    bool win_read, draw_read, lost_read;
     bool* sat_ptr;
+    bool* read_ptr;
 
     int ply = get_ply(board, stm, width, height);
     bool* bitvector = (bool*) malloc(sizeof(bool) * ((height+1)*width + 1 + 1));
@@ -306,12 +321,15 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
         if (i==0) {
             suffix = "lost";
             sat_ptr = &lost_sat;
+            read_ptr = &lost_read;
         } else if (i==1) {
             suffix = "draw";
             sat_ptr = &draw_sat;
+            read_ptr = &draw_read;
         } else {
             suffix = "win";
             sat_ptr = &win_sat;
+            read_ptr = &win_read;
         }
 
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
@@ -323,8 +341,14 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
 
         int fd = open(filename, O_RDONLY);
         if (fd == -1) {
-            perror("Error opening file for reading");
-            exit(EXIT_FAILURE);
+            // perror("Error opening file for reading");
+            // exit(EXIT_FAILURE);
+            printf("Did not read %s\n", filename);
+            *read_ptr = false;
+            continue;
+        } else {
+            printf("Read %s\n", filename);
+            *read_ptr = true;
         }
 
         map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
@@ -340,41 +364,55 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
 
         close(fd);
     }
-    // assert((win_sat + draw_sat + lost_sat) == 1);
-
     free(bitvector);
+    // have to read at least two files
+    assert(win_read + draw_read + lost_read >= 2);
+    if (win_read + draw_read + lost_read == 3) {
+        // we read all three files
+        assert((win_sat + draw_sat + lost_sat) == 1);
+    } else {
+        // we only read two files
+        if (!win_read) {
+            win_sat = 1 - draw_sat - lost_sat;
+        }
+        if (!draw_read) {
+            draw_sat = 1 - win_sat - lost_sat;
+        }
+        if (!lost_read) {
+            lost_sat = 1 - win_sat - draw_sat;
+        }
+    }
 
     if (win_sat) return 1;
     if (draw_sat) return 0;
     return -1;
+
 }
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
     const char *moveseq;
-    if (argc == 4) {
+    if (argc == 3) {
         moveseq = "";
-    } else if (argc == 5) {
-        moveseq = argv[4];
+    } else if (argc == 4) {
+        moveseq = argv[3];
     } else {
-        perror("Wrong number of arguments supplied: connect4.out log2(tablesize) width height\n");
+        perror("Wrong number of arguments supplied: connect4_bestmove.out width height moveseq\n");
         return 1;
     }
     char* succ;
-    uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
-    uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
+    uint32_t width = (uint32_t) strtoul(argv[1], &succ, 10);
+    uint32_t height = (uint32_t) strtoul(argv[2], &succ, 10);
     printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
 
-    uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
-
-
-    init_all(log2size);
+    // uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
+    // init_all(log2size);
 
 
     assert(COMPRESSED_ENCODING);
     assert(!ALLOW_ROW_ORDER);
-    memorypool.num_variables = (height+1)*width + 1;
+    // memorypool.num_variables = (height+1)*width + 1;
     bool** board = (bool**) malloc(sizeof(bool*) * width);
     for (int col=0; col<width; col++) {
         board[col] = (bool*) malloc(sizeof(bool) * (height+1));
@@ -394,30 +432,38 @@ int main(int argc, char const *argv[]) {
         assert(is_legal_move(board, stm, width, height, move));
         play_column(board, stm, width, height, move);
     }
-    print_board(board, stm, width, height);
+    print_board(board, stm, width, height, -1);
 
 
     // int res = probe_board(board, stm, width, height, log2size);
     int res = probe_board_mmap(board, stm, width, height);
     printf("Position is %d\n\n", res);
 
+    int bestmove = -1;
+    int bestscore = -2;
     if (!is_terminal(board, stm, width, height)) {
         for (move = 0; move < width; move++) {
             if (is_legal_move(board, stm, width, height, move)) {
                 play_column(board, stm, width, height, move);
-                print_board(board, stm, width, height);
+                print_board(board, stm, width, height, -1);
                 // res = -probe_board(board, stm, width, height, log2size);
                 res = -probe_board_mmap(board, stm, width, height);
                 printf("move %d is %d\n\n", move, res);
                 undo_play_column(board, stm, width, height, move);
+                if (res > bestscore) {
+                    bestscore = res;
+                    bestmove = move;
+                }
             }
         }
     }
+    printf("Best move: %d with score %d\n", bestmove, bestscore);
+    print_board(board, stm, width, height, bestmove);
 
 
     // read_all_bdd_binaries(width, height, log2size);
 
-    free_all();
+    // free_all();
 
     for (int col=0; col<width; col++) {
         free(board[col]);

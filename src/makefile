@@ -27,7 +27,7 @@ connect4:
 
 connect4-solve:
 	$(CC) connect4_solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4_solve.out
-	$(CC) connect4_bestmove.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o connect4_bestmove.out
+	$(CC) connect4_bestmove.c $(CFLAGS) $(C4FLAGS) -o connect4_bestmove.out
 
 queens:
 	$(CC) queens.c $(BDDFILES) $(CFLAGS) $(QFLAGS) -o queens.out
