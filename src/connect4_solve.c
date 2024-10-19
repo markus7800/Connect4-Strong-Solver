@@ -26,7 +26,7 @@
 #endif
 
 #ifndef SAVE_BDD_TO_DISK
-#define SAVE_BDD_TO_DISK 1
+#define SAVE_BDD_TO_DISK 0
 #endif
 
 
@@ -178,7 +178,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
 
     int board, player;
-    nodeindex_t trans, win_pre_img;
+    nodeindex_t trans, win_pre_img, draw_pre_image;
     variable_set_t* vars_board;
 
 #if WRITE_TO_FILE
@@ -213,23 +213,27 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
 
         keepalive_ix(next_draw); keepalive_ix(next_lost);
+
         term = connect4_intersect_term(current, board, player, X, width, height, gc_level);
         term_cnt = connect4_satcount(term);
-        undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
+        keepalive_ix(term);
 
-        keepalive_ix(next_draw); keepalive_ix(next_lost); keepalive_ix(term);
+
         current = connect4_substract_term(current, board, player, X, width, height, gc_level);
-        undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost); undo_keepalive_ix(term);
+        keepalive_ix(current);
 
         win_pre_img = image(trans, next_lost, vars_board);
+        keepalive_ix(win_pre_img);
+        undo_keepalive_ix(next_lost);
+
         if (gc_level) {
-            keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current); keepalive_ix(win_pre_img);
             printf("  WIN 1 GC: "); gc(true, true);
-            undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(win_pre_img);
         }
     
         win = and(current, win_pre_img);
         win_cnt = connect4_satcount(win);
+        undo_keepalive_ix(win_pre_img);
+        keepalive_ix(win);
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_win.bin", width, height, ply);
@@ -237,17 +241,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #endif
 
         if (gc_level) {
-            keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current); keepalive_ix(win);
             printf("  WIN 2 GC: "); gc(true, true);
-            undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(win);
         }
 
+        undo_keepalive_ix(current);
         current = and(current, not(win));
+        keepalive_ix(current);
+        undo_keepalive_ix(win);
 
         if (gc_level) {
-            keepalive_ix(next_draw); keepalive_ix(term); keepalive_ix(current);
             printf("  WIN 3 GC: "); gc(true, true);
-            undo_keepalive_ix(next_draw); undo_keepalive_ix(term); undo_keepalive_ix(current);
         }
 
         if (ply == width*height) {
@@ -255,22 +258,27 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         } else {
             // if ply == width*height then board is full
             // and there are no moves oven when no post-condition is placed (next_draw=ONE_INDEX)
-            draw = and(current, image(trans, next_draw, vars_board));
+            draw_pre_image = image(trans, next_draw, vars_board);
+            undo_keepalive_ix(next_draw);
+
+            draw = and(current, draw_pre_image);
         }
         draw_cnt = connect4_satcount(draw);
+        keepalive_ix(draw);
+
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.bin", width, height, ply);
         _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
 #endif
 
         if (gc_level) {
-            keepalive_ix(draw); keepalive_ix(term); keepalive_ix(current);
             printf("  DRAW GC: "); gc(true, true);
-            undo_keepalive_ix(draw); undo_keepalive_ix(term); undo_keepalive_ix(current);
         }
 
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
+        undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
+
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.bin", width, height, ply);
         _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
