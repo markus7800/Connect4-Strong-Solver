@@ -164,7 +164,7 @@ typedef uint32_t nodeindex_t;
 
 typedef uint8_t variable_t;
 
-typedef struct MMapBBDNode {
+typedef struct MMapbddNode {
     variable_t var;       // variable 1 to 255
     nodeindex_t low;      // index to low node
     nodeindex_t high;     // index to high node
@@ -188,11 +188,58 @@ bool is_sat_mmap(char* map, nodeindex_t ix, bool* bitvector) {
     return u.low == 1;
 }
 
-int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
+char* (*mmaps)[3];
+off_t (*st_sizes)[3];
+void make_mmaps(uint32_t width, uint32_t height) {
+    mmaps = malloc((width*height+1) * sizeof(*mmaps));
+    st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
+    assert(mmaps != NULL);
 
     char filename[50];
     struct stat st;
     char* suffix;
+    for (int ply = 0; ply <= width*height; ply++) { 
+        for (int i = 0; i < 3; i++) {
+            if (i==0) {
+                suffix = "lost";
+            } else if (i==1) {
+                suffix = "draw";
+            } else {
+                suffix = "win";
+            }
+
+            sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+            stat(filename, &st);
+
+            char* map;
+
+            int fd = open(filename, O_RDONLY);
+            if (fd == -1) {
+                mmaps[ply][i] = NULL;
+                continue;
+            }
+
+            // printf("%s %llu %"PRIu32"\n", filename, st.st_size, nodecount);
+            map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+            if (map == MAP_FAILED) {
+                close(fd);
+                perror("Error mmapping the file");
+                exit(EXIT_FAILURE);
+            }
+
+            mmaps[ply][i] = map;
+            st_sizes[ply][i] = st.st_size;
+
+            close(fd);
+        }
+    }
+}
+
+int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
+
+    // char filename[50];
+    // struct stat st;
+    // char* suffix;
 
     bool win_sat, draw_sat, lost_sat;
     bool win_read, draw_read, lost_read;
@@ -212,49 +259,64 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
-            suffix = "lost";
+            // suffix = "lost";
             sat_ptr = &lost_sat;
             read_ptr = &lost_read;
         } else if (i==1) {
-            suffix = "draw";
+            // suffix = "draw";
             sat_ptr = &draw_sat;
             read_ptr = &draw_read;
         } else {
-            suffix = "win";
+            // suffix = "win";
             sat_ptr = &win_sat;
             read_ptr = &win_read;
         }
 
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-        stat(filename, &st);
+        // sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+        // stat(filename, &st);
 
-        uint32_t nodecount = st.st_size / 9;
-        char* map;
+        // uint32_t nodecount = st.st_size / 9;
+        // char* map;
 
-        int fd = open(filename, O_RDONLY);
-        if (fd == -1) {
-            // perror("Error opening file for reading");
-            // exit(EXIT_FAILURE);
-            printf("Did not read %s\n", filename);
+        // int fd = open(filename, O_RDONLY);
+        // if (fd == -1) {
+        //     // printf("Did not read %s\n", filename);
+        //     *read_ptr = false;
+        //     continue;
+        // } else {
+        //     // printf("Read %s\n", filename);
+        //     *read_ptr = true;
+        // }
+        
+        // map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        // if (map == MAP_FAILED) {
+        //     close(fd);
+        //     perror("Error mmapping the file");
+        //     exit(EXIT_FAILURE);
+        // }
+
+        // nodeindex_t bdd = nodecount-1;
+
+        char* map = mmaps[ply][i];
+        if (map == NULL) {
             *read_ptr = false;
             continue;
         } else {
-            printf("Read %s\n", filename);
             *read_ptr = true;
         }
+        off_t st_size = st_sizes[ply][i];
+        uint32_t nodecount = st_size / 9;
+        nodeindex_t bdd = nodecount-1;
 
-        map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-        if (map == MAP_FAILED) {
-            close(fd);
-            perror("Error mmapping the file");
-            exit(EXIT_FAILURE);
-        }
+        *sat_ptr = is_sat_mmap(map, bdd, bitvector);
 
-        nodeindex_t bbd = nodecount-1;
-
-        *sat_ptr = is_sat_mmap(map, bbd, bitvector);
-
-        close(fd);
+        // int unmap = munmap(map, st.st_size);
+        // if (unmap == -1) {
+        //     close(fd);
+        //     perror("Error unmmapping the file");
+        //     exit(EXIT_FAILURE);
+        // }
+        // close(fd);
     }
     free(bitvector);
     // have to read at least two files
@@ -323,11 +385,15 @@ int main(int argc, char const *argv[]) {
     }
     print_board(board, stm, width, height, -1);
 
+    // test(width, height);
+    // return 0;
+    make_mmaps(width, height);
 
     // int res = probe_board(board, stm, width, height, log2size);
     int res = probe_board_mmap(board, stm, width, height);
     printf("Position is %d\n\n", res);
 
+    int ab = 0;
     int bestmove = -1;
     int bestscore = -2;
     if (!is_terminal(board, stm, width, height)) {
@@ -335,9 +401,9 @@ int main(int argc, char const *argv[]) {
             if (is_legal_move(board, stm, width, height, move)) {
                 play_column(board, stm, width, height, move);
                 print_board(board, stm, width, height, -1);
-                // res = -probe_board(board, stm, width, height, log2size);
                 res = -probe_board_mmap(board, stm, width, height);
-                printf("move %d is %d\n\n", move, res);
+                // ab = alphabeta(board, stm, width, height, -MATESCORE, -1, 0);
+                printf("move %d is %d with value %d\n\n", move, res, ab);
                 undo_play_column(board, stm, width, height, move);
                 if (res > bestscore) {
                     bestscore = res;
@@ -349,10 +415,17 @@ int main(int argc, char const *argv[]) {
     printf("Best move: %d with score %d\n", bestmove, bestscore);
     print_board(board, stm, width, height, bestmove);
 
+
+    // alphabeta(board, stm, width, height, 1, MATESCORE, 0);
+    // return 0;
+    
     for (int col=0; col<width; col++) {
         free(board[col]);
     }
     free(board);
+    
+    free(mmaps);
+    free(st_sizes);
 
     return 0;
 }
