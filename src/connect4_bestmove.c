@@ -236,11 +236,6 @@ void make_mmaps(uint32_t width, uint32_t height) {
 }
 
 int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
-
-    // char filename[50];
-    // struct stat st;
-    // char* suffix;
-
     bool win_sat, draw_sat, lost_sat;
     bool win_read, draw_read, lost_read;
     bool* sat_ptr;
@@ -272,31 +267,6 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
             read_ptr = &win_read;
         }
 
-        // sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-        // stat(filename, &st);
-
-        // uint32_t nodecount = st.st_size / 9;
-        // char* map;
-
-        // int fd = open(filename, O_RDONLY);
-        // if (fd == -1) {
-        //     // printf("Did not read %s\n", filename);
-        //     *read_ptr = false;
-        //     continue;
-        // } else {
-        //     // printf("Read %s\n", filename);
-        //     *read_ptr = true;
-        // }
-        
-        // map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-        // if (map == MAP_FAILED) {
-        //     close(fd);
-        //     perror("Error mmapping the file");
-        //     exit(EXIT_FAILURE);
-        // }
-
-        // nodeindex_t bdd = nodecount-1;
-
         char* map = mmaps[ply][i];
         if (map == NULL) {
             *read_ptr = false;
@@ -309,16 +279,9 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
         nodeindex_t bdd = nodecount-1;
 
         *sat_ptr = is_sat_mmap(map, bdd, bitvector);
-
-        // int unmap = munmap(map, st.st_size);
-        // if (unmap == -1) {
-        //     close(fd);
-        //     perror("Error unmmapping the file");
-        //     exit(EXIT_FAILURE);
-        // }
-        // close(fd);
     }
     free(bitvector);
+
     // have to read at least two files
     assert(win_read + draw_read + lost_read >= 2);
     if (win_read + draw_read + lost_read == 3) {
@@ -347,19 +310,21 @@ int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
     const char *moveseq;
-    if (argc == 3) {
+    if (argc == 4) {
         moveseq = "";
-    } else if (argc == 4) {
-        moveseq = argv[3];
+    } else if (argc == 5) {
+        moveseq = argv[4];
     } else {
-        perror("Wrong number of arguments supplied: connect4_bestmove.out width height moveseq\n");
+        perror("Wrong number of arguments supplied: connect4_bestmove.out folder width height moveseq\n");
         return 1;
     }
     char* succ;
-    uint32_t width = (uint32_t) strtoul(argv[1], &succ, 10);
-    uint32_t height = (uint32_t) strtoul(argv[2], &succ, 10);
+    uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
+    uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
     printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
 
+    const char *folder = argv[1];
+    chdir(folder);
 
 
     assert(COMPRESSED_ENCODING);
@@ -385,11 +350,8 @@ int main(int argc, char const *argv[]) {
     }
     print_board(board, stm, width, height, -1);
 
-    // test(width, height);
-    // return 0;
     make_mmaps(width, height);
 
-    // int res = probe_board(board, stm, width, height, log2size);
     int res = probe_board_mmap(board, stm, width, height);
     printf("Position is %d\n\n", res);
 
@@ -397,23 +359,32 @@ int main(int argc, char const *argv[]) {
     int bestmove = -1;
     int bestscore = -2;
     if (!is_terminal(board, stm, width, height)) {
+        printf("\033[95m");
+        for (move = 0; move < width; move++) {
+            printf("%2d ", move);
+        }
+        printf("\033[0m\n");
         for (move = 0; move < width; move++) {
             if (is_legal_move(board, stm, width, height, move)) {
                 play_column(board, stm, width, height, move);
-                print_board(board, stm, width, height, -1);
+                // print_board(board, stm, width, height, -1);
                 res = -probe_board_mmap(board, stm, width, height);
                 // ab = alphabeta(board, stm, width, height, -MATESCORE, -1, 0);
-                printf("move %d is %d with value %d\n\n", move, res, ab);
+                // printf("move %d is %d with value %d\n\n", move, res, ab);
                 undo_play_column(board, stm, width, height, move);
                 if (res > bestscore) {
                     bestscore = res;
                     bestmove = move;
                 }
+                printf("%2d ", res);
+            } else {
+                printf(". ");
             }
         }
     }
-    printf("Best move: %d with score %d\n", bestmove, bestscore);
-    print_board(board, stm, width, height, bestmove);
+    printf("\n");
+    // printf("Best move: %d with score %d\n", bestmove, bestscore);
+    // print_board(board, stm, width, height, bestmove);
 
 
     // alphabeta(board, stm, width, height, 1, MATESCORE, 0);
