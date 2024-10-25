@@ -7,7 +7,6 @@
 #include <time.h>
 
 #define MATESCORE 100
-#define AB_DEBUG 0
 
 #define FLAG_EMPTY 0
 #define FLAG_ALPHA 1
@@ -69,27 +68,30 @@ void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, u
 // return true if collision
 bool store_in_tt(uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
     tt_entry_t* entry = &tt[key & tt_mask];
-    if (entry->key != key) {
-        // override old entry with different key
-        if ((entry->flag != FLAG_EXACT) || (flag == FLAG_EXACT)) {
-            // we do not want to override pv
-            bool collision = entry->key != 0;
-            store_entry(entry, key, depth, value, move, flag);
-            return collision;
-        }
-        return true;
-    } else {
-        if ((depth > entry->depth) && ((entry->flag != FLAG_EXACT) || (flag == FLAG_EXACT))) {
-            // same position, store from node higher up in search tree, never override pv (even at lower depth)
-            store_entry(entry, key, depth, value, move, flag);
-            return false;
-        } else if ((depth == entry->depth) && entry->flag < flag) {
-            // prefer exact over alpha, beta flag
-            store_entry(entry, key, depth, value, move, flag);
-            return false;
-        }
-    }
-    return false;
+    bool collision = (entry->key != 0) && (entry->key != key);
+    store_entry(entry, key, depth, value, move, flag);
+    return collision;
+    // if (entry->key != key) {
+    //     // override old entry with different key
+    //     if ((entry->flag != FLAG_EXACT) || (flag == FLAG_EXACT)) {
+    //         // we do not want to override pv
+    //         bool collision = entry->key != 0;
+    //         store_entry(entry, key, depth, value, move, flag);
+    //         return collision;
+    //     }
+    //     return true;
+    // } else {
+    //     if ((depth > entry->depth) && ((entry->flag != FLAG_EXACT) || (flag == FLAG_EXACT))) {
+    //         // same position, store from node higher up in search tree, never override pv (even at lower depth)
+    //         store_entry(entry, key, depth, value, move, flag);
+    //         return false;
+    //     } else if ((depth == entry->depth) && entry->flag < flag) {
+    //         // prefer exact over alpha, beta flag
+    //         store_entry(entry, key, depth, value, move, flag);
+    //         return false;
+    //     }
+    // }
+    // return false;
 }
 
 uint64_t hash_64(uint64_t a) {
@@ -115,18 +117,46 @@ uint64_t key_for_board(bool** board, bool* stm, uint32_t width, uint32_t height)
     return hash_64(key);
 }
 
+typedef uint64_t wdl_cache_entry_t;
+
+wdl_cache_entry_t* wdl_cache;
+uint64_t wdl_cache_mask;
+uint64_t n_wdl_cache_hits = 0;
+
+// WIDTH * (HEIGHT+1) has to <= 62
+int8_t probe_wdl_cache(uint64_t key, bool* wdl_cache_hit) {
+    uint64_t entry = wdl_cache[key & wdl_cache_mask];
+    uint64_t stored_key = entry >> 2;
+    if (key == stored_key) {
+        *wdl_cache_hit = true;
+        return ((int8_t) (0b11 & entry)) - 1;
+    } else {
+        *wdl_cache_hit = false;
+        return 0;
+    }
+}
+
+void store_in_wdl_cache(uint64_t key, int8_t res) {
+    uint64_t entry = (key << 2) | (0b11 & ((uint8_t) (res+1)));
+    wdl_cache[key & wdl_cache_mask] = entry;
+}
+
 uint64_t n_nodes = 0;
 int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
     if (is_terminal(board, stm, width, height)) {
-        if (AB_DEBUG) {
-            for (int p = 0; p < ply; p++) { printf("| "); } 
-            printf("is terminal, score: %d\n", -MATESCORE + ply);
-        }
         return -MATESCORE + ply; // terminal is always lost
     }
-    int8_t res = probe_board_mmap(board, stm, width, height);
+    uint64_t key = key_for_board(board, stm, width, height);
 
+    bool wdl_cache_hit = false;
+    int8_t res = probe_wdl_cache(key, &wdl_cache_hit);
+    n_wdl_cache_hits += wdl_cache_hit;
+    if (!wdl_cache_hit) {
+        res = probe_board_mmap(board, stm, width, height);
+        store_in_wdl_cache(key, res);
+    }
+     
     if (res == 0) {
         return 0; // draw
     }
@@ -145,12 +175,7 @@ int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_
     if (depth == 0) {
         return res;
     }
-    if (AB_DEBUG) {
-        for (int p = 0; p < ply; p++) { printf("| "); } 
-        printf("p:%d a:%d b:%d r:%d\n", ply, alpha, beta, res);
-    }
 
-    uint64_t key = key_for_board(board, stm, width, height);
     tt_entry_t tt_entry;
     bool tt_hit = false;
     probe_tt(key, depth, alpha, beta, &tt_entry, &tt_hit);
@@ -167,28 +192,16 @@ int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_
     for (uint8_t move_ix = 0; move_ix < width; move_ix++) {
         uint8_t move = moves[move_ix];
         if (is_legal_move(board, stm, width, height, move)) {
-            if (AB_DEBUG) {
-                for (int p = 0; p < ply; p++) { printf("| "); } 
-                printf("play col %d\n", move);
-            }
             play_column(board, stm, width, height, move);
             value = -alphabeta(board, stm, width, height, -beta, -alpha, ply+1, depth-1, rootres);
             undo_play_column(board, stm, width, height, move);
         
             if (value > alpha) {
-                if (AB_DEBUG) {
-                    for (int p = 0; p < ply; p++) { printf("| "); } 
-                    printf("raised alpha to %d\n", value);
-                }
                 bestmove = move;
                 flag = FLAG_EXACT;
                 alpha = value;
             }
             if (value >= beta) {
-                if (AB_DEBUG) {
-                    for (int p = 0; p < ply; p++) { printf("| "); } 
-                    printf("beta cutoff %d\n", beta);
-                }
                 flag = FLAG_BETA;
                 alpha = beta;
                 break;
@@ -196,10 +209,7 @@ int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_
         }
     }
     n_tt_collisions += store_in_tt(key, depth, alpha, bestmove, flag);
-    if (AB_DEBUG) {
-        for (int p = 0; p < ply; p++) { printf("| "); } 
-        printf("node %d flag %u\n", alpha, flag);
-    }
+    
     return alpha;
 }
 
@@ -220,6 +230,9 @@ int8_t iterdeep(bool** board, bool* stm, uint32_t width, uint32_t height) {
         printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", n_nodes, t, n_nodes / t / 1000);
         printf("n_tt_hits = %"PRIu64", n_tt_collisions = %"PRIu64"\n", n_tt_hits, n_tt_collisions);
         if (abs(ab) > 1) {
+            return ab;
+        }
+        if (depth == 30) {
             return ab;
         }
         depth++;
@@ -266,6 +279,7 @@ depth = 27, ab = 1, n_nodes = 9303708 in 92.104s (101.014 knps), n_tt_hits = 996
 depth = 28, ab = 1, n_nodes = 12355986 in 112.434s (109.896 knps), n_tt_hits = 1502328, n_tt_collisions = 40789
 depth = 29, ab = 1, n_nodes = 18529491 in 145.179s (127.632 knps), n_tt_hits = 2180368, n_tt_collisions = 84801
 depth = 30, ab = 1, n_nodes = 23875963 in 167.090s (142.893 knps), n_tt_hits = 3092239, n_tt_collisions = 146825
+
 depth = 31, ab = 1, n_nodes = 33824680 in 215.540s (156.930 knps), n_tt_hits = 4335210, n_tt_collisions = 280144
 depth = 32, ab = 1, n_nodes = 43578232 in 283.579s (153.672 knps), n_tt_hits = 6073185, n_tt_collisions = 471989
 depth = 33, ab = 1, n_nodes = 58324132 in 436.680s (133.563 knps), n_tt_hits = 8229856, n_tt_collisions = 803416
