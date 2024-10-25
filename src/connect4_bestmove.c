@@ -10,6 +10,7 @@
 #include <sys/mman.h> // mmap
 #include <sys/stat.h> // file size
 #include <string.h> // memcpy
+#include <time.h>
 
 #ifndef COMPRESSED_ENCODING
 #define COMPRESSED_ENCODING 1
@@ -306,6 +307,12 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
 
 }
 
+#include "connect4_ab.c"
+
+double get_elapsed_time(struct timespec t0, struct timespec t1) {
+    return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
+}
+
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
@@ -355,35 +362,48 @@ int main(int argc, char const *argv[]) {
     int res = probe_board_mmap(board, stm, width, height);
     printf("Position is %d\n\n", res);
 
-    int ab = 0;
-    int bestmove = -1;
-    int bestscore = -2;
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_REALTIME, &t0);
+
+    int ab = alphabeta(board, stm, width, height, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
+ 
     if (!is_terminal(board, stm, width, height)) {
+        int bestmove = -1;
+        int bestscore = -2;
+
         printf("\033[95m");
         for (move = 0; move < width; move++) {
-            printf("%2d ", move);
+            printf("%3d ", move);
         }
         printf("\033[0m\n");
+        
         for (move = 0; move < width; move++) {
             if (is_legal_move(board, stm, width, height, move)) {
                 play_column(board, stm, width, height, move);
                 // print_board(board, stm, width, height, -1);
                 res = -probe_board_mmap(board, stm, width, height);
-                // ab = alphabeta(board, stm, width, height, -MATESCORE, -1, 0);
+                // printf("%2d ", res);
+                ab = -alphabeta(board, stm, width, height, -res == 1 ? 1 : -MATESCORE, -res == -1 ? -1 : MATESCORE, 1, 7, res);
+                printf("%3d ", ab);
+
                 // printf("move %d is %d with value %d\n\n", move, res, ab);
                 undo_play_column(board, stm, width, height, move);
-                if (res > bestscore) {
-                    bestscore = res;
+                if (ab > bestscore) {
+                    bestscore = ab;
                     bestmove = move;
                 }
-                printf("%2d ", res);
             } else {
                 printf(". ");
             }
         }
+        printf("\n\n");
+        printf("Best move: %d with score %d\n\n", bestmove, bestscore);
+
+        clock_gettime(CLOCK_REALTIME, &t1);
+        double t = get_elapsed_time(t0, t1);
+        printf("n_nodes = %d in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
     }
-    printf("\n");
-    // printf("Best move: %d with score %d\n", bestmove, bestscore);
     // print_board(board, stm, width, height, bestmove);
 
 
