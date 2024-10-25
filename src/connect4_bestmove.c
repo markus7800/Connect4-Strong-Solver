@@ -307,11 +307,11 @@ int probe_board_mmap(bool** board, bool* stm, uint32_t width, uint32_t height) {
 
 }
 
-#include "connect4_ab.c"
-
 double get_elapsed_time(struct timespec t0, struct timespec t1) {
     return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
 }
+
+#include "connect4_ab.c"
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
@@ -359,14 +359,25 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps(width, height);
 
-    int res = probe_board_mmap(board, stm, width, height);
-    printf("Position is %d\n\n", res);
+    uint64_t log2ttsize = 26;
+    tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
+    tt_mask = (1UL << log2ttsize) - 1;
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
 
-    int ab = alphabeta(board, stm, width, height, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
-    printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
+    int res = probe_board_mmap(board, stm, width, height);
+
+    // int ab = alphabeta(board, stm, width, height, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    // printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
+
+    int ab = iterdeep(board, stm, width, height);
+    printf("Position is %d (%d)\n\n", res, ab);
+    clock_gettime(CLOCK_REALTIME, &t1);
+    double t = get_elapsed_time(t0, t1);
+    printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+    printf("n_tt_hits = %"PRIu64", n_tt_collisions = %"PRIu64"\n", n_tt_hits, n_tt_collisions);
+    return 0;
  
     if (!is_terminal(board, stm, width, height)) {
         int bestmove = -1;
@@ -402,7 +413,8 @@ int main(int argc, char const *argv[]) {
 
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
-        printf("n_nodes = %d in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+        printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+        printf("n_tt_hits = %"PRIu64", n_tt_collisions = %"PRIu64"\n", n_tt_hits, n_tt_collisions);
     }
     // print_board(board, stm, width, height, bestmove);
 
@@ -417,6 +429,7 @@ int main(int argc, char const *argv[]) {
     
     free(mmaps);
     free(st_sizes);
+    free(tt);
 
     return 0;
 }
