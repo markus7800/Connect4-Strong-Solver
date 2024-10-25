@@ -105,17 +105,21 @@ uint64_t hash_64(uint64_t a) {
     return a;
 }
 
-uint64_t key_for_board(bool** board, bool* stm, uint32_t width, uint32_t height) {
-    uint64_t key = 0;
-    uint64_t i = 0;
-    for (int col = 0; col < width; col++) {
-        for (int row = 0; row < height+1; row++) {
-            key |= ((uint64_t) board[col][row]) << i;
-            i++;
-        }
-    }
-    return hash_64(key);
+// uint64_t key_for_board(c4_t* c4) {
+//     uint64_t key = 0;
+//     uint64_t i = 0;
+//     for (int col = 0; col < c4->width; col++) {
+//         for (int row = 0; row < c4->height+1; row++) {
+//             key |= ((uint64_t) c4->board[col][row]) << i;
+//             i++;
+//         }
+//     }
+//     return hash_64(key);
+// }
+uint64_t key_for_board(c4_t* c4) {
+    return c4->key >> 2;
 }
+
 
 typedef uint64_t wdl_cache_entry_t;
 
@@ -142,20 +146,24 @@ void store_in_wdl_cache(uint64_t key, int8_t res) {
 }
 
 uint64_t n_nodes = 0;
-int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
+int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
-    if (is_terminal(board, stm, width, height)) {
+    if (is_terminal(c4)) {
         return -MATESCORE + ply; // terminal is always lost
     }
-    uint64_t key = key_for_board(board, stm, width, height);
 
+    uint64_t key = key_for_board(c4);
     bool wdl_cache_hit = false;
     int8_t res = probe_wdl_cache(key, &wdl_cache_hit);
     n_wdl_cache_hits += wdl_cache_hit;
     if (!wdl_cache_hit) {
-        res = probe_board_mmap(board, stm, width, height);
+        res = probe_board_mmap(c4);
         store_in_wdl_cache(key, res);
+    } else {
+        assert(probe_board_mmap(c4) == res);
     }
+
+    // int res = probe_board_mmap(c4);
      
     if (res == 0) {
         return 0; // draw
@@ -175,6 +183,8 @@ int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_
     if (depth == 0) {
         return res;
     }
+    
+    // uint64_t key = key_for_board(c4);
 
     tt_entry_t tt_entry;
     bool tt_hit = false;
@@ -189,12 +199,13 @@ int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_
     uint8_t flag = FLAG_ALPHA;
     int8_t value;
     uint8_t bestmove = 0;
-    for (uint8_t move_ix = 0; move_ix < width; move_ix++) {
+    for (uint8_t move_ix = 0; move_ix < c4->width; move_ix++) {
         uint8_t move = moves[move_ix];
-        if (is_legal_move(board, stm, width, height, move)) {
-            play_column(board, stm, width, height, move);
-            value = -alphabeta(board, stm, width, height, -beta, -alpha, ply+1, depth-1, rootres);
-            undo_play_column(board, stm, width, height, move);
+        if (is_legal_move(c4, move)) {
+            play_column(c4, move);
+            value = -alphabeta(c4, -beta, -alpha, ply+1, depth-1, rootres);
+            undo_play_column(c4, move);
+            assert(key_for_board(c4) == key);
         
             if (value > alpha) {
                 bestmove = move;
@@ -213,8 +224,8 @@ int8_t alphabeta(bool** board, bool* stm, uint32_t width, uint32_t height, int8_
     return alpha;
 }
 
-int8_t iterdeep(bool** board, bool* stm, uint32_t width, uint32_t height) {
-    int8_t res = probe_board_mmap(board, stm, width, height);
+int8_t iterdeep(c4_t* c4) {
+    int8_t res = probe_board_mmap(c4);
     if (res == 0) {
         return 0;
     }
@@ -223,7 +234,7 @@ int8_t iterdeep(bool** board, bool* stm, uint32_t width, uint32_t height) {
     clock_gettime(CLOCK_REALTIME, &t0);
     uint8_t depth = 1;
     while (true) {
-        int8_t ab = alphabeta(board, stm, width, height, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth, res);
+        int8_t ab = alphabeta(c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth, res);
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
         printf("depth = %u, ab = %d, ", depth, ab);
@@ -296,3 +307,5 @@ Position is 1 (59)
 n_nodes = 307216200 in 3454.416s (88.934 knps)
 n_tt_hits = 47230795, n_tt_collisions = 39414424
 */
+
+// depth = 30, ab = 1, n_nodes = 24292871 in 31.495s (771.323 knps), n_tt_hits = 3136471, n_tt_collisions = 163606
