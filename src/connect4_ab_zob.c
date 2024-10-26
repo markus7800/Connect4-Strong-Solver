@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-uint64_t zob[512] = {
+const uint64_t zob[512] = {
     0xcf89ee59bd5271a4,
     0xe91f53d3a2be87cd,
     0x7940a5e3b5a252e1,

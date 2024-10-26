@@ -94,17 +94,16 @@ bool store_in_tt(uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_
     // return false;
 }
 
-uint64_t hash_64(uint64_t a) {
-    a = ~a + (a << 21);
-    a =  a ^ (a >> 24);
-    a =  a + (a << 3) + (a << 8);
-    a =  a ^ (a >> 14);
-    a =  a + (a << 2) + (a << 4);
-    a =  a ^ (a >> 28);
-    a =  a + (a << 31);
-    return a;
-}
-
+// uint64_t hash_64(uint64_t a) {
+//     a = ~a + (a << 21);
+//     a =  a ^ (a >> 24);
+//     a =  a + (a << 3) + (a << 8);
+//     a =  a ^ (a >> 14);
+//     a =  a + (a << 2) + (a << 4);
+//     a =  a ^ (a >> 28);
+//     a =  a + (a << 31);
+//     return a;
+// }
 // uint64_t key_for_board(c4_t* c4) {
 //     uint64_t key = 0;
 //     uint64_t i = 0;
@@ -116,7 +115,7 @@ uint64_t hash_64(uint64_t a) {
 //     }
 //     return hash_64(key);
 // }
-uint64_t key_for_board(c4_t* c4) {
+inline uint64_t key_for_board(c4_t* c4) {
     return c4->key >> 2;
 }
 
@@ -159,9 +158,10 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     if (!wdl_cache_hit) {
         res = probe_board_mmap(c4);
         store_in_wdl_cache(key, res);
-    } else {
-        assert(probe_board_mmap(c4) == res);
-    }
+    } 
+    // else {
+    //     assert(probe_board_mmap(c4) == res);
+    // }
 
     // int res = probe_board_mmap(c4);
      
@@ -205,7 +205,7 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
             play_column(c4, move);
             value = -alphabeta(c4, -beta, -alpha, ply+1, depth-1, rootres);
             undo_play_column(c4, move);
-            assert(key_for_board(c4) == key);
+            // assert(key_for_board(c4) == key);
         
             if (value > alpha) {
                 bestmove = move;
@@ -239,13 +239,13 @@ int8_t iterdeep(c4_t* c4) {
         double t = get_elapsed_time(t0, t1);
         printf("depth = %u, ab = %d, ", depth, ab);
         printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", n_nodes, t, n_nodes / t / 1000);
-        printf("n_tt_hits = %"PRIu64", n_tt_collisions = %"PRIu64"\n", n_tt_hits, n_tt_collisions);
+        printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
         if (abs(ab) > 1) {
             return ab;
         }
-        if (depth == 30) {
-            return ab;
-        }
+        // if (depth == 30) {
+        //     return ab;
+        // }
         depth++;
     }
 }

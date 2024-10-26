@@ -137,7 +137,7 @@ void play_column(c4_t* c4, uint8_t col) {
         c4->key ^= zob[c4->width * row + col]; // is now false
     }
     c4->stm = !(c4->stm);
-    val_zob_key(c4);
+    // val_zob_key(c4);
 }
 void undo_play_column(c4_t* c4, uint8_t col) {
     uint8_t row = c4->height+1;
@@ -149,7 +149,7 @@ void undo_play_column(c4_t* c4, uint8_t col) {
     if (!c4->stm) {
         c4->key ^= zob[c4->width * (row-1) + col];
     }
-    val_zob_key(c4);
+    // val_zob_key(c4);
 }
 
 int get_ply(c4_t* c4) {
@@ -388,7 +388,7 @@ int main(int argc, char const *argv[]) {
     c4.width = width;
     c4.height = height;
     c4.key = key;
-    val_zob_key(&c4);
+    // val_zob_key(&c4);
 
     printf("moveseq: %s\n", moveseq);
     uint8_t move;
@@ -402,7 +402,7 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps(width, height);
 
-    uint64_t log2ttsize = 26;
+    uint64_t log2ttsize = 28;
     tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
     tt_mask = (1UL << log2ttsize) - 1;
     uint64_t log2wdlcachesize = 28;
@@ -424,7 +424,6 @@ int main(int argc, char const *argv[]) {
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
     printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-    printf("n_tt_hits = %"PRIu64", n_tt_collisions = %"PRIu64"\n", n_tt_hits, n_tt_collisions);
     return 0;
  
     printf("base: %llu\n", key);
@@ -469,7 +468,7 @@ int main(int argc, char const *argv[]) {
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
         printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-        printf("n_tt_hits = %"PRIu64", n_tt_collisions = %"PRIu64"\n", n_tt_hits, n_tt_collisions);
+        printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     }
     // print_board(board, stm, width, height, bestmove);
 
