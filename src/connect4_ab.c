@@ -107,8 +107,8 @@ bool store_in_tt(uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_
 // uint64_t key_for_board(c4_t* c4) {
 //     uint64_t key = 0;
 //     uint64_t i = 0;
-//     for (int col = 0; col < c4->width; col++) {
-//         for (int row = 0; row < c4->height+1; row++) {
+//     for (int col = 0; col < WIDTH; col++) {
+//         for (int row = 0; row < HEIGHT+1; row++) {
 //             key |= ((uint64_t) c4->board[col][row]) << i;
 //             i++;
 //         }
@@ -116,7 +116,7 @@ bool store_in_tt(uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_
 //     return hash_64(key);
 // }
 inline uint64_t key_for_board(c4_t* c4) {
-    return c4->key >> 2;
+    return c4->key;
 }
 
 
@@ -195,16 +195,22 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
 
     uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
 
+    uint64_t orig_player = c4->player;
+    uint64_t orig_mask = c4->mask;
+
     uint8_t flag = FLAG_ALPHA;
     int8_t value;
     uint8_t bestmove = 0;
-    for (uint8_t move_ix = 0; move_ix < c4->width; move_ix++) {
+    for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
         uint8_t move = moves[move_ix];
         if (is_legal_move(c4, move)) {
             play_column(c4, move);
             value = -alphabeta(c4, -beta, -alpha, ply+1, depth-1, rootres);
             undo_play_column(c4, move);
             // assert(key_for_board(c4) == key);
+            assert(c4->mask == orig_mask);
+            assert(c4->player == orig_player);
+
         
             if (value > alpha) {
                 bestmove = move;
@@ -223,9 +229,9 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     return alpha;
 }
 
-uint64_t n_nodes = 0;
+uint64_t n_plain_nodes = 0;
 int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
-    n_nodes++;
+    n_plain_nodes++;
     if (is_terminal(c4)) {
         return -MATESCORE + ply; // terminal is always lost
     }
@@ -233,7 +239,7 @@ int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t
     uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
 
     int8_t value;
-    for (uint8_t move_ix = 0; move_ix < c4->width; move_ix++) {
+    for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
         uint8_t move = moves[move_ix];
         if (is_legal_move(c4, move)) {
             play_column(c4, move);

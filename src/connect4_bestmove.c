@@ -52,7 +52,7 @@ typedef struct c4 {
 } c4_t;
 
 bool is_terminal(c4_t* c4) {
-    uint64_t pos = c4->player;
+    uint64_t pos = c4->player ^ c4->mask;
     // horizontal 
     uint64_t m = pos & (pos >> (HEIGHT+1));
     if (m & (m >> (2*(HEIGHT+1)))) return true;
@@ -97,10 +97,10 @@ inline u_int64_t get_pseudo_legal_moves(uint64_t mask) {
     return (mask + BOTTOM_MASK);
 }
 
-inline uint64_t position_hash(uint64_t player, uint64_t mask) {
-    return ((mask << 1) | BOTTOM_MASK) ^ player;
+inline uint64_t position_hash(c4_t* c4) {
+    uint64_t pos = c4->ply % 2 == 1 ? c4->player : c4->player ^ c4->mask;
+    return ((c4->mask << 1) | BOTTOM_MASK) ^ pos;
 }
-
 
 int get_ply(c4_t* c4) {
     return c4->ply;
@@ -158,6 +158,7 @@ void play_column(c4_t* c4, uint8_t col) {
         c4->ply++;
         c4->player ^= c4->mask;
         c4->mask |= move;
+        c4->key = position_hash(c4);
     } else {
         perror("Illegal move!\n");
         exit(EXIT_FAILURE);
@@ -174,6 +175,7 @@ void undo_play_column(c4_t* c4, uint8_t col) {
     c4->ply--;
     c4->mask = c4->mask & ~move;
     c4->player ^= c4->mask;
+    c4->key = position_hash(c4);
     // print_mask(c4->mask);
 }
 
@@ -277,7 +279,7 @@ int probe_board_mmap(c4_t* c4) {
     //     }
     // }
 
-    uint64_t bitvector = (position_hash(c4->player, c4->mask) << 2) | (stm << 1);
+    uint64_t bitvector = (position_hash(c4) << 2) | (stm << 1);
 
     // for (int var = 1; var < ((HEIGHT+1)*WIDTH + 1); var++) {
     //     printf("%d: %d\n", var, 0b1 & (bitvector >> var));
@@ -346,7 +348,7 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
     return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
 }
 
-// #include "connect4_ab.c"
+#include "connect4_ab.c"
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
@@ -376,7 +378,7 @@ int main(int argc, char const *argv[]) {
 
     c4.player = 0;
     c4.mask = 0;
-    c4.key = 0;
+    c4.key = position_hash(&c4);
     c4.ply = 0;
     // val_zob_key(&c4);
 
@@ -395,12 +397,12 @@ int main(int argc, char const *argv[]) {
     uint64_t orig_player = c4.player;
     uint64_t orig_mask = c4.mask;
 
-    // uint64_t log2ttsize = 28;
-    // tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
-    // tt_mask = (1UL << log2ttsize) - 1;
-    // uint64_t log2wdlcachesize = 28;
-    // wdl_cache =  calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
-    // wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
+    uint64_t log2ttsize = 28;
+    tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
+    tt_mask = (1UL << log2ttsize) - 1;
+    uint64_t log2wdlcachesize = 28;
+    wdl_cache =  calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
+    wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
 
 
     struct timespec t0, t1;
@@ -411,8 +413,11 @@ int main(int argc, char const *argv[]) {
     printf("res = %d\n", res);
     // return 0;
 
-    // int ab = alphabeta(board, stm, width, height, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
-    // printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
+    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    // printf("ab = %d, n_nodes = %d\n", ab, n_plain_nodes);
+
+    ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
 
     // ab = iterdeep(&c4);
     // printf("Position is %d (%d)\n\n", res, ab);
@@ -470,8 +475,8 @@ int main(int argc, char const *argv[]) {
     
     free(mmaps);
     free(st_sizes);
-    // free(tt);
-    // free(wdl_cache);
+    free(tt);
+    free(wdl_cache);
 
     return 0;
 }
