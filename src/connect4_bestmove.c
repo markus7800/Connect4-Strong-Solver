@@ -210,52 +210,117 @@ bool is_sat_mmap(char* map, nodeindex_t ix, uint64_t bitvector) {
     return u.low == 1;
 }
 
+
+
 char* (*mmaps)[3];
 off_t (*st_sizes)[3];
+
+void make_mmap(uint32_t width, uint32_t height, int ply) {
+
+    char filename[50];
+    struct stat st;
+    char* suffix;
+
+    for (int i = 0; i < 3; i++) {
+        if (i==0) {
+            suffix = "lost";
+        } else if (i==1) {
+            suffix = "draw";
+        } else {
+            suffix = "win";
+        }
+
+        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+        stat(filename, &st);
+
+        char* map;
+
+        int fd = open(filename, O_RDONLY);
+        if (fd == -1) {
+            mmaps[ply][i] = NULL;
+            continue;
+        }
+
+        // printf("%s %llu %"PRIu32"\n", filename, st.st_size, nodecount);
+        map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        if (map == MAP_FAILED) {
+            close(fd);
+            perror("Error mmapping the file");
+            exit(EXIT_FAILURE);
+        }
+
+        mmaps[ply][i] = map;
+        st_sizes[ply][i] = st.st_size;
+
+        close(fd);
+    }
+}
+
+void read_file(uint32_t width, uint32_t height, int ply) {
+
+    char filename[50];
+    struct stat st;
+    char* suffix;
+
+    for (int i = 0; i < 3; i++) {
+        if (i==0) {
+            suffix = "lost";
+        } else if (i==1) {
+            suffix = "draw";
+        } else {
+            suffix = "win";
+        }
+
+        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+        stat(filename, &st);
+
+        char* map;
+
+        FILE* file = fopen(filename, "rb");
+        if (file == NULL) {
+            mmaps[ply][i] = NULL;
+            continue;
+        }
+        assert(mmaps[ply][i] == NULL);
+
+        map = (char*) malloc(st.st_size);
+        if (map == NULL) {
+            fclose(file);
+            perror("Error making buffer for file");
+            exit(EXIT_FAILURE);
+        }
+        size_t bytes_read = fread(map, sizeof(char), st.st_size, file);
+        assert(bytes_read == st.st_size);
+
+        mmaps[ply][i] = map;
+        st_sizes[ply][i] = st.st_size;
+
+        fclose(file);
+    }
+}
+
 void make_mmaps(uint32_t width, uint32_t height) {
     mmaps = malloc((width*height+1) * sizeof(*mmaps));
     st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
     assert(mmaps != NULL);
 
-    char filename[50];
-    struct stat st;
-    char* suffix;
     for (int ply = 0; ply <= width*height; ply++) { 
-        for (int i = 0; i < 3; i++) {
-            if (i==0) {
-                suffix = "lost";
-            } else if (i==1) {
-                suffix = "draw";
-            } else {
-                suffix = "win";
-            }
-
-            sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-            stat(filename, &st);
-
-            char* map;
-
-            int fd = open(filename, O_RDONLY);
-            if (fd == -1) {
-                mmaps[ply][i] = NULL;
-                continue;
-            }
-
-            // printf("%s %llu %"PRIu32"\n", filename, st.st_size, nodecount);
-            map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-            if (map == MAP_FAILED) {
-                close(fd);
-                perror("Error mmapping the file");
-                exit(EXIT_FAILURE);
-            }
-
-            mmaps[ply][i] = map;
-            st_sizes[ply][i] = st.st_size;
-
-            close(fd);
-        }
-    }
+        make_mmap(width, height, ply);
+    }       
 }
+// void free_mmap(uint32_t width, uint32_t height, int ply) {
+//     for (int i = 0; i < 3; i++) {
+//         if (mmaps[ply][i] != NULL) {
+//             free(mmaps[ply][i]);
+//         }
+//     }
+// }
+
+// void free_mmaps(uint32_t width, uint32_t height) {
+//     for (int ply = 0; ply <= width*height; ply++) { 
+//         free_mmap(width, height, ply);
+//     }       
+// }
 
 int probe_board_mmap(c4_t* c4) {
     bool win_sat, draw_sat, lost_sat;
@@ -393,6 +458,9 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps(width, height);
 
+    // free_mmap(width, height, 10);
+    read_file(width, height, 10);
+
     uint64_t orig_player = c4.player;
     uint64_t orig_mask = c4.mask;
 
@@ -472,7 +540,7 @@ int main(int argc, char const *argv[]) {
         // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     }
     
-    
+    // free_mmaps(width, height);
     free(mmaps);
     free(st_sizes);
     free(tt);
