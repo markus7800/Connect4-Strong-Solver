@@ -145,7 +145,7 @@ void store_in_wdl_cache(uint64_t key, int8_t res) {
 }
 
 uint64_t n_plain_nodes = 0;
-int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
+int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth) {
     n_plain_nodes++;
     if (is_terminal(c4)) {
         return -MATESCORE + ply; // terminal is always lost
@@ -164,7 +164,7 @@ int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t
         uint8_t move = moves[move_ix];
         if (is_legal_move(c4, move)) {
             play_column(c4, move);
-            value = -alphabeta_plain(c4, -beta, -alpha, ply+1, depth-1, rootres);
+            value = -alphabeta_plain(c4, -beta, -alpha, ply+1, depth-1);
             undo_play_column(c4, move);
         
             if (value > alpha) {
@@ -213,14 +213,10 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
         }
     }
 
-    if (ply % 2 == 0) {
-        assert(res == rootres);
-    } else {
-        assert(res == -rootres);
-    }
+    assert(res == rootres);
 
     if (depth == 0) {
-        int8_t horizon_res = alphabeta_plain(c4, alpha, beta, ply, 4, rootres);
+        int8_t horizon_res = alphabeta_plain(c4, alpha, beta, ply, 4);
         if (horizon_res != 0) {
             return horizon_res;
         } else {
@@ -251,7 +247,7 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
         uint8_t move = moves[move_ix];
         if (is_legal_move(c4, move)) {
             play_column(c4, move);
-            value = -alphabeta(c4, -beta, -alpha, ply+1, depth-1, rootres);
+            value = -alphabeta(c4, -beta, -alpha, ply+1, depth-1, -rootres);
             undo_play_column(c4, move);
             // assert(key_for_board(c4) == key);
             assert(c4->mask == orig_mask);
@@ -276,7 +272,7 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
 }
 
 
-int8_t iterdeep(c4_t* c4) {
+int8_t iterdeep(c4_t* c4, bool verbose, uint8_t ply) {
     int8_t res = probe_board_mmap(c4);
     if (res == 0) {
         return 0;
@@ -299,15 +295,17 @@ int8_t iterdeep(c4_t* c4) {
         //     }   
         // }
         if (res == 1) {
-            ab = alphabeta(c4, 1, MATESCORE, 0, depth, res);
+            ab = alphabeta(c4, 1, MATESCORE, ply, depth, res);
         } else {
-            ab = alphabeta(c4, -MATESCORE, -1, 0, depth, res);
+            ab = alphabeta(c4, -MATESCORE, -1, ply, depth, res);
         }
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
-        printf("depth = %u, ab = %d, ", depth, ab);
-        printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", n_nodes, t, n_nodes / t / 1000);
-        printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
+        if (verbose) {
+            printf("depth = %u, ab = %d, ", depth, ab);
+            printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", n_nodes, t, n_nodes / t / 1000);
+            printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
+        }
         if (abs(ab) > 1) {
             return ab;
         }

@@ -413,7 +413,7 @@ int main(int argc, char const *argv[]) {
 
 
     // clock_gettime(CLOCK_REALTIME, &t0);
-    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7);
     // clock_gettime(CLOCK_REALTIME, &t1);
     // double t = get_elapsed_time(t0, t1);
     // printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
@@ -422,12 +422,11 @@ int main(int argc, char const *argv[]) {
     // printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
 
     clock_gettime(CLOCK_REALTIME, &t0);
-    ab = iterdeep(&c4);
+    ab = iterdeep(&c4, true, 0);
     printf("Position is %d (%d)\n\n", res, ab);
     clock_gettime(CLOCK_REALTIME, &t1);
     double t = get_elapsed_time(t0, t1);
     printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-    return 0;
  
     // printf("base: %llu\n", key);
 
@@ -444,12 +443,10 @@ int main(int argc, char const *argv[]) {
         for (move = 0; move < width; move++) {
             if (is_legal_move(&c4, move)) {
                 play_column(&c4, move);
-                // print_board(board, stm, width, height, -1);
-                res = -probe_board_mmap(&c4);
+                // res = -probe_board_mmap(&c4);
                 // printf("%2d ", res);
-                // ab = -alphabeta(&c4, -res == 1 ? 1 : -MATESCORE, -res == -1 ? -1 : MATESCORE, 1, 7, res);
-
-                ab = res;
+                // ab = res;
+                ab = -iterdeep(&c4, false, 1);
                 
                 printf("%3d ", ab);
 
