@@ -150,7 +150,6 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     if (is_terminal(c4)) {
         return -MATESCORE + ply; // terminal is always lost
     }
-
     uint64_t key = key_for_board(c4);
     bool wdl_cache_hit = false;
     int8_t res = probe_wdl_cache(key, &wdl_cache_hit);
@@ -164,7 +163,7 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     // }
 
     // int res = probe_board_mmap(c4);
-     
+
     if (res == 0) {
         return 0; // draw
     }
@@ -224,6 +223,36 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     return alpha;
 }
 
+uint64_t n_nodes = 0;
+int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
+    n_nodes++;
+    if (is_terminal(c4)) {
+        return -MATESCORE + ply; // terminal is always lost
+    }
+
+    uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
+
+    int8_t value;
+    for (uint8_t move_ix = 0; move_ix < c4->width; move_ix++) {
+        uint8_t move = moves[move_ix];
+        if (is_legal_move(c4, move)) {
+            play_column(c4, move);
+            value = -alphabeta_plain(c4, -beta, -alpha, ply+1, depth-1, rootres);
+            undo_play_column(c4, move);
+        
+            if (value > alpha) {
+                alpha = value;
+            }
+            if (value >= beta) {
+                alpha = beta;
+                break;
+            }
+        }
+    }
+    
+    return alpha;
+}
+
 int8_t iterdeep(c4_t* c4) {
     int8_t res = probe_board_mmap(c4);
     if (res == 0) {
@@ -243,9 +272,9 @@ int8_t iterdeep(c4_t* c4) {
         if (abs(ab) > 1) {
             return ab;
         }
-        // if (depth == 30) {
-        //     return ab;
-        // }
+        if (depth == 30) {
+            return ab;
+        }
         depth++;
     }
 }

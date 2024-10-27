@@ -20,159 +20,105 @@
 #define ALLOW_ROW_ORDER 0
 #endif
 
+#define HEIGHT 6
+#define WIDTH 7
+
+#define BOTTOM_MASK 0x40810204081
+#define BOARD_MASK 0xfdfbf7efdfbf
+#define COLUMN_A 0x3f           // 0
+#define COLUMN_B 0x1f80         // 1
+#define COLUMN_C 0xfc000        // 2
+#define COLUMN_D 0x7e00000      // 3
+#define COLUMN_E 0x3f0000000    // 4
+#define COLUMN_F 0x1f800000000  // 5
+#define COLUMN_G 0xfc0000000000 // 6
+
+u_int64_t column_mask(uint8_t col) {
+    return ((1ULL << HEIGHT) - 1) << col * (HEIGHT + 1);
+}
+
+inline int is_set(u_int64_t pos, int i) {
+    return (1ULL & (pos >> i));
+}
+inline void set(u_int64_t* pos, int i) {
+    *pos = (1ULL << i) | *pos;
+}
+
 typedef struct c4 {
-    bool** board;
-    bool stm;
-    uint32_t width;
-    uint32_t height;
+    uint64_t player;
+    uint64_t mask;
     uint64_t key;
+    uint32_t ply;
 } c4_t;
 
-
-bool is_played_cell(c4_t* c4, int col, int row) {
-    for (int r = row+1; r < c4->height+1; r++) {
-        if (c4->board[col][r]) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool is_terminal(c4_t* c4) {
-    bool a;
-    bool x;
-    if (c4->height >= 4) {
-        for (int col = 0; col < c4->width; col++) {
-            for (int row = 0; row <= c4->height - 4; row++) {
-                a = true;
-                for (int i = 0; i < 4; i++) {
-                    x = !(c4->stm) ? c4->board[col][row + i] : !(c4->board[col][row + i]);
-                    a = a && x && is_played_cell(c4, col, row + i);
-                }
-                if (a) return true;
-            }
-        }
-    }
+    uint64_t pos = c4->player;
+    // horizontal 
+    uint64_t m = pos & (pos >> (HEIGHT+1));
+    if (m & (m >> (2*(HEIGHT+1)))) return true;
 
-    // ROW
-    if (c4->width >= 4) {
-        for (int row = 0; row < c4->height; row++) {
-            for (int col = 0; col <= c4->width - 4; col++) {
-                a = true;
-                for (int i = 0; i < 4; i++) {
-                    x = !(c4->stm) ? c4->board[col + i][row] : !(c4->board[col + i][row]);
-                    a = a && x && is_played_cell(c4, col + i, row);
-                }
-                if (a) return true;
-            }
-        }
-    }
+    // diagonal 1
+    m = pos & (pos >> HEIGHT);
+    if(m & (m >> (2*HEIGHT))) return true;
 
-    if (c4->height >= 4 && c4->width >= 4) {
-        // DIAG ascending
-        for (int col = 0; col <= c4->width - 4; col++) {
-            for (int row = 0; row <= c4->height - 4; row++) {
-                a = true;
-                for (int i = 0; i < 4; i++) {
-                    x = !(c4->stm) ? c4->board[col + i][row + i] : !(c4->board[col + i][row + i]);
-                    a = a && x && is_played_cell(c4, col + i, row + i);
-                }
-                if (a) return true;
-            }
-        }
+    // diagonal 2 
+    m = pos & (pos >> (HEIGHT+2));
+    if(m & (m >> (2*(HEIGHT+2)))) return true;
 
-        // DIAG descending
-        for (int col = 3; col < c4->width; col++) {
-            for (int row = 0; row <= c4->height - 4; row++) {
-                a = true;
-                for (int i = 0; i < 4; i++) {
-                    x = !(c4->stm) ? c4->board[col - i][row + i] : !((c4->board[col - i][row + i]));
-                    a = a && x && is_played_cell(c4, col - i, row + i);
-                }
-                if (a) return true;
-            }
-        }
-    }
+    // vertical;
+    m = pos & (pos >> 1);
+    if(m & (m >> 2)) return true;
 
     // draw
-    a = true;
-    for (int col = 0; col < c4->width; col++) {
-        a = a && c4->board[col][c4->height+1];
-    }
-    if (a) return true;
+    if (c4->ply == HEIGHT*WIDTH) return true;
 
     return false;
 }
 
-bool is_legal_move(c4_t* c4, int col) {
-    return !(c4->board[col][c4->height]);
+bool is_legal_move(c4_t* c4, uint8_t col) {
+    return (c4->mask + BOTTOM_MASK) & column_mask(col);
 }
 
 #include "connect4_ab_zob.c"
 
-void val_zob_key(c4_t* c4) {
-    // add zob if board[c][r] == true
-    uint64_t cmp_key = 0;
-    for (int c=0; c < c4->width; c++) {
-        for (int r=0; r < c4->height+1; r++) {
-            if (c4->board[c][r]) {
-                cmp_key ^= zob[c4->width * r + c];
-            }
-        }
-    }
-    assert(cmp_key == c4->key);
+// void val_zob_key(c4_t* c4) {
+//     // add zob if board[c][r] == true
+//     uint64_t cmp_key = 0;
+//     for (int c=0; c < WIDTH; c++) {
+//         for (int r=0; r < HEIGHT+1; r++) {
+//             if (c4->board[c][r]) {
+//                 cmp_key ^= zob[WIDTH * r + c];
+//             }
+//         }
+//     }
+//     assert(cmp_key == c4->key);
+// }
+inline u_int64_t get_pseudo_legal_moves(uint64_t mask) {
+    return (mask + BOTTOM_MASK);
 }
 
-void play_column(c4_t* c4, uint8_t col) {
-    if (c4->board[col][c4->height]) {
-        perror("Cannot play column.");
-        return;
-    }
-    uint8_t row = c4->height;
-    while (!c4->board[col][row]) row--;
-    c4->board[col][row] = c4->stm;
-    c4->board[col][row+1] = true;
-    c4->key ^= zob[c4->width * (row+1) + col];
-    if (!c4->stm) {
-        c4->key ^= zob[c4->width * row + col]; // is now false
-    }
-    c4->stm = !(c4->stm);
-    // val_zob_key(c4);
+inline uint64_t position_hash(uint64_t player, uint64_t mask) {
+    return ((mask << 1) | BOTTOM_MASK) ^ player;
 }
-void undo_play_column(c4_t* c4, uint8_t col) {
-    uint8_t row = c4->height+1;
-    while (!c4->board[col][row]) row--;
-    c4->board[col][row] = false;
-    c4->board[col][row-1] = true;
-    c4->key ^= zob[c4->width * row + col];
-    c4->stm = !(c4->stm);
-    if (!c4->stm) {
-        c4->key ^= zob[c4->width * (row-1) + col];
-    }
-    // val_zob_key(c4);
-}
+
 
 int get_ply(c4_t* c4) {
-    int ply = 0;
-    for (int i = 0; i < c4->height; i++) {
-        for (int j = 0; j < c4->width; j++) {
-            ply += is_played_cell(c4, j, i);
-        }
-    }
-    return ply;
+    return c4->ply;
 }
 
 void print_board(c4_t* c4, int highlight_col) {
-
-    char stm_c = c4->stm ? 'x' : 'o';
+    int to_play = c4->ply % 2;
+    char stm_c = (to_play == 0) ? 'x' : 'o';
     bool term = is_terminal(c4);
     int cnt = get_ply(c4);
-    printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", c4->width, c4->height);
-    for (int i = c4->height-1; i>= 0; i--) {
-        for (int j = 0; j < c4->width; j++) {
+    printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", WIDTH, HEIGHT);
+    int bit;
+    for (int i = HEIGHT-1; i>= 0; i--) {
+        for (int j = 0; j < WIDTH; j++) {
             if (j == highlight_col) printf("\033[95m");
-            if (is_played_cell(c4, j, i)) {
-                if (c4->board[j][i]) {
+            bit = i + (HEIGHT+1)*j;
+            if (is_set(c4->mask, bit)) {
+                if (is_set(c4->player, bit) != to_play) {
                     printf(" x");
                 } else {
                     printf(" o");
@@ -190,6 +136,46 @@ void print_board(c4_t* c4, int highlight_col) {
     // printf("stones played: %d\nside to move: %c\n\n", cnt, stm_c, term);
 }
 
+void print_mask(u_int64_t mask) {
+    int bit;
+    for (int i = HEIGHT; i>= 0; i--) {
+        for (int j = 0; j < WIDTH; j++) {
+            bit = i + (HEIGHT+1)*j;
+            if (is_set(mask, bit) > 0) {
+                printf("1 ");
+            } else {
+                printf("0 ");
+            }
+        }
+        printf("\n");
+    }
+    printf("0x%llx\n", mask);
+}
+
+void play_column(c4_t* c4, uint8_t col) {
+    uint64_t move = get_pseudo_legal_moves(c4->mask) & column_mask(col);
+    if (move) {
+        c4->ply++;
+        c4->player ^= c4->mask;
+        c4->mask |= move;
+    } else {
+        perror("Illegal move!\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+// new_mask = mask | (mask + BOTTOM_MASK) & col
+
+void undo_play_column(c4_t* c4, uint8_t col) {
+    uint64_t move = (get_pseudo_legal_moves(c4->mask >> 1) & column_mask(col));
+    // print_mask(c4->mask);
+    // print_mask((BOTTOM_MASK << HEIGHT) - c4->mask);
+    // print_mask(move);
+    c4->ply--;
+    c4->mask = c4->mask & ~move;
+    c4->player ^= c4->mask;
+    // print_mask(c4->mask);
+}
 
 typedef uint32_t nodeindex_t;
 // the special nodes 0 and 1 will always be stored at index 0 and 1 respectively
@@ -212,11 +198,11 @@ void get_mmap_node(char* map, nodeindex_t ix, mmapbddnode_t* node) {
     memcpy(&node->high, &map[i+5], 4);
 }
 
-bool is_sat_mmap(char* map, nodeindex_t ix, bool* bitvector) {
+bool is_sat_mmap(char* map, nodeindex_t ix, uint64_t bitvector) {
     mmapbddnode_t u;
     get_mmap_node(map, ix, &u);
     while (u.var != 0) {
-        ix = bitvector[u.var] ? u.high : u.low;
+        ix = (0b1 & (bitvector >> (u.var))) ? u.high : u.low;
         get_mmap_node(map, ix, &u);
     }
     return u.low == 1;
@@ -276,15 +262,32 @@ int probe_board_mmap(c4_t* c4) {
     bool* read_ptr;
 
     int ply = get_ply(c4);
-    bool* bitvector = (bool*) malloc(sizeof(bool) * ((c4->height+1)*c4->width + 1 + 1));
-    bitvector[1] = c4->stm;
-    int k = 2;
-    for (int col=0; col < c4->width; col++) {
-        for (int row=0; row < c4->height+1; row++) {
-            bitvector[k] = c4->board[col][row];
-            k++;
-        }
-    }
+    bool stm = ply % 2 == 0;
+
+
+    // bool* _bitvector = (bool*) malloc(sizeof(bool) * ((HEIGHT+1)*WIDTH + 1 + 1));
+    // _bitvector[0] = 0;
+    // _bitvector[1] = stm;
+    // int k = 2;
+    // for (int col=0; col < WIDTH; col++) {
+    //     for (int row=0; row < HEIGHT+1; row++) {
+    //         int bit = row + (HEIGHT+1)*col;
+    //         _bitvector[k] = ((BOTTOM_MASK & (1 << bit)) > 0);
+    //         k++; //is_set(c4->player, bit) | 
+    //     }
+    // }
+
+    uint64_t bitvector = (position_hash(c4->player, c4->mask) << 2) | (stm << 1);
+
+    // for (int var = 1; var < ((HEIGHT+1)*WIDTH + 1); var++) {
+    //     printf("%d: %d\n", var, 0b1 & (bitvector >> var));
+    // }
+    // for (int k = 0; k < ((HEIGHT+1)*WIDTH + 1 + 1); k++) {
+    //     printf("%d: %d vs %d\n", k, _bitvector[k], 0b1 & (bitvector >> k));
+    // }
+    // exit(EXIT_FAILURE);
+
+
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
@@ -314,7 +317,6 @@ int probe_board_mmap(c4_t* c4) {
 
         *sat_ptr = is_sat_mmap(map, bdd, bitvector);
     }
-    free(bitvector);
 
     // have to read at least two files
     assert(win_read + draw_read + lost_read >= 2);
@@ -344,7 +346,7 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
     return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
 }
 
-#include "connect4_ab.c"
+// #include "connect4_ab.c"
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
@@ -371,23 +373,11 @@ int main(int argc, char const *argv[]) {
     assert(COMPRESSED_ENCODING);
     assert(!ALLOW_ROW_ORDER);
     uint64_t key = 0;
-    bool** board = (bool**) malloc(sizeof(bool*) * width);
-    for (int col=0; col<width; col++) {
-        board[col] = (bool*) malloc(sizeof(bool) * (height+1));
-        board[col][0] = true; // bottom row is high
-        key ^= zob[col];
-        for (int row=1; row<height+1; row++) {
-            board[col][row] = false;
-        }
-    }
-    bool _stm = true;
-    bool* stm = &_stm;
 
-    c4.board = board;
-    c4.stm = stm;
-    c4.width = width;
-    c4.height = height;
-    c4.key = key;
+    c4.player = 0;
+    c4.mask = 0;
+    c4.key = 0;
+    c4.ply = 0;
     // val_zob_key(&c4);
 
     printf("moveseq: %s\n", moveseq);
@@ -402,12 +392,15 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps(width, height);
 
-    uint64_t log2ttsize = 28;
-    tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
-    tt_mask = (1UL << log2ttsize) - 1;
-    uint64_t log2wdlcachesize = 28;
-    wdl_cache =  calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
-    wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
+    uint64_t orig_player = c4.player;
+    uint64_t orig_mask = c4.mask;
+
+    // uint64_t log2ttsize = 28;
+    // tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
+    // tt_mask = (1UL << log2ttsize) - 1;
+    // uint64_t log2wdlcachesize = 28;
+    // wdl_cache =  calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
+    // wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
 
 
     struct timespec t0, t1;
@@ -415,18 +408,20 @@ int main(int argc, char const *argv[]) {
 
     int res = probe_board_mmap(&c4);
     int ab;
+    printf("res = %d\n", res);
+    // return 0;
 
     // int ab = alphabeta(board, stm, width, height, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
     // printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
 
-    ab = iterdeep(&c4);
-    printf("Position is %d (%d)\n\n", res, ab);
-    clock_gettime(CLOCK_REALTIME, &t1);
-    double t = get_elapsed_time(t0, t1);
-    printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-    return 0;
+    // ab = iterdeep(&c4);
+    // printf("Position is %d (%d)\n\n", res, ab);
+    // clock_gettime(CLOCK_REALTIME, &t1);
+    // double t = get_elapsed_time(t0, t1);
+    // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+    // return 0;
  
-    printf("base: %llu\n", key);
+    // printf("base: %llu\n", key);
 
     if (!is_terminal(&c4)) {
         int bestmove = -1;
@@ -445,21 +440,22 @@ int main(int argc, char const *argv[]) {
                 res = -probe_board_mmap(&c4);
                 // printf("%2d ", res);
                 // ab = -alphabeta(&c4, -res == 1 ? 1 : -MATESCORE, -res == -1 ? -1 : MATESCORE, 1, 7, res);
-                // printf("%3d ", ab);
 
                 ab = res;
-                printf("%d: %llu ", move, c4.key);
+                
+                printf("%3d ", ab);
 
                 undo_play_column(&c4, move);
-                printf("undo: %llu\n", c4.key);
-                assert(key == c4.key);
+                
+                assert(c4.mask == orig_mask);
+                assert(c4.player == orig_player);
 
                 if (ab > bestscore) {
                     bestscore = ab;
                     bestmove = move;
                 }
             } else {
-                printf(". ");
+                printf("  . ");
             }
         }
         printf("\n\n");
@@ -467,24 +463,15 @@ int main(int argc, char const *argv[]) {
 
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
-        printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-        printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
+        // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+        // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     }
-    // print_board(board, stm, width, height, bestmove);
-
-
-    // alphabeta(board, stm, width, height, 1, MATESCORE, 0);
-    // return 0;
     
-    for (int col=0; col<width; col++) {
-        free(board[col]);
-    }
-    free(board);
     
     free(mmaps);
     free(st_sizes);
-    free(tt);
-    free(wdl_cache);
+    // free(tt);
+    // free(wdl_cache);
 
     return 0;
 }
