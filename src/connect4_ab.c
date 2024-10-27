@@ -94,16 +94,16 @@ bool store_in_tt(uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_
     // return false;
 }
 
-// uint64_t hash_64(uint64_t a) {
-//     a = ~a + (a << 21);
-//     a =  a ^ (a >> 24);
-//     a =  a + (a << 3) + (a << 8);
-//     a =  a ^ (a >> 14);
-//     a =  a + (a << 2) + (a << 4);
-//     a =  a ^ (a >> 28);
-//     a =  a + (a << 31);
-//     return a;
-// }
+uint64_t hash_64(uint64_t a) {
+    a = ~a + (a << 21);
+    a =  a ^ (a >> 24);
+    a =  a + (a << 3) + (a << 8);
+    a =  a ^ (a >> 14);
+    a =  a + (a << 2) + (a << 4);
+    a =  a ^ (a >> 28);
+    a =  a + (a << 31);
+    return a;
+}
 // uint64_t key_for_board(c4_t* c4) {
 //     uint64_t key = 0;
 //     uint64_t i = 0;
@@ -116,7 +116,7 @@ bool store_in_tt(uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_
 //     return hash_64(key);
 // }
 inline uint64_t key_for_board(c4_t* c4) {
-    return c4->key;
+    return hash_64(c4->key);
 }
 
 
@@ -234,6 +234,9 @@ int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t
     n_plain_nodes++;
     if (is_terminal(c4)) {
         return -MATESCORE + ply; // terminal is always lost
+    }
+    if (depth == 0) {
+        return 0;
     }
 
     uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};

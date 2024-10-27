@@ -406,19 +406,23 @@ int main(int argc, char const *argv[]) {
 
 
     struct timespec t0, t1;
-    clock_gettime(CLOCK_REALTIME, &t0);
 
     int res = probe_board_mmap(&c4);
     int ab;
     printf("res = %d\n", res);
     // return 0;
 
-    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
-    // printf("ab = %d, n_nodes = %d\n", ab, n_plain_nodes);
+
+    clock_gettime(CLOCK_REALTIME, &t0);
+    ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    clock_gettime(CLOCK_REALTIME, &t1);
+    double t = get_elapsed_time(t0, t1);
+    printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
 
     ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
-    printf("ab = %d, n_nodes = %d\n", ab, n_nodes);
+    printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
 
+    // clock_gettime(CLOCK_REALTIME, &t0);
     // ab = iterdeep(&c4);
     // printf("Position is %d (%d)\n\n", res, ab);
     // clock_gettime(CLOCK_REALTIME, &t1);
