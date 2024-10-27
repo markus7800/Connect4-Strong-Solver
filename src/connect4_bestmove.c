@@ -374,7 +374,6 @@ int main(int argc, char const *argv[]) {
 
     assert(COMPRESSED_ENCODING);
     assert(!ALLOW_ROW_ORDER);
-    uint64_t key = 0;
 
     c4.player = 0;
     c4.mask = 0;
@@ -401,7 +400,7 @@ int main(int argc, char const *argv[]) {
     tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
     tt_mask = (1UL << log2ttsize) - 1;
     uint64_t log2wdlcachesize = 28;
-    wdl_cache =  calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
+    wdl_cache = calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
     wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
 
 
@@ -413,22 +412,22 @@ int main(int argc, char const *argv[]) {
     // return 0;
 
 
-    clock_gettime(CLOCK_REALTIME, &t0);
-    ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
-    clock_gettime(CLOCK_REALTIME, &t1);
-    double t = get_elapsed_time(t0, t1);
-    printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
-
-    ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
-    printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
-
     // clock_gettime(CLOCK_REALTIME, &t0);
-    // ab = iterdeep(&c4);
-    // printf("Position is %d (%d)\n\n", res, ab);
+    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
     // clock_gettime(CLOCK_REALTIME, &t1);
     // double t = get_elapsed_time(t0, t1);
-    // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-    // return 0;
+    // printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
+
+    // ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    // printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
+
+    clock_gettime(CLOCK_REALTIME, &t0);
+    ab = iterdeep(&c4);
+    printf("Position is %d (%d)\n\n", res, ab);
+    clock_gettime(CLOCK_REALTIME, &t1);
+    double t = get_elapsed_time(t0, t1);
+    printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+    return 0;
  
     // printf("base: %llu\n", key);
 
@@ -470,8 +469,8 @@ int main(int argc, char const *argv[]) {
         printf("\n\n");
         printf("Best move: %d with score %d\n\n", bestmove, bestscore);
 
-        clock_gettime(CLOCK_REALTIME, &t1);
-        double t = get_elapsed_time(t0, t1);
+        // clock_gettime(CLOCK_REALTIME, &t1);
+        // double t = get_elapsed_time(t0, t1);
         // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
         // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     }
