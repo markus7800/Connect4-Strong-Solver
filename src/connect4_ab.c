@@ -153,6 +153,9 @@ int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t
     if (depth == 0) {
         return 0;
     }
+    if (MATESCORE - ply <= alpha) {
+        return alpha;
+    }
 
     uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
 
@@ -182,6 +185,9 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     n_nodes++;
     if (is_terminal(c4)) {
         return -MATESCORE + ply; // terminal is always lost
+    }
+    if (MATESCORE - ply <= alpha) {
+        return alpha;
     }
 
     uint64_t key = key_for_board(c4);
@@ -220,6 +226,7 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
         } else {
             return res;
         }
+        // return res;
     }
     
     // uint64_t key = key_for_board(c4);
@@ -278,8 +285,24 @@ int8_t iterdeep(c4_t* c4) {
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
     uint8_t depth = 1;
+    int8_t ab;
     while (true) {
-        int8_t ab = alphabeta(c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth, res);
+        // if (res == 1) {
+        //     ab = alphabeta(c4, 1, 2, 0, depth, res);
+        //     if (ab > 1) {
+        //         ab = alphabeta(c4, 1, MATESCORE, 0, depth, res);
+        //     }
+        // } else {
+        //     ab = alphabeta(c4, -2, -1, 0, depth, res);
+        //     if (ab < -1) {
+        //         ab = alphabeta(c4, -MATESCORE, -1, 0, depth, res);
+        //     }   
+        // }
+        if (res == 1) {
+            ab = alphabeta(c4, 1, MATESCORE, 0, depth, res);
+        } else {
+            ab = alphabeta(c4, -MATESCORE, -1, 0, depth, res);
+        }
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
         printf("depth = %u, ab = %d, ", depth, ab);
