@@ -180,6 +180,8 @@ int8_t alphabeta_plain(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t
     return alpha;
 }
 
+#define PLIES_IN_MEMORY 1
+
 uint64_t n_nodes = 0;
 int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
@@ -214,6 +216,10 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     }
 
     assert(res == rootres);
+    if ((depth <= PLIES_IN_MEMORY) && !(in_memory[ply][0] || in_memory[ply][1] || in_memory[ply][2])) {
+        printf("not in memory: %u\n", ply); // TODO: remove
+        exit(EXIT_FAILURE);
+    }
 
     if (depth == 0) {
         int8_t horizon_res = alphabeta_plain(c4, alpha, beta, ply, 4);
@@ -280,9 +286,11 @@ int8_t iterdeep(c4_t* c4, bool verbose, uint8_t ply) {
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
-    uint8_t depth = 1;
+    uint8_t depth = 0;
     int8_t ab;
     while (true) {
+        free_mmap(WIDTH, HEIGHT, depth+ply);
+        read_in_memory(WIDTH, HEIGHT, depth+ply);
         // if (res == 1) {
         //     ab = alphabeta(c4, 1, 2, 0, depth, res);
         //     if (ab > 1) {
@@ -312,6 +320,12 @@ int8_t iterdeep(c4_t* c4, bool verbose, uint8_t ply) {
         // if (depth == 30) {
         //     return ab;
         // }
+
+        if (depth + ply - PLIES_IN_MEMORY >= 0) {
+            free_mmap(WIDTH, HEIGHT, depth + ply - PLIES_IN_MEMORY);
+            make_mmap(WIDTH, HEIGHT, depth + ply - PLIES_IN_MEMORY);
+        }
+
         depth++;
     }
 }
