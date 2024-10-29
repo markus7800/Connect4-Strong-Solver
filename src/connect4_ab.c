@@ -193,16 +193,21 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     }
 
     uint64_t key = key_for_board(c4);
-    bool wdl_cache_hit = false;
-    int8_t res = probe_wdl_cache(key, &wdl_cache_hit);
-    n_wdl_cache_hits += wdl_cache_hit;
-    if (!wdl_cache_hit) {
-        res = probe_board_mmap(c4);
-        store_in_wdl_cache(key, res);
-    } 
-    // else {
-    //     assert(probe_board_mmap(c4) == res);
-    // }
+
+    int8_t res;
+    if (rootres == 1) {
+        // assert(probe_board_mmap(c4) == 1);
+        // all responses of opponent in lost position lead to winning position
+        res = 1;
+    } else {
+        bool wdl_cache_hit = false;
+        res = probe_wdl_cache(key, &wdl_cache_hit);
+        n_wdl_cache_hits += wdl_cache_hit;
+        if (!wdl_cache_hit) {
+            res = probe_board_mmap(c4);
+            store_in_wdl_cache(key, res);
+        } 
+    }
 
     // int res = probe_board_mmap(c4);
 
@@ -211,24 +216,25 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     }
     if (res == 1) {
         if (beta <= 0) {
+            // winning move but we now that opponent has win
             return beta;
         }
     }
 
     assert(res == rootres);
-    if ((depth <= PLIES_IN_MEMORY) && !(in_memory[ply][0] || in_memory[ply][1] || in_memory[ply][2])) {
-        printf("not in memory: %u\n", ply); // TODO: remove
-        exit(EXIT_FAILURE);
-    }
+    // if ((depth <= PLIES_IN_MEMORY) && !(in_memory[ply][0] || in_memory[ply][1] || in_memory[ply][2])) {
+    //     printf("not in memory: %u\n", ply); // TODO: remove
+    //     exit(EXIT_FAILURE);
+    // }
 
     if (depth == 0) {
-        int8_t horizon_res = alphabeta_plain(c4, alpha, beta, ply, 4);
-        if (horizon_res != 0) {
-            return horizon_res;
-        } else {
-            return res;
-        }
-        // return res;
+        // int8_t horizon_res = alphabeta_plain(c4, alpha, beta, ply, 4);
+        // if (horizon_res != 0) {
+        //     return horizon_res;
+        // } else {
+        //     return res;
+        // }
+        return res;
     }
     
     // uint64_t key = key_for_board(c4);
@@ -289,8 +295,8 @@ int8_t iterdeep(c4_t* c4, bool verbose, uint8_t ply) {
     uint8_t depth = 0;
     int8_t ab;
     while (true) {
-        free_mmap(WIDTH, HEIGHT, depth+ply);
-        read_in_memory(WIDTH, HEIGHT, depth+ply);
+        // free_mmap(WIDTH, HEIGHT, depth+ply);
+        // read_in_memory(WIDTH, HEIGHT, depth+ply);
         // if (res == 1) {
         //     ab = alphabeta(c4, 1, 2, 0, depth, res);
         //     if (ab > 1) {
@@ -321,10 +327,10 @@ int8_t iterdeep(c4_t* c4, bool verbose, uint8_t ply) {
         //     return ab;
         // }
 
-        if (depth + ply - PLIES_IN_MEMORY >= 0) {
-            free_mmap(WIDTH, HEIGHT, depth + ply - PLIES_IN_MEMORY);
-            make_mmap(WIDTH, HEIGHT, depth + ply - PLIES_IN_MEMORY);
-        }
+        // if (depth + ply - PLIES_IN_MEMORY >= 0) {
+        //     free_mmap(WIDTH, HEIGHT, depth + ply - PLIES_IN_MEMORY);
+        //     make_mmap(WIDTH, HEIGHT, depth + ply - PLIES_IN_MEMORY);
+        // }
 
         depth++;
     }

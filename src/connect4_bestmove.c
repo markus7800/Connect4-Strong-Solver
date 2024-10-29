@@ -312,11 +312,11 @@ void make_mmaps(uint32_t width, uint32_t height) {
     assert(mmaps != NULL);
 
     for (int ply = 0; ply <= width*height; ply++) {
-        // if (ply <= 21) {
-        //     read_in_memory(width, height, ply);
-        // } else {
+        if (ply <= 21) {
+            read_in_memory(width, height, ply);
+        } else {
             make_mmap(width, height, ply);
-        // }
+        }
     }       
 }
 
