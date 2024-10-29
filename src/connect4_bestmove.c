@@ -51,8 +51,7 @@ typedef struct c4 {
     uint32_t ply;
 } c4_t;
 
-bool is_terminal(c4_t* c4) {
-    uint64_t pos = c4->player ^ c4->mask;
+bool alightment(uint64_t pos) {
     // horizontal 
     uint64_t m = pos & (pos >> (HEIGHT+1));
     if (m & (m >> (2*(HEIGHT+1)))) return true;
@@ -68,6 +67,14 @@ bool is_terminal(c4_t* c4) {
     // vertical;
     m = pos & (pos >> 1);
     if(m & (m >> 2)) return true;
+
+    return false;
+}
+bool is_terminal(c4_t* c4) {
+    uint64_t pos = c4->player ^ c4->mask;
+    if (alightment(pos)) {
+        return true;
+    }
 
     // draw
     if (c4->ply == HEIGHT*WIDTH) return true;
@@ -499,6 +506,7 @@ int main(int argc, char const *argv[]) {
 
 
     struct timespec t0, t1;
+    double t;
 
     int res = probe_board_mmap(&c4);
     int ab;
@@ -509,17 +517,26 @@ int main(int argc, char const *argv[]) {
     // clock_gettime(CLOCK_REALTIME, &t0);
     // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7);
     // clock_gettime(CLOCK_REALTIME, &t1);
-    // double t = get_elapsed_time(t0, t1);
+    // t = get_elapsed_time(t0, t1);
     // printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
 
     // ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
     // printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
 
     clock_gettime(CLOCK_REALTIME, &t0);
+    uint8_t depth = 12;
+    // uint64_t cnt = perft(&c4, depth);
+    uint64_t cnt = perft2(c4.player, c4.mask, depth);
+    clock_gettime(CLOCK_REALTIME, &t1);
+    t = get_elapsed_time(t0, t1);
+    printf("perft(%d) = %"PRIu64" in %.3fs (%.3f mnps)\n", depth, cnt, t, cnt / t / 1000000);
+    return 0;
+
+    clock_gettime(CLOCK_REALTIME, &t0);
     ab = iterdeep(&c4, true, 0);
     printf("Position is %d (%d)\n\n", res, ab);
     clock_gettime(CLOCK_REALTIME, &t1);
-    double t = get_elapsed_time(t0, t1);
+    t = get_elapsed_time(t0, t1);
     printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
  
     // printf("base: %llu\n", key);
@@ -561,7 +578,7 @@ int main(int argc, char const *argv[]) {
         printf("Best move: %d with score %d\n\n", bestmove, bestscore);
 
         // clock_gettime(CLOCK_REALTIME, &t1);
-        // double t = get_elapsed_time(t0, t1);
+        // t = get_elapsed_time(t0, t1);
         // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
         // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     }

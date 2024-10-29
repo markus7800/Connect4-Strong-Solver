@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <time.h>
 #include "bdd.h"
-#include "set.h"
+// #include "set.h"
 #include "math.h"
 
 /*
@@ -214,161 +214,8 @@ uint64_t perft_root(uint64_t player, uint64_t mask, int ply, int depth, struct t
     return cnt;
 }
 
-inline bool contains_hash(nodeindex_t bdd, uint64_t hash) {
-    return is_sat(bdd, hash);
-}
-
-inline nodeindex_t push_hash(nodeindex_t bdd, uint64_t hash) {
-    return or_conjunction_fast(bdd, hash);
-}
-
 inline uint64_t position_hash(uint64_t player, uint64_t mask) {
     return ((mask << 1) | BOTTOM_MASK) ^ player;
-}
-
-set_t sets[WIDTH*HEIGHT];
-nodeindex_t bdds[WIDTH*HEIGHT];
-
-uint64_t perft_set(uint64_t player, uint64_t mask, int ply, int depth) {
-    set_t* set = &sets[ply];
-    uint64_t hash = ply % 2 == 1 ? position_hash(player, mask) : position_hash(player ^ mask, mask);
-
-    if (has_value(set, hash)) {
-        return 0;
-    } else {
-        add_value(set, hash);
-        // assert(has_value(set, hash));
-    }
-
-    if (depth == 0) {
-        return 1;
-    }
-
-    uint64_t other_player = player ^ mask;
-
-    if (alignment(other_player)) {
-        return 0;
-    }
-
-    uint64_t moves = get_pseudo_legal_moves(mask);
-
-    uint64_t cnt = 0;
-    if (moves & COLUMN_A) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_A), ply+1, depth-1);
-    }
-    if (moves & COLUMN_B) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_B), ply+1, depth-1);
-    }
-    if (moves & COLUMN_C) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_C), ply+1, depth-1);
-    }
-    if (moves & COLUMN_D) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_D), ply+1, depth-1);
-    }
-    if (moves & COLUMN_E) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_E), ply+1, depth-1);
-    }
-    if (moves & COLUMN_F) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_F), ply+1, depth-1);
-    }
-    if (moves & COLUMN_G) {
-        cnt += perft_set(other_player, mask | (moves & COLUMN_G), ply+1, depth-1);
-    }
-    return cnt;
-}
-
-
-
-uint64_t perft_bdd(uint64_t player, uint64_t mask, int ply, int depth) {
-    if (2 * uniquetable.count > uniquetable.size) {
-        for (int i = 0; i < WIDTH*HEIGHT; i++) {
-            keepalive(get_node(bdds[i]));
-        }
-        gc(true, true);
-        for (int i = 0; i < WIDTH*HEIGHT; i++) {
-            undo_keepalive(get_node(bdds[i]));
-        }
-    }
-
-    nodeindex_t bdd = bdds[ply];
-    uint64_t hash = position_hash(player, mask); //ply % 2 == 1 ? position_hash(player, mask) : position_hash(player ^ mask, mask);
-
-    if (contains_hash(bdd, hash)) {
-        // assert(has_value(set, hash));
-        return 0;
-    } else {
-        bdds[ply] = push_hash(bdd, hash);
-        // assert(contains_hash(bdds[ply], hash));
-        // assert(!has_value(set, hash));
-        // add_value(set, hash);
-    }
-
-    if (depth == 0) {
-        return 1;
-    }
-
-    uint64_t other_player = player ^ mask;
-
-    if (alignment(other_player)) {
-        return 0;
-    }
-
-    uint64_t moves = get_pseudo_legal_moves(mask);
-
-    uint64_t cnt = 0;
-    if (moves & COLUMN_A) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_A), ply+1, depth-1);
-    }
-    if (moves & COLUMN_B) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_B), ply+1, depth-1);
-    }
-    if (moves & COLUMN_C) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_C), ply+1, depth-1);
-    }
-    if (moves & COLUMN_D) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_D), ply+1, depth-1);
-    }
-    if (moves & COLUMN_E) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_E), ply+1, depth-1);
-    }
-    if (moves & COLUMN_F) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_F), ply+1, depth-1);
-    }
-    if (moves & COLUMN_G) {
-        cnt += perft_bdd(other_player, mask | (moves & COLUMN_G), ply+1, depth-1);
-    }
-    return cnt;
-}
-
-
-
-int _main() {
-    init_all(26);
-
-    memorypool.num_nodes = 2;
-
-    nodeindex_t bdd = ZEROINDEX;
-
-    uint64_t hash = 0;
-    printf("Contains(%llu)=%d\n", hash, contains_hash(bdd, hash));
-    bdd = push_hash(bdd, hash);
-    bdd = push_hash(bdd, 0b01);
-    bdd = push_hash(bdd, 0b11);
-    printf("bdd=%u\n", bdd);
-    hash = 0b00;
-    printf("Contains(%llu)=%d\n", hash, contains_hash(bdd, hash));
-    hash = 0b01;
-    printf("Contains(%llu)=%d\n", hash, contains_hash(bdd, hash));
-    hash = 0b10;
-    printf("Contains(%llu)=%d\n", hash, contains_hash(bdd, hash));
-    hash = 0b11;
-    printf("Contains(%llu)=%d\n", hash, contains_hash(bdd, hash));
-
-    print_dot();
-
-    free_all();
-
-    return 0;
 }
 
 int main() {
@@ -378,13 +225,16 @@ int main() {
     u_int64_t mask = 0;
     uint64_t nodes;
 
-    int depth = 12;
+    int depth = 7;
+    // perft 12: 12 billion nodes in 16.89 seconds (735.170 MNPS, 12418296244 nodes)
+    // perft 10: 0 billion nodes in 0.39 seconds (679.818 MNPS, 268031646 nodes)
+    // perft 7: 0 billion nodes in 0.00 seconds (261.440 MNPS, 823536 nodes)
 
-    // clock_gettime(CLOCK_REALTIME, &t0);
-    // nodes = perft(player, mask, depth);
-    // clock_gettime(CLOCK_REALTIME, &t1);
-    // printf("perft %d: ", depth);
-    // print_elapsed(nodes, t0, t1);
+    clock_gettime(CLOCK_REALTIME, &t0);
+    nodes = perft(player, mask, depth);
+    clock_gettime(CLOCK_REALTIME, &t1);
+    printf("perft %d: ", depth);
+    print_elapsed(nodes, t0, t1);
 
     // for (int ply = 0; ply < WIDTH*HEIGHT; ply++) {
     //     init_hashset(&sets[ply], 25);
@@ -402,30 +252,6 @@ int main() {
     //     nodes += sets[ply].count;
     // }
     // print_elapsed(nodes, t0, t1);
-
-    init_all(28);
-
-    memorypool.num_variables = (WIDTH+1)*HEIGHT;
-    for (int ply = 0; ply < WIDTH*HEIGHT; ply++) {
-        bdds[ply] = ZEROINDEX;
-    }
-    clock_gettime(CLOCK_REALTIME, &t0);
-    nodes = perft_bdd(player, mask, 0, depth);
-    clock_gettime(CLOCK_REALTIME, &t1);
-    printf("perft %d:\n", depth);
-
-    nodes = 0;
-    for (int ply = 0; ply <= depth; ply++) {
-        uint64_t cnt = satcount(bdds[ply]);
-        nodes += cnt;
-        printf("%d: %"PRIu64"\n", ply, cnt);
-    }
-    print_elapsed(nodes, t0, t1);
-    gc(true, true);
-    printf("GC_MAX_NODES_ALLOC=%"PRIu64"\n", GC_MAX_NODES_ALLOC);
-
-    // 4,531,985,219,092 wrt tranpositions
-    free_all();
 
     return 0;
 }
