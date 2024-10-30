@@ -24,7 +24,7 @@
 #define WIDTH 7
 
 #define BOTTOM_MASK 0x40810204081
-#define BOARD_MASK 0xfdfbf7efdfbf
+#define BOARD_MASK 0xfdfbf7efdfbf // WIDTH x HEIGHT filled with one
 #define COLUMN_A 0x3f           // 0
 #define COLUMN_B 0x1f80         // 1
 #define COLUMN_C 0xfc000        // 2
@@ -77,7 +77,8 @@ bool is_terminal(c4_t* c4) {
     }
 
     // draw
-    if (c4->ply == HEIGHT*WIDTH) return true;
+    // if (c4->ply == HEIGHT*WIDTH) return true;
+    if (c4->mask == BOARD_MASK) return true;
 
     return false;
 }
@@ -319,11 +320,12 @@ void make_mmaps(uint32_t width, uint32_t height) {
     assert(mmaps != NULL);
 
     for (int ply = 0; ply <= width*height; ply++) {
-        if (ply <= 21) {
-            read_in_memory(width, height, ply);
-        } else {
-            make_mmap(width, height, ply);
-        }
+        // if (ply <= 21) {
+        //     read_in_memory(width, height, ply);
+        // } else {
+        //     make_mmap(width, height, ply);
+        // }
+        make_mmap(width, height, ply);
     }       
 }
 
@@ -515,22 +517,24 @@ int main(int argc, char const *argv[]) {
 
 
     // clock_gettime(CLOCK_REALTIME, &t0);
-    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7);
+    // uint8_t depth = 16;
+    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth);
+    // // ab = alphabeta_plain2(c4.player, c4.mask, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth);
     // clock_gettime(CLOCK_REALTIME, &t1);
     // t = get_elapsed_time(t0, t1);
     // printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
-
+    // return 0;
     // ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
     // printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
 
-    clock_gettime(CLOCK_REALTIME, &t0);
-    uint8_t depth = 12;
-    // uint64_t cnt = perft(&c4, depth);
-    uint64_t cnt = perft2(c4.player, c4.mask, depth);
-    clock_gettime(CLOCK_REALTIME, &t1);
-    t = get_elapsed_time(t0, t1);
-    printf("perft(%d) = %"PRIu64" in %.3fs (%.3f mnps)\n", depth, cnt, t, cnt / t / 1000000);
-    return 0;
+    // clock_gettime(CLOCK_REALTIME, &t0);
+    // uint8_t depth = 12;
+    // // uint64_t cnt = perft(&c4, depth);
+    // uint64_t cnt = perft2(c4.player, c4.mask, depth);
+    // clock_gettime(CLOCK_REALTIME, &t1);
+    // t = get_elapsed_time(t0, t1);
+    // printf("perft(%d) = %"PRIu64" in %.3fs (%.3f mnps)\n", depth, cnt, t, cnt / t / 1000000);
+    // return 0;
 
     clock_gettime(CLOCK_REALTIME, &t0);
     ab = iterdeep(&c4, true, 0);

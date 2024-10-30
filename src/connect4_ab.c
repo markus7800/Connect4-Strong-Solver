@@ -199,11 +199,11 @@ uint64_t perft(c4_t* c4, uint8_t depth) {
 }
 
 uint64_t perft2(uint64_t player, uint64_t mask, uint8_t depth) {
-    uint64_t pos = player ^ mask;
     if (depth == 0) {
         return 1;
     }
-    if (alightment(pos)) {
+    uint64_t pos = player ^ mask;
+    if (alightment(pos) || mask == BOARD_MASK) {
         return 0;
     }
     uint64_t cnt = 0;
@@ -217,6 +217,41 @@ uint64_t perft2(uint64_t player, uint64_t mask, uint8_t depth) {
     return cnt;
 }
 
+int8_t alphabeta_plain2(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth) {
+    n_plain_nodes++;
+    uint64_t pos = player ^ mask;
+
+    if (alightment(pos) || mask == BOARD_MASK) {
+        return -MATESCORE + ply; // terminal is always lost
+    }
+    if (depth == 0) {
+        return 0;
+    }
+    if (MATESCORE - ply <= alpha) {
+        return alpha;
+    }
+
+    uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
+
+    int8_t value = alpha;
+    uint64_t move_mask = get_pseudo_legal_moves(mask);
+    for (uint8_t col = 0; col < WIDTH; col++) {
+        uint64_t move = move_mask & column_mask(moves[col]);
+        if (move) {
+            value = -alphabeta_plain2(player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
+        
+            if (value > alpha) {
+                alpha = value;
+            }
+            if (value >= beta) {
+                alpha = beta;
+                break;
+            }
+        }
+    }
+    
+    return alpha;
+}
 
 #define PLIES_IN_MEMORY 1
 
@@ -266,13 +301,13 @@ int8_t alphabeta(c4_t* c4, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth
     // }
 
     if (depth == 0) {
-        // int8_t horizon_res = alphabeta_plain(c4, alpha, beta, ply, 4);
-        // if (horizon_res != 0) {
-        //     return horizon_res;
-        // } else {
-        //     return res;
-        // }
-        return res;
+        int8_t horizon_res = alphabeta_plain2(c4->player, c4->mask, alpha, beta, ply, 10);
+        if (horizon_res != 0) {
+            return horizon_res;
+        } else {
+            return res;
+        }
+        // return res;
     }
     
     // uint64_t key = key_for_board(c4);
