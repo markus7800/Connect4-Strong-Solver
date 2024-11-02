@@ -44,13 +44,6 @@ inline void set(u_int64_t* pos, int i) {
     *pos = (1ULL << i) | *pos;
 }
 
-typedef struct c4 {
-    uint64_t player;
-    uint64_t mask;
-    uint64_t key;
-    uint32_t ply;
-} c4_t;
-
 bool alightment(uint64_t pos) {
     // horizontal 
     uint64_t m = pos & (pos >> (HEIGHT+1));
@@ -70,21 +63,20 @@ bool alightment(uint64_t pos) {
 
     return false;
 }
-bool is_terminal(c4_t* c4) {
-    uint64_t pos = c4->player ^ c4->mask;
+bool is_terminal(uint64_t player, uint64_t mask) {
+    uint64_t pos = player ^ mask;
     if (alightment(pos)) {
         return true;
     }
 
     // draw
-    // if (c4->ply == HEIGHT*WIDTH) return true;
-    if (c4->mask == BOARD_MASK) return true;
+    if (mask == BOARD_MASK) return true;
 
     return false;
 }
 
-bool is_legal_move(c4_t* c4, uint8_t col) {
-    return (c4->mask + BOTTOM_MASK) & column_mask(col);
+bool is_legal_move(uint64_t player, uint64_t mask, uint8_t col) {
+    return (mask + BOTTOM_MASK) & column_mask(col);
 }
 
 #include "connect4_ab_zob.c"
@@ -105,28 +97,28 @@ inline u_int64_t get_pseudo_legal_moves(uint64_t mask) {
     return (mask + BOTTOM_MASK);
 }
 
-inline uint64_t position_hash(c4_t* c4) {
-    uint64_t pos = c4->ply % 2 == 1 ? c4->player : c4->player ^ c4->mask;
-    return ((c4->mask << 1) | BOTTOM_MASK) ^ pos;
+int get_ply(uint64_t player, uint64_t mask) {
+    return __builtin_popcountll(mask);
 }
 
-int get_ply(c4_t* c4) {
-    return c4->ply;
+inline uint64_t position_hash(uint64_t player, uint64_t mask) {
+    uint64_t pos = get_ply(player, mask) % 2 == 1 ? player : player ^ mask;
+    return ((mask << 1) | BOTTOM_MASK) ^ pos;
 }
 
-void print_board(c4_t* c4, int highlight_col) {
-    int to_play = c4->ply % 2;
+void print_board(uint64_t player, uint64_t mask, int highlight_col) {
+    int cnt = get_ply(player, mask);
+    int to_play = cnt % 2;
     char stm_c = (to_play == 0) ? 'x' : 'o';
-    bool term = is_terminal(c4);
-    int cnt = get_ply(c4);
+    bool term = is_terminal(player, mask);
     printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", WIDTH, HEIGHT);
     int bit;
     for (int i = HEIGHT-1; i>= 0; i--) {
         for (int j = 0; j < WIDTH; j++) {
             if (j == highlight_col) printf("\033[95m");
             bit = i + (HEIGHT+1)*j;
-            if (is_set(c4->mask, bit)) {
-                if (is_set(c4->player, bit) != to_play) {
+            if (is_set(mask, bit)) {
+                if (is_set(player, bit) != to_play) {
                     printf(" x");
                 } else {
                     printf(" o");
@@ -160,31 +152,21 @@ void print_mask(u_int64_t mask) {
     printf("0x%llx\n", mask);
 }
 
-void play_column(c4_t* c4, uint8_t col) {
-    uint64_t move = get_pseudo_legal_moves(c4->mask) & column_mask(col);
+void play_column(uint64_t* player, uint64_t* mask, uint8_t col) {
+    uint64_t move = get_pseudo_legal_moves(*mask) & column_mask(col);
     if (move) {
-        c4->ply++;
-        c4->player ^= c4->mask;
-        c4->mask |= move;
-        c4->key = position_hash(c4);
+        *player = *player ^ *mask;
+        *mask = *mask | move;
     } else {
         perror("Illegal move!\n");
         exit(EXIT_FAILURE);
     }
 }
 
-// new_mask = mask | (mask + BOTTOM_MASK) & col
-
-void undo_play_column(c4_t* c4, uint8_t col) {
-    uint64_t move = (get_pseudo_legal_moves(c4->mask >> 1) & column_mask(col));
-    // print_mask(c4->mask);
-    // print_mask((BOTTOM_MASK << HEIGHT) - c4->mask);
-    // print_mask(move);
-    c4->ply--;
-    c4->mask = c4->mask & ~move;
-    c4->player ^= c4->mask;
-    c4->key = position_hash(c4);
-    // print_mask(c4->mask);
+void undo_play_column(uint64_t* player, uint64_t* mask, uint8_t col) {
+    uint64_t move = (get_pseudo_legal_moves(*mask >> 1) & column_mask(col));
+    *mask = *mask & ~move;
+    *player = *player ^ *mask;
 }
 
 typedef uint32_t nodeindex_t;
@@ -356,39 +338,17 @@ void free_mmaps(uint32_t width, uint32_t height) {
     }       
 }
 
-int probe_board_mmap(c4_t* c4) {
+int probe_board_mmap(uint64_t player, uint64_t mask) {
     bool win_sat, draw_sat, lost_sat;
     bool win_read, draw_read, lost_read;
     bool* sat_ptr;
     bool* read_ptr;
 
-    int ply = get_ply(c4);
+    int ply = get_ply(player, mask);
     bool stm = ply % 2 == 0;
 
 
-    // bool* _bitvector = (bool*) malloc(sizeof(bool) * ((HEIGHT+1)*WIDTH + 1 + 1));
-    // _bitvector[0] = 0;
-    // _bitvector[1] = stm;
-    // int k = 2;
-    // for (int col=0; col < WIDTH; col++) {
-    //     for (int row=0; row < HEIGHT+1; row++) {
-    //         int bit = row + (HEIGHT+1)*col;
-    //         _bitvector[k] = ((BOTTOM_MASK & (1 << bit)) > 0);
-    //         k++; //is_set(c4->player, bit) | 
-    //     }
-    // }
-
-    uint64_t bitvector = (position_hash(c4) << 2) | (stm << 1);
-
-    // for (int var = 1; var < ((HEIGHT+1)*WIDTH + 1); var++) {
-    //     printf("%d: %d\n", var, 0b1 & (bitvector >> var));
-    // }
-    // for (int k = 0; k < ((HEIGHT+1)*WIDTH + 1 + 1); k++) {
-    //     printf("%d: %d vs %d\n", k, _bitvector[k], 0b1 & (bitvector >> k));
-    // }
-    // exit(EXIT_FAILURE);
-
-
+    uint64_t bitvector = (position_hash(player, mask) << 2) | (stm << 1);
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
@@ -469,35 +429,23 @@ int main(int argc, char const *argv[]) {
     const char *folder = argv[1];
     chdir(folder);
 
-    c4_t c4;
-
     assert(COMPRESSED_ENCODING);
     assert(!ALLOW_ROW_ORDER);
 
-    c4.player = 0;
-    c4.mask = 0;
-    c4.key = position_hash(&c4);
-    c4.ply = 0;
-    // val_zob_key(&c4);
+    uint64_t player = 0;
+    uint64_t mask = 0;
 
     printf("moveseq: %s\n", moveseq);
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');
         assert(0 <= move && move < width);
-        assert(is_legal_move(&c4, move));
-        play_column(&c4, move);
+        assert(is_legal_move(player, mask, move));
+        play_column(&player, &mask, move);
     }
-    print_board(&c4, -1);
+    print_board(player,  mask, -1);
 
     make_mmaps(width, height);
-
-    // free_mmaps(width, height);
-    // free_mmap(width, height, 10);
-    // read_in_memory(width, height, 10);
-
-    uint64_t orig_player = c4.player;
-    uint64_t orig_mask = c4.mask;
 
     uint64_t log2ttsize = 28;
     tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
@@ -510,7 +458,7 @@ int main(int argc, char const *argv[]) {
     struct timespec t0, t1;
     double t;
 
-    int res = probe_board_mmap(&c4);
+    int res = probe_board_mmap(player, mask);
     int ab;
     printf("res = %d\n", res);
     // return 0;
@@ -518,34 +466,34 @@ int main(int argc, char const *argv[]) {
 
     // clock_gettime(CLOCK_REALTIME, &t0);
     // uint8_t depth = 16;
-    // ab = alphabeta_plain(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth);
-    // // ab = alphabeta_plain2(c4.player, c4.mask, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth);
+    // ab = alphabeta_plain(player, mask, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth);
+    // // ab = alphabeta_plain2(player, mask, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, depth);
     // clock_gettime(CLOCK_REALTIME, &t1);
     // t = get_elapsed_time(t0, t1);
     // printf("ab = %d, n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", ab, n_plain_nodes, t, n_plain_nodes / t / 1000);
     // return 0;
-    // ab = alphabeta(&c4, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
+    // ab = alphabeta(player, mask, res == 1 ? 1 : -MATESCORE, res == -1 ? -1 : MATESCORE, 0, 7, res);
     // printf("ab = %d, n_nodes = %"PRIu64"\n", ab, n_nodes);
 
     // clock_gettime(CLOCK_REALTIME, &t0);
-    // uint8_t depth = 12;
-    // // uint64_t cnt = perft(&c4, depth);
-    // uint64_t cnt = perft2(c4.player, c4.mask, depth);
+    // uint8_t depth = 10;
+    // uint64_t cnt = perft(player, mask, depth);
+    // uint64_t cnt = perft2(player, mask, depth);
     // clock_gettime(CLOCK_REALTIME, &t1);
     // t = get_elapsed_time(t0, t1);
     // printf("perft(%d) = %"PRIu64" in %.3fs (%.3f mnps)\n", depth, cnt, t, cnt / t / 1000000);
     // return 0;
 
     clock_gettime(CLOCK_REALTIME, &t0);
-    ab = iterdeep(&c4, true, 0);
+    ab = iterdeep(player, mask, true, 0);
     printf("Position is %d (%d)\n\n", res, ab);
     clock_gettime(CLOCK_REALTIME, &t1);
     t = get_elapsed_time(t0, t1);
     printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
  
-    // printf("base: %llu\n", key);
+    return 0;
 
-    if (!is_terminal(&c4)) {
+    if (!is_terminal(player, mask)) {
         int bestmove = -1;
         int bestscore = -2;
 
@@ -556,19 +504,16 @@ int main(int argc, char const *argv[]) {
         printf("\033[0m\n");
         
         for (move = 0; move < width; move++) {
-            if (is_legal_move(&c4, move)) {
-                play_column(&c4, move);
-                // res = -probe_board_mmap(&c4);
-                // printf("%2d ", res);
-                // ab = res;
-                ab = -iterdeep(&c4, false, 1);
-                
-                printf("%3d ", ab);
+            if (is_legal_move(player, mask, move)) {
+                play_column(&player, &mask, move);
+                res = -probe_board_mmap(player, mask);
+                printf("%3d ", res);
+                ab = res;
 
-                undo_play_column(&c4, move);
-                
-                assert(c4.mask == orig_mask);
-                assert(c4.player == orig_player);
+                // ab = -iterdeep(player, mask, false, 1);
+                // printf("%3d ", ab);
+
+                undo_play_column(&player, &mask, move);
 
                 if (ab > bestscore) {
                     bestscore = ab;
@@ -598,3 +543,5 @@ int main(int argc, char const *argv[]) {
 
     return 0;
 }
+
+// ./connect4_bestmove.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6 '01234560123456'
