@@ -104,8 +104,8 @@ uint64_t hash_64(uint64_t a) {
     a =  a + (a << 31);
     return a;
 }
-inline uint64_t key_for_board(uint64_t player, uint64_t mask) {
-    return hash_64(position_hash(player, mask));
+inline uint64_t hash_for_board(uint64_t player, uint64_t mask) {
+    return hash_64(position_key(player, mask));
 }
 
 
@@ -303,7 +303,7 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
         return alpha;
     }
 
-    uint64_t key = key_for_board(player, mask);
+    uint64_t key = hash_for_board(player, mask);
 
     int8_t res;
     if (rootres == 1) {

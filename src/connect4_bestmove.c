@@ -101,7 +101,7 @@ int get_ply(uint64_t player, uint64_t mask) {
     return __builtin_popcountll(mask);
 }
 
-inline uint64_t position_hash(uint64_t player, uint64_t mask) {
+inline uint64_t position_key(uint64_t player, uint64_t mask) {
     uint64_t pos = get_ply(player, mask) % 2 == 1 ? player : player ^ mask;
     return ((mask << 1) | BOTTOM_MASK) ^ pos;
 }
@@ -348,7 +348,7 @@ int probe_board_mmap(uint64_t player, uint64_t mask) {
     bool stm = ply % 2 == 0;
 
 
-    uint64_t bitvector = (position_hash(player, mask) << 2) | (stm << 1);
+    uint64_t bitvector = (position_key(player, mask) << 2) | (stm << 1);
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
@@ -409,6 +409,27 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
 
 #include "connect4_ab.c"
 
+#include "connect4_openingbook.c"
+
+void fill_opening_book(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth) {
+    if (depth == 0) {
+        if (!has_position(ob, position_key(player, mask))) {
+            add_position_value(ob, position_key(player, mask), 0);
+        }
+        return;
+    }
+    if (is_terminal(player, mask)) {
+        return;
+    }
+    for (uint8_t move = 0; move < WIDTH; move++) {
+        if (is_legal_move(player, mask, move)) {
+            play_column(&player, &mask, move);
+            fill_opening_book(ob, player, mask, depth-1);
+            undo_play_column(&player, &mask, move);
+        }
+    }
+}
+
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
@@ -444,6 +465,12 @@ int main(int argc, char const *argv[]) {
         play_column(&player, &mask, move);
     }
     print_board(player,  mask, -1);
+
+    openingbook_t ob;
+    init_openingbook(&ob, 20);
+    fill_opening_book(&ob, player, mask, 8);
+    printf("Opening book positions: %"PRIu64"\n", ob.count);
+    return 0;
 
     make_mmaps(width, height);
 

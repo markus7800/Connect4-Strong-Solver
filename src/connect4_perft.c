@@ -214,7 +214,7 @@ uint64_t perft_root(uint64_t player, uint64_t mask, int ply, int depth, struct t
     return cnt;
 }
 
-inline uint64_t position_hash(uint64_t player, uint64_t mask) {
+inline uint64_t position_key(uint64_t player, uint64_t mask) {
     return ((mask << 1) | BOTTOM_MASK) ^ player;
 }
 
