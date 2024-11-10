@@ -1,4 +1,4 @@
-#include "bdd.h"
+#include "../../bdd/bdd.h"
 
 #ifndef ALLOW_ROW_ORDER
 #define ALLOW_ROW_ORDER 0

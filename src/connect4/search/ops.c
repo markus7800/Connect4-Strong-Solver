@@ -1,5 +1,5 @@
 
-#include "bdd.h"
+#include "../../bdd/bdd.h"
 
 #define CONNECT4_SAT_OP 7
 

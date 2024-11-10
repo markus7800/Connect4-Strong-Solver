@@ -3,9 +3,9 @@
 #include <inttypes.h>
 #include <time.h>
 
-#include "bdd.h"
+#include "../../bdd/bdd.h"
 
-#include "connect4_ops.c"
+#include "ops.c"
 
 #ifndef FULLBDD
 #define FULLBDD 1
@@ -20,9 +20,9 @@
 #endif
 
 #if COMPRESSED_ENCODING
-#include "connect4_compressed_encoding.c"
+#include "compressed_encoding.c"
 #else
-#include "connect4_default_encoding.c"
+#include "default_encoding.c"
 #endif
 
 #ifndef SAVE_BDD_TO_DISK

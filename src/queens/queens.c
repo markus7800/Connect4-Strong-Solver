@@ -3,7 +3,7 @@
 #include <time.h>
 #include <inttypes.h>
 
-#include "bdd.h"
+#include "../bdd/bdd.h"
 
 /*
 Solves the n-queens puzzle

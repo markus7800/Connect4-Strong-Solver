@@ -79,7 +79,7 @@ bool is_legal_move(uint64_t player, uint64_t mask, uint8_t col) {
     return (mask + BOTTOM_MASK) & column_mask(col);
 }
 
-#include "connect4_ab_zob.c"
+#include "zob.c"
 
 // void val_zob_key(c4_t* c4) {
 //     // add zob if board[c][r] == true
@@ -407,9 +407,9 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
     return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
 }
 
-#include "connect4_ab.c"
+#include "ab.c"
 
-#include "connect4_openingbook.c"
+#include "openingbook.c"
 
 void fill_opening_book(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth) {
     if (depth == 0) {
@@ -571,4 +571,4 @@ int main(int argc, char const *argv[]) {
     return 0;
 }
 
-// ./connect4_bestmove.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6 '01234560123456'
+// ./bestmove.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6 '01234560123456'
