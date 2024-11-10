@@ -26,7 +26,7 @@ solve:
 	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o solve.out
 
 bestmove:
-	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -o bestmove.out
+	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -o bestmove.out -lpthread
 
 perft:
 	$(CC) probe/perft.c $(BDDFILES) $(CFLAGS) -o perft.out 
