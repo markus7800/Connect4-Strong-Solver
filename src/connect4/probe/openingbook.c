@@ -100,3 +100,72 @@ void init_openingbook(openingbook_t* ob, uint64_t log2size) {
         ob->entries[i].key = 0;
     }
 }
+
+#include <pthread.h>
+
+void _fill_opening_book_worker(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth, uint8_t worker_id, uint8_t n_workers) {
+    if (depth == 0) {
+        uint64_t key = position_key(player, mask);
+        uint64_t hash = hash_64(key);
+        // key <-> hash should be almost bijective
+        if ((hash % n_workers == worker_id) && !has_position(ob, key)) {
+            uint8_t value = iterdeep(player, mask, false, 0);
+            add_position_value(ob, key, value);
+            if (worker_id == 0) {
+                printf("%u: %"PRIu64"\r", worker_id, ob->count);
+            }
+        }
+        return;
+    }
+    if (is_terminal(player, mask)) {
+        return;
+    }
+    for (uint8_t move = 0; move < WIDTH; move++) {
+        if (is_legal_move(player, mask, move)) {
+            play_column(&player, &mask, move);
+            _fill_opening_book_worker(ob, player, mask, depth-1, worker_id, n_workers);
+            undo_play_column(&player, &mask, move);
+        }
+    }
+}
+
+void fill_opening_book_worker(uint64_t player, uint64_t mask, uint8_t depth, uint8_t worker_id, uint8_t n_workers) {
+    openingbook_t ob;
+    init_openingbook(&ob, 10);
+    _fill_opening_book_worker(&ob, player, mask, depth, worker_id, n_workers);
+}
+
+void fill_opening_book(uint64_t player, uint64_t mask, uint8_t depth) {
+    fill_opening_book_worker(player, mask, depth, 0, 1);
+}
+
+typedef struct OpeningBookPayload {
+    uint64_t player;
+    uint64_t mask;
+    uint8_t depth;
+    uint8_t worker_id;
+    uint8_t n_workers;
+} openingbook_payload_t;
+
+void *fill_opening_book_multithreade_worker(void* arg) {
+    openingbook_payload_t* payload = (openingbook_payload_t*) arg;
+    printf("Started worker %u\n", payload->worker_id);
+    fill_opening_book_worker(payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
+    return NULL;
+}
+
+void fill_opening_book_multithreaded(uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers) {
+    pthread_t* tid = malloc(n_workers * sizeof(pthread_t));
+    openingbook_payload_t* payloads = malloc(n_workers * sizeof(openingbook_payload_t));
+
+    for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
+        payloads[worker_id] = (openingbook_payload_t) {player, mask, depth, worker_id, n_workers};
+        pthread_create(&tid[worker_id], NULL, fill_opening_book_multithreade_worker, &payloads[worker_id]);
+    }
+    for  (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
+        pthread_join(tid[worker_id], NULL);
+    }
+
+    free(tid);
+    free(payloads);
+}
