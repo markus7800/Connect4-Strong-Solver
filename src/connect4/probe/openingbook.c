@@ -38,7 +38,7 @@ void add_position_value(openingbook_t* ob, uint64_t key, uint8_t value) {
     ob->count++;
     if (ob->count == ob->size) {
         perror("Openingbook is too small :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
 
     ob->entries[i].key = key;
@@ -78,7 +78,7 @@ uint8_t get_value_for_position(openingbook_t* ob, uint64_t key) {
         b = entry.next;
     }
     perror("No value for key.\n");
-    assert(0);
+    exit(EXIT_FAILURE);
 }
 
 void init_openingbook(openingbook_t* ob, uint64_t log2size) {
@@ -89,7 +89,7 @@ void init_openingbook(openingbook_t* ob, uint64_t log2size) {
     ob->entries = (openingbook_entry_t*) malloc(size * sizeof(openingbook_entry_t));
     if (ob->buckets == NULL || ob->entries == NULL) {
         perror("Could not allocate opening book :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
     ob->size = size;
     ob->count = 0;
