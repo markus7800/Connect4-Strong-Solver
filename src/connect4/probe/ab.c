@@ -81,7 +81,7 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
     return alpha;
 }
 
-#define HORIZON_DEPTH 10
+#define HORIZON_DEPTH 2
 
 uint64_t n_nodes = 0;
 int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
@@ -179,7 +179,7 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
 }
 
 
-int8_t iterdeep(uint64_t player, uint64_t mask, bool verbose, uint8_t ply) {
+int8_t iterdeep(uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         return 0;
@@ -197,7 +197,18 @@ int8_t iterdeep(uint64_t player, uint64_t mask, bool verbose, uint8_t ply) {
         }
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
-        if (verbose) {
+        if (verbose == 1) {
+            uint8_t bound = MATESCORE - (depth + HORIZON_DEPTH) - 1;
+            if (ab == -1) {
+                printf("\033[94m%3d\033[0m\b\b\b", bound); // <
+                // printf("<%3d\n", bound);
+            } 
+            if (ab == 1) {
+                printf("\033[94m%3d\033[0m\b\b\b", -bound); // >
+                // printf(">%3d\n", -bound);
+            }
+        }
+        if (verbose == 2) {
             printf("depth = %u, ab = %d, ", depth, ab);
             uint64_t N = n_nodes + n_horizon_nodes;
             printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", N, t, N / t / 1000);

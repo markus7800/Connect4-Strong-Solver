@@ -110,7 +110,7 @@ int main(int argc, char const *argv[]) {
     // return 0;
 
     clock_gettime(CLOCK_REALTIME, &t0);
-    ab = iterdeep(player, mask, true, 0);
+    ab = iterdeep(player, mask, 2, 0);
     printf("Position is %d (%d)\n\n", res, ab);
     clock_gettime(CLOCK_REALTIME, &t1);
     t = get_elapsed_time(t0, t1);
@@ -131,12 +131,12 @@ int main(int argc, char const *argv[]) {
         for (move = 0; move < width; move++) {
             if (is_legal_move(player, mask, move)) {
                 play_column(&player, &mask, move);
-                res = -probe_board_mmap(player, mask);
-                printf("%3d ", res);
+                // res = -probe_board_mmap(player, mask);
+                // printf("%3d ", res);
                 ab = res;
 
-                // ab = -iterdeep(player, mask, false, 1);
-                // printf("%3d ", ab);
+                ab = -iterdeep(player, mask, 1, 1);
+                printf("%3d ", ab);
 
                 undo_play_column(&player, &mask, move);
 
