@@ -32,19 +32,25 @@
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
-    const char *moveseq;
-    if (argc == 4) {
-        moveseq = "";
-    } else if (argc == 5) {
-        moveseq = argv[4];
-    } else {
-        perror("Wrong number of arguments supplied: connect4_bestmove.out folder width height moveseq\n");
-        return 1;
+    if (argc < 5) {
+        perror("Wrong number of arguments supplied: connect4_bestmove.out folder width height moveseq [-wdl | -dtm]\n");
+        exit(EXIT_FAILURE);
     }
     char* succ;
     uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
     uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
-    printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
+
+    const char *moveseq = argv[4];
+
+    bool do_ab = false;
+    for (int i = 5; i < argc; i++) {
+        if (strcmp(argv[i], "-wdl") == 0) {
+            do_ab = false;
+        }
+        if (strcmp(argv[i], "-dtm") == 0) {
+            do_ab = true;
+        }
+    }
 
     const char *folder = argv[1];
     chdir(folder);
@@ -79,8 +85,14 @@ int main(int argc, char const *argv[]) {
     double t;
 
     int res = probe_board_mmap(player, mask);
-    int ab;
-    printf("res = %d\n", res);
+    
+    if (res == 1) {
+        printf("\nres = %d (forced win)\n", res);
+    } else if (res == 0) {
+        printf("\nres = %d (forced draw)\n", res);
+    } else {
+        printf("\nres = %d (forced loss)\n", res);
+    }
     // return 0;
 
 
@@ -109,16 +121,20 @@ int main(int argc, char const *argv[]) {
     // printf("perft(%d) = %"PRIu64" in %.3fs (%.3f mnps)\n", depth, cnt, t, cnt / t / 1000000);
     // return 0;
 
-    clock_gettime(CLOCK_REALTIME, &t0);
-    ab = iterdeep(player, mask, 2, 0);
-    printf("Position is %d (%d)\n\n", res, ab);
-    clock_gettime(CLOCK_REALTIME, &t1);
-    t = get_elapsed_time(t0, t1);
-    printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+    if (do_ab && res != 0) {
+        printf("Computing distance to mate ...\n");
+        clock_gettime(CLOCK_REALTIME, &t0);
+        uint8_t ab = iterdeep(player, mask, 2, 0);
+        printf("Position is %d (%d)\n\n", res, ab);
+        clock_gettime(CLOCK_REALTIME, &t1);
+        t = get_elapsed_time(t0, t1);
+        printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+    }
  
     // return 0;
 
     if (!is_terminal(player, mask)) {
+        printf("\n");
         int bestmove = -1;
         int bestscore = -2;
 
@@ -131,17 +147,17 @@ int main(int argc, char const *argv[]) {
         for (move = 0; move < width; move++) {
             if (is_legal_move(player, mask, move)) {
                 play_column(&player, &mask, move);
-                // res = -probe_board_mmap(player, mask);
-                // printf("%3d ", res);
-                ab = res;
-
-                ab = -iterdeep(player, mask, 1, 1);
-                printf("%3d ", ab);
+                if (do_ab) {
+                    res = -iterdeep(player, mask, 1, 1);
+                } else {
+                    res = -probe_board_mmap(player, mask);
+                }
+                printf("%3d ", res);
 
                 undo_play_column(&player, &mask, move);
 
-                if (ab > bestscore) {
-                    bestscore = ab;
+                if (res > bestscore) {
+                    bestscore = res;
                     bestmove = move;
                 }
             } else {
@@ -170,3 +186,4 @@ int main(int argc, char const *argv[]) {
 }
 
 // ./bestmove.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6 '01234560123456'
+// ./bestmove.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6 '02234332'

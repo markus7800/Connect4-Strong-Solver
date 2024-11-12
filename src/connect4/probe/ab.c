@@ -81,7 +81,7 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
     return alpha;
 }
 
-#define HORIZON_DEPTH 2
+#define HORIZON_DEPTH 10
 
 uint64_t n_nodes = 0;
 int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
