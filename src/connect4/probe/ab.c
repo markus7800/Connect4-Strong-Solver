@@ -43,6 +43,60 @@ void store_in_wdl_cache(uint64_t key, int8_t res) {
     wdl_cache[key & wdl_cache_mask] = entry;
 }
 
+uint64_t winning_spots(uint64_t position, uint64_t mask) {
+    // vertical;
+    uint64_t r = (position << 1) & (position << 2) & (position << 3);
+
+    //horizontal
+    uint64_t p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
+    r |= p & (position << 3 * (HEIGHT + 1));
+    r |= p & (position >> (HEIGHT + 1));
+    p = (position >> (HEIGHT + 1)) & (position >> 2 * (HEIGHT + 1));
+    r |= p & (position << (HEIGHT + 1));
+    r |= p & (position >> 3 * (HEIGHT + 1));
+
+    //diagonal 1
+    p = (position << HEIGHT) & (position << 2 * HEIGHT);
+    r |= p & (position << 3 * HEIGHT);
+    r |= p & (position >> HEIGHT);
+    p = (position >> HEIGHT) & (position >> 2 * HEIGHT);
+    r |= p & (position << HEIGHT);
+    r |= p & (position >> 3 * HEIGHT);
+
+    //diagonal 2
+    p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
+    r |= p & (position << 3 * (HEIGHT + 2));
+    r |= p & (position >> (HEIGHT + 2));
+    p = (position >> (HEIGHT + 2)) & (position >> 2 * (HEIGHT + 2));
+    r |= p & (position << (HEIGHT + 2));
+    r |= p & (position >> 3 * (HEIGHT + 2));
+
+    return r & (BOARD_MASK ^ mask);
+}
+
+void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask) {
+    uint64_t scores[WIDTH];
+    for (uint8_t i = 0; i < WIDTH; i++) {
+        uint64_t move = move_mask & column_mask(moves[i]);
+        scores[i] = __builtin_popcountll(winning_spots(player | move, mask));
+        // scores[i] = __builtin_popcountll(column_mask(moves[i]) & mask);
+    }
+    // insertion sort
+    for (uint8_t i = 0; i < WIDTH; i++) {
+        uint8_t m = moves[i];
+        uint64_t s = scores[i];
+        uint8_t j;
+        for (j = i; j > 0 && scores[j-1] < s; j--) {
+            scores[j] = scores[j-1];
+            moves[j] = moves[j-1];
+        }
+        scores[j] = s;
+        moves[j] = m;
+    }
+    // for (uint8_t i = 0; i < WIDTH-1; i++) {
+    //     assert(scores[i] >= scores[i+1]);
+    // }
+}
 
 uint64_t n_horizon_nodes = 0;
 int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth) {
@@ -59,12 +113,13 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
         return alpha;
     }
 
-    uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
+    uint8_t moves[WIDTH] = {3, 2, 4, 1, 5, 0, 6};
+    uint64_t move_mask = get_pseudo_legal_moves(mask);
+    // sort_moves(moves, move_mask, player, mask);
 
     int8_t value = alpha;
-    uint64_t move_mask = get_pseudo_legal_moves(mask);
-    for (uint8_t col = 0; col < WIDTH; col++) {
-        uint64_t move = move_mask & column_mask(moves[col]);
+    for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
+        uint64_t move = move_mask & column_mask(moves[move_ix]);
         if (move) {
             value = -alphabeta_horizon(player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
         
@@ -145,24 +200,20 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
     }
 
     uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
-
-    uint64_t orig_player = player;
-    uint64_t orig_mask = mask;
+    uint64_t move_mask = get_pseudo_legal_moves(mask);
+    // sort_moves(moves, move_mask, player, mask);
 
     uint8_t flag = FLAG_ALPHA;
     int8_t value;
     uint8_t bestmove = 0;
     for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
-        uint8_t move = moves[move_ix];
-        if (is_legal_move(player, mask, move)) {
-            play_column(&player, &mask, move);
-            value = -alphabeta(player, mask, -beta, -alpha, ply+1, depth-1, -rootres);
-            undo_play_column(&player, &mask, move);
-            assert(player == orig_player);
-            assert(mask == orig_mask);
+        uint64_t move = move_mask & column_mask(moves[move_ix]);
+
+        if (move) {
+            value = -alphabeta(player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
         
             if (value > alpha) {
-                bestmove = move;
+                bestmove = move_ix;
                 flag = FLAG_EXACT;
                 alpha = value;
             }
