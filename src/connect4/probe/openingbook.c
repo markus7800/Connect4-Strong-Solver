@@ -20,17 +20,6 @@ typedef struct OpeningBook {
     uint64_t count;
 } openingbook_t;
 
-// uint64_t hash_64(uint64_t a) {
-//     a = ~a + (a << 21);
-//     a =  a ^ (a >> 24);
-//     a =  a + (a << 3) + (a << 8);
-//     a =  a ^ (a >> 14);
-//     a =  a + (a << 2) + (a << 4);
-//     a =  a ^ (a >> 28);
-//     a =  a + (a << 31);
-//     return a;
-// }
-
 void add_position_value(openingbook_t* ob, uint64_t key, uint8_t value) {
     uint32_t target_bucket_ix = hash_64(key) & ob->mask;
 
@@ -110,6 +99,7 @@ void _fill_opening_book_worker(openingbook_t* ob, uint64_t player, uint64_t mask
         // key <-> hash should be almost bijective
         if ((hash % n_workers == worker_id) && !has_position(ob, key)) {
             uint8_t value = iterdeep(player, mask, false, 0);
+            // uint8_t value = 0;
             add_position_value(ob, key, value);
             if (worker_id == 0) {
                 printf("%u: %"PRIu64"\r", worker_id, ob->count);
@@ -131,8 +121,9 @@ void _fill_opening_book_worker(openingbook_t* ob, uint64_t player, uint64_t mask
 
 void fill_opening_book_worker(uint64_t player, uint64_t mask, uint8_t depth, uint8_t worker_id, uint8_t n_workers) {
     openingbook_t ob;
-    init_openingbook(&ob, 10);
+    init_openingbook(&ob, 20);
     _fill_opening_book_worker(&ob, player, mask, depth, worker_id, n_workers);
+    printf("worker %u: generated %"PRIu64" positions\n", worker_id, ob.count);
 }
 
 void fill_opening_book(uint64_t player, uint64_t mask, uint8_t depth) {
