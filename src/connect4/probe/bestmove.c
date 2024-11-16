@@ -27,23 +27,18 @@
 #endif
 
 
-
-
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
-    if (argc < 5) {
-        perror("Wrong number of arguments supplied: connect4_bestmove.out folder width height moveseq [-wdl | -dtm]\n");
+    if (argc < 3) {
+        perror("Wrong number of arguments supplied: connect4_bestmove.out folder moveseq [-wdl | -dtm]\n");
         exit(EXIT_FAILURE);
     }
-    char* succ;
-    uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
-    uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
 
-    const char *moveseq = argv[4];
+    const char *moveseq = argv[2];
 
     bool do_ab = false;
-    for (int i = 5; i < argc; i++) {
+    for (int i = 3; i < argc; i++) {
         if (strcmp(argv[i], "-wdl") == 0) {
             do_ab = false;
         }
@@ -65,20 +60,18 @@ int main(int argc, char const *argv[]) {
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');
-        assert(0 <= move && move < width);
+        assert(0 <= move && move < WIDTH);
         assert(is_legal_move(player, mask, move));
         play_column(&player, &mask, move);
     }
     print_board(player,  mask, -1);
 
-    make_mmaps(width, height);
+    make_mmaps(WIDTH, HEIGHT);
 
-    uint64_t log2ttsize = 28;
-    tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
-    tt_mask = (1UL << log2ttsize) - 1;
-    uint64_t log2wdlcachesize = 28;
-    wdl_cache = calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
-    wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
+    tt_t tt;
+    init_tt(&tt, 28);
+    wdl_cache_t wdl_cache;
+    init_wdl_cache(&wdl_cache, 28);
 
 
     struct timespec t0, t1;
@@ -128,7 +121,7 @@ int main(int argc, char const *argv[]) {
     if (do_ab && res != 0) {
         printf("Computing distance to mate ...\n");
         clock_gettime(CLOCK_REALTIME, &t0);
-        uint8_t ab = iterdeep(player, mask, 2, 0);
+        int8_t ab = iterdeep(&tt, &wdl_cache, player, mask, 2, 0);
         printf("Position is %d (%d)\n\n", res, ab);
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
@@ -144,16 +137,16 @@ int main(int argc, char const *argv[]) {
         int bestscore = -2;
 
         printf("\033[95m");
-        for (move = 0; move < width; move++) {
+        for (move = 0; move < WIDTH; move++) {
             printf("%3d ", move);
         }
         printf("\033[0m\n");
         
-        for (move = 0; move < width; move++) {
+        for (move = 0; move < WIDTH; move++) {
             if (is_legal_move(player, mask, move)) {
                 play_column(&player, &mask, move);
                 if (do_ab) {
-                    res = -iterdeep(player, mask, 1, 1);
+                    res = -iterdeep(&tt, &wdl_cache, player, mask, 1, 1);
                 } else {
                     res = -probe_board_mmap(player, mask);
                 }
@@ -182,12 +175,12 @@ int main(int argc, char const *argv[]) {
     uint64_t N = n_nodes + n_horizon_nodes;
     printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", N, t, N / t / 1000);
     
-    free_mmaps(width, height);
+    free_mmaps(WIDTH, HEIGHT);
     free(mmaps);
     free(st_sizes);
     free(in_memory);
-    free(tt);
-    free(wdl_cache);
+    free(tt.entries);
+    free(wdl_cache.entries);
 
     // sleep(100);
 

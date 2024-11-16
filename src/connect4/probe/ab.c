@@ -21,13 +21,21 @@ inline uint64_t hash_for_board(uint64_t player, uint64_t mask) {
 
 typedef uint64_t wdl_cache_entry_t;
 
-wdl_cache_entry_t* wdl_cache;
-uint64_t wdl_cache_mask;
-uint64_t n_wdl_cache_hits = 0;
+typedef struct WDLCache {
+    wdl_cache_entry_t* entries;
+    uint64_t mask;
+    uint64_t hits;
+} wdl_cache_t;
+
+void init_wdl_cache(wdl_cache_t* wdl_cache, uint64_t log2wdlcachesize) {
+    wdl_cache->entries = calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
+    wdl_cache->mask = (1UL << log2wdlcachesize) - 1;
+    wdl_cache->hits = 0;
+}
 
 // WIDTH * (HEIGHT+1) has to <= 62
-int8_t probe_wdl_cache(uint64_t key, bool* wdl_cache_hit) {
-    uint64_t entry = wdl_cache[key & wdl_cache_mask];
+int8_t probe_wdl_cache(wdl_cache_t* wdl_cache, uint64_t key, bool* wdl_cache_hit) {
+    uint64_t entry = wdl_cache->entries[key & wdl_cache->mask];
     uint64_t stored_key = entry >> 2;
     if (key == stored_key) {
         *wdl_cache_hit = true;
@@ -38,9 +46,9 @@ int8_t probe_wdl_cache(uint64_t key, bool* wdl_cache_hit) {
     }
 }
 
-void store_in_wdl_cache(uint64_t key, int8_t res) {
+void store_in_wdl_cache(wdl_cache_t* wdl_cache, uint64_t key, int8_t res) {
     uint64_t entry = (key << 2) | (0b11 & ((uint8_t) (res+1)));
-    wdl_cache[key & wdl_cache_mask] = entry;
+    wdl_cache->entries[key & wdl_cache->mask] = entry;
 }
 
 uint64_t winning_spots(uint64_t position, uint64_t mask) {
@@ -113,7 +121,7 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
         return alpha;
     }
 
-    uint8_t moves[WIDTH] = {3, 2, 4, 1, 5, 0, 6};
+    uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     uint64_t move_mask = get_pseudo_legal_moves(mask);
     // sort_moves(moves, move_mask, player, mask);
 
@@ -139,7 +147,7 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
 #define HORIZON_DEPTH 10
 
 uint64_t n_nodes = 0;
-int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
+int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
     if (is_terminal(player, mask)) {
         return -MATESCORE + ply; // terminal is always lost
@@ -156,15 +164,17 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
         // all responses of opponent in lost position lead to winning position
         res = 1;
     } else {
-        bool wdl_cache_hit = false;
-        res = probe_wdl_cache(key, &wdl_cache_hit);
-        n_wdl_cache_hits += wdl_cache_hit;
-        if (!wdl_cache_hit) {
+        if (wdl_cache != NULL) {
+            bool wdl_cache_hit = false;
+            res = probe_wdl_cache(wdl_cache, key, &wdl_cache_hit);
+            wdl_cache->hits += wdl_cache_hit;
+            if (!wdl_cache_hit) {
+                res = probe_board_mmap(player, mask);
+                store_in_wdl_cache(wdl_cache, key, res);
+            }
+        } else {
             res = probe_board_mmap(player, mask);
-            store_in_wdl_cache(key, res);
         }
-
-        // res = probe_board_mmap(player, mask);
     }
 
     // int res = probe_board_mmap(player, mask);
@@ -193,13 +203,13 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
 
     tt_entry_t tt_entry;
     bool tt_hit = false;
-    probe_tt(key, depth, alpha, beta, &tt_entry, &tt_hit);
-    n_tt_hits += tt_hit;
+    probe_tt(tt, key, depth, alpha, beta, &tt_entry, &tt_hit);
+    tt->hits += tt_hit;
     if (tt_hit) {
         return tt_entry.value;
     }
 
-    uint8_t moves[7] = {3, 2, 4, 1, 5, 0, 6};
+    uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     uint64_t move_mask = get_pseudo_legal_moves(mask);
     // sort_moves(moves, move_mask, player, mask);
 
@@ -210,7 +220,7 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
         uint64_t move = move_mask & column_mask(moves[move_ix]);
 
         if (move) {
-            value = -alphabeta(player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+            value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
         
             if (value > alpha) {
                 bestmove = move_ix;
@@ -224,13 +234,13 @@ int8_t alphabeta(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint
             }
         }
     }
-    n_tt_collisions += store_in_tt(key, depth, alpha, bestmove, flag);
+    tt->collisions += store_in_tt(tt, key, depth, alpha, bestmove, flag);
     
     return alpha;
 }
 
 
-int8_t iterdeep(uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
+int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         return 0;
@@ -242,9 +252,9 @@ int8_t iterdeep(uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
     int8_t ab;
     while (true) {
         if (res == 1) {
-            ab = alphabeta(player, mask, 1, MATESCORE, ply, depth, res);
+            ab = alphabeta(tt, wdl_cache, player, mask, 1, MATESCORE, ply, depth, res);
         } else {
-            ab = alphabeta(player, mask, -MATESCORE, -1, ply, depth, res);
+            ab = alphabeta(tt, wdl_cache, player, mask, -MATESCORE, -1, ply, depth, res);
         }
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
@@ -263,7 +273,7 @@ int8_t iterdeep(uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
             printf("depth = %u, ab = %d, ", depth, ab);
             uint64_t N = n_nodes + n_horizon_nodes;
             printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", N, t, N / t / 1000);
-            printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
+            printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) tt->hits / n_nodes, tt->collisions, (double) wdl_cache->hits / n_nodes);
         }
         if (abs(ab) > 1) {
             return ab;

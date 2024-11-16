@@ -6,18 +6,17 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#define HEIGHT 6
-#define WIDTH 7
+#ifndef WIDTH
+    #define WIDTH 7
+#endif
+#ifndef HEIGHT
+    #define HEIGHT 6
+#endif
 
-#define BOTTOM_MASK 0x40810204081
-#define BOARD_MASK 0xfdfbf7efdfbf // WIDTH x HEIGHT filled with one
-#define COLUMN_A 0x3f           // 0
-#define COLUMN_B 0x1f80         // 1
-#define COLUMN_C 0xfc000        // 2
-#define COLUMN_D 0x7e00000      // 3
-#define COLUMN_E 0x3f0000000    // 4
-#define COLUMN_F 0x1f800000000  // 5
-#define COLUMN_G 0xfc0000000000 // 6
+#include "board_constants.c"
+
+// #define BOTTOM_MASK 0x40810204081
+// #define BOARD_MASK 0xfdfbf7efdfbf // WIDTH x HEIGHT filled with one
 
 u_int64_t column_mask(uint8_t col) {
     return ((1ULL << HEIGHT) - 1) << col * (HEIGHT + 1);

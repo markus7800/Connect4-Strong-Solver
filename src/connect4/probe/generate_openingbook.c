@@ -21,40 +21,34 @@
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
-    if (argc < 4) {
+    if (argc < 2) {
         perror("Wrong number of arguments supplied: generate_ob.out folder width height\n");
         exit(EXIT_FAILURE);
     }
-    char* succ;
-    uint32_t width = (uint32_t) strtoul(argv[2], &succ, 10);
-    uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
 
     const char *folder = argv[1];
     chdir(folder);
 
-    make_mmaps(width, height); // change to read binary
-
-    uint64_t log2ttsize = 28;
-    tt = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
-    tt_mask = (1UL << log2ttsize) - 1;
-    uint64_t log2wdlcachesize = 28;
-    wdl_cache = calloc((1UL << log2wdlcachesize), sizeof(wdl_cache_entry_t));
-    wdl_cache_mask = (1UL << log2wdlcachesize) - 1;
+    make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
 
     struct timespec t0, t1;
     double t;
 
     clock_gettime(CLOCK_REALTIME, &t0);
-    // fill_opening_book_multithreaded(player, mask, 8, 2);
 
-    fill_opening_book(0, 0, 8);
+    fill_opening_book_multithreaded(0, 0, 8, 10);
+    // fill_opening_book(0, 0, 8);
 
     clock_gettime(CLOCK_REALTIME, &t1);
     t = get_elapsed_time(t0, t1);
     
-    printf("finished in %.3fs\n", t);
+    printf("generated %u finished in %.3fs\n", cnt, t);
 
     return 0;
 }
 
 //  ./generate_ob.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6
+
+// (sci) markus@Markuss-MacBook-Pro-14 connect4 % ./generate_ob.out 'solution_w6_h5'
+// worker 0: generated 72312 positions
+// generated 72312 finished in 548.703s

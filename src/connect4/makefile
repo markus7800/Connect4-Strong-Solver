@@ -7,6 +7,9 @@ IN_OP_GC = 0		    # should GC be performed during ops?
 ALLOW_ROW_ORDER = 0     # should order by row if height > width?
 COMPRESSED_ENCODING = 1 # use compressed Connect4 encoding?
 
+WIDTH = 7
+HEIGHT = 6
+
 CFLAGS = -O3 -flto -Wall -O3
 
 BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../bdd/ops.c ../bdd/uniquetable.c ../bdd/save.c ../bdd/nodeindexmap.c
@@ -26,10 +29,10 @@ solve:
 	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o solve.out
 
 bestmove:
-	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -o bestmove.out
+	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o bestmove_w$(WIDTH)_h$(HEIGHT).out
 
 openingbook:
-	$(CC) probe/generate_openingbook.c $(CFLAGS) $(C4FLAGS) -o generate_ob.out -lpthread
+	$(CC) probe/generate_openingbook.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o generate_ob_w$(WIDTH)_h$(HEIGHT).out -lpthread
 
 perft:
-	$(CC) probe/perft.c $(BDDFILES) $(CFLAGS) -o perft.out 
+	$(CC) probe/perft.c $(BDDFILES) $(CFLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o perft_w$(WIDTH)_h$(HEIGHT).out 

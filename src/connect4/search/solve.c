@@ -26,7 +26,7 @@
 #endif
 
 #ifndef SAVE_BDD_TO_DISK
-#define SAVE_BDD_TO_DISK 0
+#define SAVE_BDD_TO_DISK 1
 #endif
 
 
