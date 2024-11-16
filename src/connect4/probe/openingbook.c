@@ -102,11 +102,10 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         // key <-> hash should be almost bijective
         if ((hash % n_workers == worker_id) && !has_position(ob, key)) {
             uint8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
-            // uint8_t value = 0;
             add_position_value(ob, key, value);
             cnt++;
             if (worker_id == 0) {
-                printf("%u: %u\r", worker_id, cnt);
+                printf("... %u\r", cnt);
             }
         }
         return;
@@ -123,13 +122,12 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
     }
 }
 
+tt_t tt;
+wdl_cache_t wdl_cache;
+
 void fill_opening_book_worker(uint64_t player, uint64_t mask, uint8_t depth, uint8_t worker_id, uint8_t n_workers) {
     openingbook_t ob;
     init_openingbook(&ob, 20);
-    tt_t tt;
-    init_tt(&tt, 24);
-    wdl_cache_t wdl_cache;
-    init_wdl_cache(&wdl_cache, 24);
     _fill_opening_book_worker(&tt, &wdl_cache, &ob, player, mask, depth, worker_id, n_workers);
     printf("worker %u: generated %"PRIu64" positions\n", worker_id, ob.count);
 }
@@ -146,7 +144,9 @@ typedef struct OpeningBookPayload {
     uint8_t n_workers;
 } openingbook_payload_t;
 
-void *fill_opening_book_multithreade_worker(void* arg) {
+
+
+void *fill_opening_book_multithreaded_worker(void* arg) {
     openingbook_payload_t* payload = (openingbook_payload_t*) arg;
     printf("Started worker %u\n", payload->worker_id);
     fill_opening_book_worker(payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
@@ -159,7 +159,7 @@ void fill_opening_book_multithreaded(uint64_t player, uint64_t mask, uint8_t dep
 
     for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
         payloads[worker_id] = (openingbook_payload_t) {player, mask, depth, worker_id, n_workers};
-        pthread_create(&tid[worker_id], NULL, fill_opening_book_multithreade_worker, &payloads[worker_id]);
+        pthread_create(&tid[worker_id], NULL, fill_opening_book_multithreaded_worker, &payloads[worker_id]);
     }
     for  (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
         pthread_join(tid[worker_id], NULL);

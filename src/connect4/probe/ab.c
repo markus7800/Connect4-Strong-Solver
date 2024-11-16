@@ -10,7 +10,8 @@
 #include "probing.c"
 #define MATESCORE 100
 
-#include "tt.c"
+// #include "tt.c"
+#include "tt_multi.c"
 
 #include "utils.c"
 
@@ -156,7 +157,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         return alpha;
     }
 
-    uint64_t key = hash_for_board(player, mask);
+    uint64_t hash = hash_for_board(player, mask);
 
     int8_t res;
     if (rootres == 1) {
@@ -166,11 +167,11 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     } else {
         if (wdl_cache != NULL) {
             bool wdl_cache_hit = false;
-            res = probe_wdl_cache(wdl_cache, key, &wdl_cache_hit);
+            res = probe_wdl_cache(wdl_cache, hash, &wdl_cache_hit);
             wdl_cache->hits += wdl_cache_hit;
             if (!wdl_cache_hit) {
                 res = probe_board_mmap(player, mask);
-                store_in_wdl_cache(wdl_cache, key, res);
+                store_in_wdl_cache(wdl_cache, hash, res);
             }
         } else {
             res = probe_board_mmap(player, mask);
@@ -201,12 +202,11 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
     
 
-    tt_entry_t tt_entry;
     bool tt_hit = false;
-    probe_tt(tt, key, depth, alpha, beta, &tt_entry, &tt_hit);
+    int8_t tt_value = probe_tt(tt, hash, depth, alpha, beta, &tt_hit);
     tt->hits += tt_hit;
     if (tt_hit) {
-        return tt_entry.value;
+        return tt_value;
     }
 
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
@@ -234,7 +234,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
             }
         }
     }
-    tt->collisions += store_in_tt(tt, key, depth, alpha, bestmove, flag);
+    tt->collisions += store_in_tt(tt, hash, depth, alpha, bestmove, flag);
     
     return alpha;
 }
@@ -273,7 +273,7 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask
             printf("depth = %u, ab = %d, ", depth, ab);
             uint64_t N = n_nodes + n_horizon_nodes;
             printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps), ", N, t, N / t / 1000);
-            printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) tt->hits / n_nodes, tt->collisions, (double) wdl_cache->hits / n_nodes);
+            printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64" (%.4f), wdl_cache_hits = %.4f\n", (double) tt->hits / n_nodes, tt->collisions, (double) tt->collisions / tt->stored, (double) wdl_cache->hits / n_nodes);
         }
         if (abs(ab) > 1) {
             return ab;

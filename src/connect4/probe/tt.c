@@ -39,8 +39,8 @@ inline int8_t clamp(int8_t x, int8_t a, int8_t b) {
     return x;
 }
 
-int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta, tt_entry_t* entry, bool* tt_hit) {
-    *entry = tt->entries[key & tt->mask];
+int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta, bool* tt_hit) {
+    tt_entry_t* entry = &tt->entries[key & tt->mask];
     if (key == entry->key) {
         if (entry->flag == FLAG_EXACT) {
             // either we have a terminal win/loss value (potentially searched at lower depth) or we have searched this node for higher depth
