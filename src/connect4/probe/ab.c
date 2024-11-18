@@ -218,11 +218,38 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     uint64_t move_mask = get_pseudo_legal_moves(mask);
+    int8_t value;
+
+
+    uint64_t win_moves = winning_spots(player, mask) & move_mask;
+    if (win_moves) {
+        return MATESCORE - ply - 1;
+    }
+
+    uint64_t opponent = player ^ mask;
+    uint64_t forced_moves = winning_spots(opponent, mask) & move_mask;
+    if (forced_moves) {
+        if (__builtin_popcountll(forced_moves) > 1) {
+            // cannot stop two mates
+            return -MATESCORE + ply + 1;
+        }
+        uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
+        value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+        return clamp(value, alpha, beta);
+
+        // for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
+        //     uint64_t move = forced_moves & column_mask(moves[move_ix]);
+        //     if (move) {
+        //         assert(move == (1ULL << __builtin_ctzl(forced_moves)));
+        //         value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+        //         return clamp(value, alpha, beta);
+        //     }
+        // }
+    }
 
     sort_moves(moves, move_mask, player, mask);
 
     uint8_t flag = FLAG_ALPHA;
-    int8_t value;
     uint8_t bestmove = 0;
     bool do_full = true;
     for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
