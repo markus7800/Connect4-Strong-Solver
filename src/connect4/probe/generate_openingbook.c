@@ -34,11 +34,6 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
 
-#if GLOBAL_TT
-    init_tt(&tt, 30);
-    init_wdl_cache(&wdl_cache, 24);
-#endif
-
     struct timespec t0, t1;
     double t;
 
@@ -60,42 +55,53 @@ int main(int argc, char const *argv[]) {
     enumerate_nondraw(&nondraw_positions, player, mask, depth);
     printf("Non-draw positions: %"PRIu64"\n", nondraw_positions.count);
 
-    // uint64_t work_per_worker = nondraw_positions.count / n_workers + (nondraw_positions.count % n_workers != 0);
-    // uint64_t i = 0;
-    // for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-    //     for (uint64_t j = 0; j < work_per_worker; j++) {
-    //         if (i >= nondraw_positions.count) {
-    //             break;
-    //         }
-    //         add_position_value(&obs[worker_id], nondraw_positions.entries[i].key, nondraw_positions.entries[i].value);
-    //         i++;
-    //     }
-    //     printf("Worker %u: %"PRIu64" positions\n", worker_id, obs[worker_id].count);
-    // }
+    // nondraw_positions.count = 100;
 
+    // uint8_t sub_group_size = n_workers;
+
+    uint8_t sub_group_size = n_workers < 4 ? n_workers : 4;
+
+
+    assert(n_workers % sub_group_size == 0);
+    uint8_t n_sub_groups = n_workers / sub_group_size;
+
+    uint64_t work_per_subgroup =  nondraw_positions.count / n_sub_groups + (nondraw_positions.count % n_sub_groups != 0);
+    uint8_t sub_group = 0;
     for (uint64_t i = 0; i < nondraw_positions.count; i++) {
-        uint64_t worker_id = i % n_workers;
-        // uint8_t worker_id = hash_64(nondraw_positions.entries[i].key) % n_workers;
+        if (i % work_per_subgroup == 0) {
+            sub_group++;
+        }
+        uint8_t worker_id = i % sub_group_size + sub_group_size *(sub_group-1);
+        // printf("%llu: %u\n", i, worker_id);
         add_position_value(&obs[worker_id], nondraw_positions.entries[i].key, nondraw_positions.entries[i].value);
     }
-    for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        printf("Worker %u: %"PRIu64" positions\n", worker_id, obs[worker_id].count);
+
+    tt_t* tts = (tt_t*) malloc(n_sub_groups * sizeof(tt_t));
+    wdl_cache_t* wdl_caches = (wdl_cache_t*) malloc(n_sub_groups * sizeof(wdl_cache_t));
+    for (uint64_t i = 0; i < n_sub_groups; i++) {
+        init_tt(&tts[i], 28);
+        init_wdl_cache(&wdl_caches[i], 24);
     }
 
-    fill_opening_book_multithreaded(obs, player, mask, depth, n_workers);
+    for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
+        sub_group = worker_id / sub_group_size;
+        printf("Worker %u: %"PRIu64" positions, group: %u\n", worker_id, obs[worker_id].count, sub_group);
+    }
+    
 
-    // fill_opening_book_multithreaded_2(obs, player, mask, depth, n_workers);
+    fill_opening_book_multithreaded(tts, wdl_caches, obs, player, mask, depth, n_workers, sub_group_size);
+
+    // fill_opening_book_multithreaded_2(tts, wdl_caches, obs, player, mask, depth, n_workers, sub_group_size);
 
     clock_gettime(CLOCK_REALTIME, &t1);
     t = get_elapsed_time(t0, t1);
     
     printf("generated %u finished in %.3fs\n", cnt, t);
 
-#if GLOBAL_TT
-    // printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) \n", tt.hits, tt.collisions, (double) tt.collisions / tt.stored);
-    free(tt.entries);
-    free(wdl_cache.entries);
-#endif
+    for (uint64_t i = 0; i < n_sub_groups; i++) {
+        free(tts[i].entries);
+        free(wdl_caches[i].entries);
+    }
 
     return 0;
 }

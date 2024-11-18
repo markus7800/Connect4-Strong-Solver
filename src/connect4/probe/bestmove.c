@@ -37,7 +37,7 @@ int main(int argc, char const *argv[]) {
 
     const char *moveseq = argv[2];
 
-    bool do_ab = false;
+    bool do_ab = true;
     for (int i = 3; i < argc; i++) {
         if (strcmp(argv[i], "-wdl") == 0) {
             do_ab = false;

@@ -180,6 +180,8 @@ void _fill_opening_book_worker_2(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t
 }
 
 typedef struct OpeningBookPayload {
+    tt_t* tt;
+    wdl_cache_t* wdl_cache;
     openingbook_t* ob;
     uint64_t player;
     uint64_t mask;
@@ -203,40 +205,23 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
     }
 }
 
-#define GLOBAL_TT 1
-
-#if GLOBAL_TT
-tt_t tt;
-wdl_cache_t wdl_cache;
-#endif
 
 void *fill_opening_book_multithreaded_worker(void* arg) {
     openingbook_payload_t* payload = (openingbook_payload_t*) arg;
     printf("Started worker %u\n", payload->worker_id);
 
-#if !GLOBAL_TT
-    tt_t tt;
-    wdl_cache_t wdl_cache;
-    init_tt(&tt, 28);
-    init_wdl_cache(&wdl_cache, 24);
-#endif
-
-    _fill_opening_book_worker(&tt, &wdl_cache, payload->ob, payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
-
-#if !GLOBAL_TT
-    free(tt.entries);
-    free(wdl_cache.entries);
-#endif
+    _fill_opening_book_worker(payload->tt, payload->wdl_cache, payload->ob, payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
 
     return NULL;
 }
 
-void fill_opening_book_multithreaded(openingbook_t* obs, uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers) {
+void fill_opening_book_multithreaded(tt_t* tts, wdl_cache_t* wdl_caches, openingbook_t* obs, uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers, uint8_t sub_group_size) {
     pthread_t* tid = malloc(n_workers * sizeof(pthread_t));
     openingbook_payload_t* payloads = malloc(n_workers * sizeof(openingbook_payload_t));
 
     for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        payloads[worker_id] = (openingbook_payload_t) {&obs[worker_id], player, mask, depth, worker_id, n_workers};
+        uint8_t subgroup = worker_id / sub_group_size;
+        payloads[worker_id] = (openingbook_payload_t) {&tts[subgroup], &wdl_caches[subgroup], &obs[worker_id], player, mask, depth, worker_id, n_workers};
         pthread_create(&tid[worker_id], NULL, fill_opening_book_multithreaded_worker, &payloads[worker_id]);
     }
     for  (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
@@ -251,29 +236,18 @@ void *fill_opening_book_multithreaded_worker_2(void* arg) {
     openingbook_payload_t* payload = (openingbook_payload_t*) arg;
     printf("Started worker %u\n", payload->worker_id);
 
-#if !GLOBAL_TT
-    tt_t tt;
-    wdl_cache_t wdl_cache;
-    init_tt(&tt, 28);
-    init_wdl_cache(&wdl_cache, 24);
-#endif
-
-    _fill_opening_book_worker_2(&tt, &wdl_cache, payload->ob, payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
-
-#if !GLOBAL_TT
-    free(tt.entries);
-    free(wdl_cache.entries);
-#endif
+    _fill_opening_book_worker_2(payload->tt, payload->wdl_cache, payload->ob, payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
 
     return NULL;
 }
 
-void fill_opening_book_multithreaded_2(openingbook_t* obs, uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers) {
+void fill_opening_book_multithreaded_2(tt_t* tts, wdl_cache_t* wdl_caches, openingbook_t* obs, uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers, uint8_t sub_group_size) {
     pthread_t* tid = malloc(n_workers * sizeof(pthread_t));
     openingbook_payload_t* payloads = malloc(n_workers * sizeof(openingbook_payload_t));
 
     for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        payloads[worker_id] = (openingbook_payload_t) {&obs[worker_id], player, mask, depth, worker_id, n_workers};
+        uint8_t subgroup = worker_id / sub_group_size;
+        payloads[worker_id] = (openingbook_payload_t) {&tts[subgroup], &wdl_caches[subgroup], &obs[worker_id], player, mask, depth, worker_id, n_workers};
         pthread_create(&tid[worker_id], NULL, fill_opening_book_multithreaded_worker_2, &payloads[worker_id]);
     }
     for  (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {

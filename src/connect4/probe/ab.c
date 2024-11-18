@@ -193,12 +193,16 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     assert(res == rootres);
 
     if (depth == 0) {
+#if HORIZON_DEPTH > 0
         int8_t horizon_res = alphabeta_horizon(player, mask, alpha, beta, ply, HORIZON_DEPTH);
         if (horizon_res != 0) {
             return horizon_res;
         } else {
             return res;
         }
+#else
+        return res;
+#endif
     }
     
 
