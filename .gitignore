@@ -4,3 +4,4 @@
 lambda_dump
 *.bin
 *.DS_Store
+*.redundant

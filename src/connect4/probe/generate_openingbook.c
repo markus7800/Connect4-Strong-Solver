@@ -34,7 +34,6 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
 
-    struct timespec t0, t1;
     double t;
 
     clock_gettime(CLOCK_REALTIME, &t0);
@@ -54,6 +53,7 @@ int main(int argc, char const *argv[]) {
     init_openingbook(&nondraw_positions, 20);
     enumerate_nondraw(&nondraw_positions, player, mask, depth);
     printf("Non-draw positions: %"PRIu64"\n", nondraw_positions.count);
+    total_cnt = nondraw_positions.count;
 
     // nondraw_positions.count = 100;
 

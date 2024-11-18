@@ -110,6 +110,7 @@ void init_openingbook(openingbook_t* ob, uint64_t log2size) {
 
 #include <pthread.h>
 #include <stdatomic.h>
+#include <time.h>
 
 uint64_t mask_from_key(uint64_t key) {
     uint64_t mask = 0;
@@ -151,6 +152,8 @@ void enumerate_nondraw(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_
 }
 
 atomic_uint cnt = 0;
+uint64_t total_cnt = 0;
+struct timespec t0, t1;
 
 void _fill_opening_book_worker_2(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth, uint8_t worker_id, uint8_t n_workers) {
     if (depth == 0) {
@@ -162,7 +165,9 @@ void _fill_opening_book_worker_2(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t
             add_position_value(ob, key, value);
             cnt++;
             if (worker_id == 0) {
-                printf("... %u\r", cnt);
+                clock_gettime(CLOCK_REALTIME, &t1);
+                double t = get_elapsed_time(t0, t1);
+                printf("... %u (%.0f%% in %0.fs)                      \r", cnt, 100.0 * cnt / total_cnt, t);
             }
         }
         return;
@@ -200,7 +205,9 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         entry->value = value;
         cnt++;
         if (worker_id == 0) {
-            printf("... %u\r", cnt);
+            clock_gettime(CLOCK_REALTIME, &t1);
+            double t = get_elapsed_time(t0, t1);
+            printf("... %u (%.0f%% in %0.fs)                      \r", cnt, 100.0 * cnt / total_cnt, t);
         }
     }
 }
