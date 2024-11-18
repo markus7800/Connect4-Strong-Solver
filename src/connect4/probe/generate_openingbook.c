@@ -101,59 +101,14 @@ int main(int argc, char const *argv[]) {
     for (uint64_t i = 0; i < n_sub_groups; i++) {
         free(tts[i].entries);
         free(wdl_caches[i].entries);
+        printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) \n", tts[i].hits, tts[i].collisions, (double) tts[i].collisions / tts[i].stored);
     }
 
     return 0;
 }
 
-//  ./generate_ob.out '/Users/markus/Downloads/Connect4-PositionCount-Solve' 7 6
-
-// (sci) markus@Markuss-MacBook-Pro-14 connect4 % ./generate_ob.out 'solution_w6_h5'
-// worker 0: generated 72312 positions
-// generated 72312 finished in 548.703s
-
-// (sci) markus@Markuss-MacBook-Pro-14 connect4 % ./generate_ob_w6_h5.out 'solution_w6_h5'
+// Non-draw positions: 57400
+// Worker 0: 57400 positions, group: 0
 // Started worker 0
-// Started worker 1
-// Started worker 5
-// Started worker 6
-// Started worker 4
-// Started worker 2
-// Started worker 3
-// Started worker 7
-// Started worker 8
-// Started worker 9
-// worker 9: generated 7250 positions
-// worker 7: generated 7186 positions
-// worker 8: generated 7233 positions
-// worker 3: generated 7121 positions
-// worker 0: generated 7188 positions
-// worker 5: generated 7194 positions
-// worker 2: generated 7173 positions
-// worker 6: generated 7339 positions
-// worker 4: generated 7378 positions
-// worker 1: generated 7250 positions
-// generated 72312 finished in 300.535s
-
-// markus@Markuss-MacBook-Pro-14 connect4 % ./generate_ob_w6_h5.out 'solution_w6_h5'
-// worker 0: generated 72312 positions
-// tt: hits=11440133 collisions=9073274
-// generated 72312 finished in 568.166s
-
-// markus@Markuss-MacBook-Pro-14 connect4 % ./generate_ob_w5_h5.out 'solution_w5_h5'
-// worker 0: generated 25060 positions
-// tt: hits=142780 collisions=5009
-// generated 25060 finished in 8.592s
-
-
-// w6 x h5
-// 2^30 tt
-// depth 6
-//   single: 230s
-//   10 threads: 60s
-// depth 8
-//   single: 560s
-//   10 threads: 140s
-// depth 10:
-//   single: 960s
-//   10 threads: 240s
+// generated 57400 finished in 132.754s          
+// tt: hits=85199208 collisions=14966105 (0.0662) 

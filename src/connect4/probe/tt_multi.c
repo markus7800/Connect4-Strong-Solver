@@ -6,6 +6,8 @@
 #define FLAG_BETA 2
 #define FLAG_EXACT 3
 
+#define TT_CLUSTER_SIZE 3
+
 #define uint128_t __uint128_t
 
 typedef uint128_t tt_entry_t;
@@ -20,7 +22,7 @@ typedef struct TT {
 } tt_t;
 
 void init_tt(tt_t* tt, uint64_t log2ttsize) {
-    tt->entries = calloc((1UL << log2ttsize), sizeof(tt_entry_t));
+    tt->entries = calloc((1UL << log2ttsize) + TT_CLUSTER_SIZE, sizeof(tt_entry_t));
     tt->mask = (1UL << log2ttsize) - 1;
     tt->hits = 0;
     tt->collisions = 0;
@@ -37,10 +39,26 @@ inline int8_t clamp(int8_t x, int8_t a, int8_t b) {
     return x;
 }
 
+
 int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta, bool* tt_hit) {
-    tt_entry_t entry = tt->entries[key & tt->mask];
-    uint64_t entry_key = (uint64_t) entry;
-    if (key == entry_key) {
+    tt_entry_t entry;
+    uint64_t entry_key;
+    bool found = false;
+#if TT_CLUSTER_SIZE > 0
+    for (uint64_t i = 0; i < TT_CLUSTER_SIZE; i++) {
+        entry = tt->entries[(key & tt->mask) + i];
+        entry_key = (uint64_t) entry;
+        if (key == entry_key) {
+            found = true;
+            break;
+        }
+    }
+#else
+        entry = tt->entries[key & tt->mask];
+        entry_key = (uint64_t) entry;
+        found = (key == entry_key);
+#endif
+    if (found) {
         uint8_t entry_depth = (uint8_t) (entry >> 64);
         int8_t entry_value = (int8_t) (entry >> 72);
         uint8_t entry_flag = (uint8_t) (entry >> 88);
@@ -85,8 +103,21 @@ void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, u
 
 // return true if collision
 bool store_in_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
-    tt_entry_t* entry = &tt->entries[key & tt->mask];
-    uint64_t entry_key = (uint64_t) *entry;
+    tt_entry_t* entry;
+    uint64_t entry_key;
+#if TT_CLUSTER_SIZE > 0
+    for (uint64_t i = 0; i < TT_CLUSTER_SIZE; i++) {
+        entry = &tt->entries[(key & tt->mask) + i];
+        entry_key = (uint64_t) *entry;
+        if (entry_key == 0 || entry_key == key) {
+            break;
+        }
+    }
+#else
+    entry = &tt->entries[key & tt->mask];
+    entry_key = (uint64_t) *entry;
+#endif
+
 
     bool collision = (entry_key != 0) && (entry_key != key);
     store_entry(entry, key, depth, value, move, flag);
