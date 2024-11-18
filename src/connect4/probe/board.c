@@ -29,7 +29,7 @@ inline void set(u_int64_t* pos, int i) {
     *pos = (1ULL << i) | *pos;
 }
 
-bool alightment(uint64_t pos) {
+bool alignment(uint64_t pos) {
     // horizontal 
     uint64_t m = pos & (pos >> (HEIGHT+1));
     if (m & (m >> (2*(HEIGHT+1)))) return true;
@@ -50,7 +50,7 @@ bool alightment(uint64_t pos) {
 }
 bool is_terminal(uint64_t player, uint64_t mask) {
     uint64_t pos = player ^ mask;
-    if (alightment(pos)) {
+    if (alignment(pos)) {
         return true;
     }
 

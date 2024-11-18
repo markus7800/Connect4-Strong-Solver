@@ -112,7 +112,7 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
     n_horizon_nodes++;
     uint64_t pos = player ^ mask;
 
-    if (alightment(pos) || mask == BOARD_MASK) {
+    if (alignment(pos) || mask == BOARD_MASK) {
         return -MATESCORE + ply; // terminal is always lost
     }
     if (depth == 0) {
@@ -146,6 +146,8 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
 }
 
 #define HORIZON_DEPTH 5
+
+uint64_t bestmove_ixs[WIDTH] = {0, 0, 0, 0, 0, 0,};
 
 uint64_t n_nodes = 0;
 int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
@@ -185,12 +187,13 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
     if (res == 1) {
         if (beta <= 0) {
-            // winning move but we now that opponent has win
+            // winning move but we know that opponent has win
             return beta;
         }
     }
 
     assert(res == rootres);
+
 
     if (depth == 0) {
 #if HORIZON_DEPTH > 0
@@ -215,31 +218,45 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     uint64_t move_mask = get_pseudo_legal_moves(mask);
-    // sort_moves(moves, move_mask, player, mask);
+
+    sort_moves(moves, move_mask, player, mask);
 
     uint8_t flag = FLAG_ALPHA;
     int8_t value;
     uint8_t bestmove = 0;
+    bool do_full = true;
     for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
         uint64_t move = move_mask & column_mask(moves[move_ix]);
 
         if (move) {
-            value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+            // value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+
+            if (do_full) {
+                value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+            } else {
+                value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -alpha-1, -alpha, ply+1, depth-1, -rootres);
+                if (value > alpha) {
+                    value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);   
+                }
+            }
         
             if (value > alpha) {
                 bestmove = move_ix;
                 flag = FLAG_EXACT;
+                do_full = false;
                 alpha = value;
             }
             if (value >= beta) {
                 flag = FLAG_BETA;
                 alpha = beta;
+
                 break;
             }
         }
     }
     tt->collisions += store_in_tt(tt, hash, depth, alpha, bestmove, flag);
     
+    bestmove_ixs[bestmove]++;
     return alpha;
 }
 

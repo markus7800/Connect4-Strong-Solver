@@ -104,6 +104,15 @@ int main(int argc, char const *argv[]) {
         printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) \n", tts[i].hits, tts[i].collisions, (double) tts[i].collisions / tts[i].stored);
     }
 
+    // printf("null_window_searches: ");
+    // for (uint64_t i = 0; i < WIDTH; i++) { printf("%.4f, ", (double) null_window_searches[i] / searches_total); };
+    // printf("\n");
+    printf("bestmove ixs: ");
+    for (uint64_t i = 0; i < WIDTH; i++) { printf("%"PRIu64", ", bestmove_ixs[i]); };
+    printf("\n");
+    // printf("cutoff_ixs ixs: ");
+    // for (uint64_t i = 0; i < WIDTH; i++) { printf("%"PRIu64", ", cutoff_ixs[i]); };
+    // printf("\n");
     return 0;
 }
 

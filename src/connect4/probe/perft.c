@@ -25,7 +25,7 @@ uint64_t perft2(uint64_t player, uint64_t mask, uint8_t depth) {
         return 1;
     }
     uint64_t pos = player ^ mask;
-    if (alightment(pos) || mask == BOARD_MASK) {
+    if (alignment(pos) || mask == BOARD_MASK) {
         return 0;
     }
     uint64_t cnt = 0;
