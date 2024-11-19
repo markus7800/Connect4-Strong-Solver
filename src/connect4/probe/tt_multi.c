@@ -102,10 +102,12 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, int8_t alpha
                 if (depth >= entry_depth) {
                     *tt_hit = true;
                 } else {
-                    if (ply + depth >= 100 - abs(entry_value)) {
+                    // TODO: change numbers to constants
+                    if (ply + depth + 5 >= 100 - abs(entry_value)) {
                         *tt_hit = true;
                     } else {
                         // the search depth would not be enough to find the mate
+                        // TODO: can we still use information somehow
                         entry_value = entry_value > 0 ? 1 : -1;
                         *tt_hit = true;
                     }
@@ -117,6 +119,8 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, int8_t alpha
                     *tt_hit = false;
                 }
             }
+
+            // *tt_hit = (entry_depth == depth) // is always safe
 
             return clamp(entry_value, alpha, beta);
 
