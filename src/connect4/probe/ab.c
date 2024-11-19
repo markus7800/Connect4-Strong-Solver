@@ -84,7 +84,7 @@ uint64_t winning_spots(uint64_t position, uint64_t mask) {
 }
 
 void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask, uint8_t tt_move) {
-    uint64_t scores[WIDTH];
+    int64_t scores[WIDTH];
     uint64_t opponent = player ^ mask;
     uint64_t opponent_win_spots = winning_spots(opponent, mask);
     uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
@@ -92,14 +92,14 @@ void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint6
     for (uint8_t i = 0; i < WIDTH; i++) {
         uint64_t move = move_mask & column_mask(moves[i]);
         scores[i] = __builtin_popcountll(winning_spots(player | move, mask));
-        // scores[i] += (move == tt_move) * (1<<20);
+        scores[i] += __builtin_popcountll(winning_spots(opponent | move, mask)) - __builtin_popcountll(opponent_win_spots); // this improves % first move correct, but is not faster
+        // scores[i] += (move == tt_move) * (1<<16);
         scores[i] += ((move & nonlosing_moves) > 0) * (1<<20);
-        // scores[i] = __builtin_popcountll(column_mask(moves[i]) & mask);
     }
     // insertion sort
     for (uint8_t i = 0; i < WIDTH; i++) {
         uint8_t m = moves[i];
-        uint64_t s = scores[i];
+        int64_t s = scores[i];
         uint8_t j;
         for (j = i; j > 0 && scores[j-1] < s; j--) {
             scores[j] = scores[j-1];
@@ -318,6 +318,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint8_t flag = FLAG_ALPHA;
     uint8_t bestmove = 0;
+    uint8_t bestmove_ix = 0;
     bool do_full = true;
     for (uint8_t move_ix = 0; move_ix < movecount; move_ix++) {
         uint64_t move = move_mask & column_mask(moves[move_ix]);
@@ -335,7 +336,8 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
             }
         
             if (value > alpha) {
-                bestmove = move_ix;
+                bestmove = moves[move_ix];
+                bestmove_ix = move_ix;
                 flag = FLAG_EXACT;
                 do_full = false;
                 alpha = value;
@@ -364,7 +366,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     //     }
     // }
 
-    bestmove_ixs[bestmove]++;
+    bestmove_ixs[bestmove_ix]++;
 
     return alpha;
 }

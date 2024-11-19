@@ -126,6 +126,8 @@ int main(int argc, char const *argv[]) {
     for (uint64_t i = 0; i < WIDTH; i++) { s += bestmove_ixs[i]; }
     for (uint64_t i = 0; i < WIDTH; i++) { printf("%.4f, ", (double) bestmove_ixs[i] / s); };
     printf("\n");
+    printf("n_nodes=%"PRIu64"\n", n_nodes);
+    printf("n_horizon_nodes=%"PRIu64"\n", n_horizon_nodes);
     // printf("cutoff_ixs ixs: ");
     // for (uint64_t i = 0; i < WIDTH; i++) { printf("%"PRIu64", ", cutoff_ixs[i]); };
     // printf("\n");
