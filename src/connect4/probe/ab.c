@@ -214,7 +214,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     if (tt != NULL) {
         bool tt_hit = false;
         tt_entry_t entry;
-        int8_t tt_value = probe_tt(tt, hash, depth, ply, alpha, beta, &tt_hit, &entry);
+        int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit, &entry);
         tt->hits += tt_hit;
         if (tt_hit) {
             // uint8_t entry_depth = (uint8_t) (entry >> 64);

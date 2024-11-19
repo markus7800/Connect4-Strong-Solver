@@ -39,7 +39,9 @@ inline int8_t clamp(int8_t x, int8_t a, int8_t b) {
     return x;
 }
 
-int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, int8_t alpha, int8_t beta, bool* tt_hit, tt_entry_t* _entry) {
+#define MATESCORE 100
+
+int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t horizon_depth, int8_t alpha, int8_t beta, bool* tt_hit, tt_entry_t* _entry) {
     tt_entry_t entry;
     uint64_t entry_key;
     bool found = false;
@@ -99,25 +101,17 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, int8_t alpha
             */
 
             if (abs(entry_value) > 1) {
-                if (depth >= entry_depth) {
-                    *tt_hit = true;
-                } else {
+                if (depth < entry_depth) {
                     // TODO: change numbers to constants
-                    if (ply + depth + 5 >= 100 - abs(entry_value)) {
-                        *tt_hit = true;
-                    } else {
+                    if (ply + depth + horizon_depth < MATESCORE - abs(entry_value)) {
                         // the search depth would not be enough to find the mate
                         // TODO: can we still use information somehow
                         entry_value = entry_value > 0 ? 1 : -1;
-                        *tt_hit = true;
                     }
                 }
+                *tt_hit = true;
             } else {
-                if (entry_depth >= depth) {
-                    *tt_hit = true;
-                } else {
-                    *tt_hit = false;
-                }
+                *tt_hit = (entry_depth >= depth);
             }
 
             // *tt_hit = (entry_depth == depth) // is always safe
