@@ -122,7 +122,9 @@ int main(int argc, char const *argv[]) {
     // for (uint64_t i = 0; i < WIDTH; i++) { printf("%.4f, ", (double) null_window_searches[i] / searches_total); };
     // printf("\n");
     printf("bestmove ixs: ");
-    for (uint64_t i = 0; i < WIDTH; i++) { printf("%"PRIu64", ", bestmove_ixs[i]); };
+    uint64_t s = 0;
+    for (uint64_t i = 0; i < WIDTH; i++) { s += bestmove_ixs[i]; }
+    for (uint64_t i = 0; i < WIDTH; i++) { printf("%.4f, ", (double) bestmove_ixs[i] / s); };
     printf("\n");
     // printf("cutoff_ixs ixs: ");
     // for (uint64_t i = 0; i < WIDTH; i++) { printf("%"PRIu64", ", cutoff_ixs[i]); };

@@ -83,11 +83,17 @@ uint64_t winning_spots(uint64_t position, uint64_t mask) {
     return r & (BOARD_MASK ^ mask);
 }
 
-void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask) {
+void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask, uint8_t tt_move) {
     uint64_t scores[WIDTH];
+    uint64_t opponent = player ^ mask;
+    uint64_t opponent_win_spots = winning_spots(opponent, mask);
+    uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
+
     for (uint8_t i = 0; i < WIDTH; i++) {
         uint64_t move = move_mask & column_mask(moves[i]);
         scores[i] = __builtin_popcountll(winning_spots(player | move, mask));
+        // scores[i] += (move == tt_move) * (1<<20);
+        scores[i] += ((move & nonlosing_moves) > 0) * (1<<20);
         // scores[i] = __builtin_popcountll(column_mask(moves[i]) & mask);
     }
     // insertion sort
@@ -110,10 +116,12 @@ void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint6
 uint64_t n_horizon_nodes = 0;
 int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth) {
     n_horizon_nodes++;
+
     if (alignment(player ^ mask)) {
         return -MATESCORE + ply; // terminal is always lost
     }
     if (mask == BOARD_MASK) return 0; // draw
+
 
     if (depth == 0) {
         return 0;
@@ -155,10 +163,12 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     // int8_t orig_alpha = alpha;
     // int8_t orig_beta = beta;
 
+
     if (alignment(player ^ mask)) {
         return -MATESCORE + ply; // terminal is always lost
     }
     if (mask == BOARD_MASK) return 0; // draw
+
 
     if (MATESCORE - ply <= alpha) {
         return alpha;
@@ -214,40 +224,40 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
     
 
-    if (tt != NULL) {
-        bool tt_hit = false;
-        tt_entry_t entry;
-        int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit, &entry);
-        tt->hits += tt_hit;
-        if (tt_hit) {
-            // uint8_t entry_depth = (uint8_t) (entry >> 64);
-            // int8_t entry_value = (int8_t) (entry >> 72);
-            // uint8_t entry_flag = (uint8_t) (entry >> 88);
-            // if (entry_flag == FLAG_EXACT) {
-            //     if (entry_depth != depth) {
-            //         int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
-            //         if (compare_value != tt_value) {
-            //             printf("probe depth %u, alpha=%d, beta=%d: ab=%d vs tt=%d (%d @ %u)\n", depth, alpha, beta, compare_value, tt_value, entry_value, entry_depth);
-            //             assert(false);
-            //         }
-            //     }
-            // }
+    bool tt_hit = false;
+    tt_entry_t entry;
+    int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit, &entry);
+    tt->hits += tt_hit;
+    uint8_t tt_move = tt_hit ? (uint8_t) (entry >> 80) : (uint8_t) -1;
+    if (tt_hit) {
+        // uint8_t entry_depth = (uint8_t) (entry >> 64);
+        // int8_t entry_value = (int8_t) (entry >> 72);
+        // uint8_t entry_flag = (uint8_t) (entry >> 88);
+        // if (entry_flag == FLAG_EXACT) {
+        //     if (entry_depth != depth) {
+        //         int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
+        //         if (compare_value != tt_value) {
+        //             printf("probe depth %u, alpha=%d, beta=%d: ab=%d vs tt=%d (%d @ %u)\n", depth, alpha, beta, compare_value, tt_value, entry_value, entry_depth);
+        //             assert(false);
+        //         }
+        //     }
+        // }
 
-            return tt_value;
-        }
+        return tt_value;
     }
 
     uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
     int8_t value;
 
-
-    uint64_t win_moves = winning_spots(player, mask) & move_mask;
+    uint64_t win_spots = winning_spots(player, mask);
+    uint64_t win_moves = win_spots & move_mask;
     if (win_moves) {
         return MATESCORE - ply - 1;
     }
 
     uint64_t opponent = player ^ mask;
-    uint64_t forced_moves = winning_spots(opponent, mask) & move_mask;
+    uint64_t opponent_win_spots = winning_spots(opponent, mask);
+    uint64_t forced_moves = opponent_win_spots & move_mask;
     if (forced_moves) {
         if (__builtin_popcountll(forced_moves) > 1) {
             // cannot stop two mates
@@ -258,13 +268,58 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         return clamp(value, alpha, beta);
     }
 
+    // if (__builtin_popcountll(move_mask) == 1) {
+    //     uint64_t move = (1ULL << __builtin_ctzl(move_mask));
+    //     print_board(player, mask, -1);
+    //     print_mask(move);
+    //     assert(false);
+    // }
+    //     uint64_t sign = 1;
+    //     while (move) {
+    //         player = player ^ mask;
+    //         mask = mask | move;
+    //         ply++;
+    //         sign *= -1;
+
+    //         if (mask == BOARD_MASK) {
+    //             return 0;
+    //         }
+    //         if (alignment(player ^ mask)) {
+    //             return sign * (-MATESCORE + ply);
+    //         }
+    //         move = (move << 1) & BOARD_MASK;
+    //     }
+    // }
+    // if (__builtin_popcountll(move_mask) - __builtin_popcountll((move_mask << 1) & opponent_win_spots) == 1 ) {
+    // uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
+    // if (__builtin_popcountll(nonlosing_moves) == 1 ) {
+    //     uint8_t move_ix = __builtin_ctzl(nonlosing_moves) % WIDTH;
+    //     uint64_t move = (1ULL << __builtin_ctzl(nonlosing_moves));
+
+    //     // x . o o . x
+    //     // o . x o . o
+    //     // x . o x . x  stones played: 21
+    //     // o . o x . x  side to move: o
+    //     // x o x o . x  is terminal: 0
+    //     print_board(player, mask, move_ix);
+    //     print_mask(nonlosing_moves);
+    //     print_mask(win_spots);
+    //     assert(false);
+    // }
+
+    uint8_t movecount = WIDTH;
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
-    sort_moves(moves, move_mask, player, mask);
+    sort_moves(moves, move_mask, player, mask, tt_move);
+
+    if (res == 1) {
+        uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
+        movecount = __builtin_popcountll(nonlosing_moves);
+    }
 
     uint8_t flag = FLAG_ALPHA;
     uint8_t bestmove = 0;
     bool do_full = true;
-    for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
+    for (uint8_t move_ix = 0; move_ix < movecount; move_ix++) {
         uint64_t move = move_mask & column_mask(moves[move_ix]);
 
         if (move) {
@@ -326,9 +381,12 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask
     uint8_t depth = 0;
     int8_t ab;
     while (true) {
+        // int8_t mate_bound =  MATESCORE - (depth + HORIZON_DEPTH);
         if (res == 1) {
+            // ab = alphabeta(tt, wdl_cache, player, mask, 1, mate_bound, ply, depth, res);
             ab = alphabeta(tt, wdl_cache, player, mask, 1, MATESCORE, ply, depth, res);
         } else {
+            // ab = alphabeta(tt, wdl_cache, player, mask, -mate_bound, -1, ply, depth, res);
             ab = alphabeta(tt, wdl_cache, player, mask, -MATESCORE, -1, ply, depth, res);
         }
         clock_gettime(CLOCK_REALTIME, &t1);
@@ -358,16 +416,57 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask
     }
 }
 
-// depth = 20, ab = 1, n_nodes = 5307978179 in 17.685s (300144.423 knps), tt_hits = 0.0879, n_tt_collisions = 3, wdl_cache_hits = 0.0958
-// depth = 21, ab = 1, n_nodes = 7351908580 in 25.596s (287223.624 knps), tt_hits = 0.0820, n_tt_collisions = 10, wdl_cache_hits = 0.0927
-// depth = 22, ab = 1, n_nodes = 9051155364 in 31.566s (286737.955 knps), tt_hits = 0.0942, n_tt_collisions = 37, wdl_cache_hits = 0.0997
-// depth = 23, ab = 1, n_nodes = 11083683833 in 41.147s (269370.608 knps), tt_hits = 0.0922, n_tt_collisions = 105, wdl_cache_hits = 0.0976
-// depth = 24, ab = 1, n_nodes = 12508372215 in 47.008s (266091.663 knps), tt_hits = 0.1032, n_tt_collisions = 243, wdl_cache_hits = 0.1033
-// depth = 25, ab = 1, n_nodes = 13943420346 in 59.223s (235439.918 knps), tt_hits = 0.1011, n_tt_collisions = 634, wdl_cache_hits = 0.1000
-// depth = 26, ab = 1, n_nodes = 14889367219 in 63.888s (233055.360 knps), tt_hits = 0.1116, n_tt_collisions = 1351, wdl_cache_hits = 0.1048
-// depth = 27, ab = 1, n_nodes = 15612249620 in 75.870s (205777.375 knps), tt_hits = 0.1109, n_tt_collisions = 2968, wdl_cache_hits = 0.1028
-// depth = 28, ab = 1, n_nodes = 16093290967 in 79.682s (201968.675 knps), tt_hits = 0.1222, n_tt_collisions = 5988, wdl_cache_hits = 0.1054
-// depth = 29, ab = 1, n_nodes = 16440010056 in 100.056s (164307.505 knps), tt_hits = 0.1234, n_tt_collisions = 14488, wdl_cache_hits = 0.0992
-// depth = 30, ab = 1, n_nodes = 16464158110 in 100.628s (163613.320 knps), tt_hits = 0.1235, n_tt_collisions = 14982, wdl_cache_hits = 0.0987
-// depth = 31, ab = 59, n_nodes = 17220586240 in 293.089s (58755.446 knps), tt_hits = 0.1541, n_tt_collisions = 2080765, wdl_cache_hits = 0.0282
+// (sci) markus@Markuss-MacBook-Pro-14 connect4 % ./bestmove_w7_h6.out 'solution_w7_h6' ''
+// moveseq: 
+// Connect4 width=7 x height=6
+//  . . . . . . .
+//  . . . . . . .
+//  . . . . . . .
+//  . . . . . . .  stones played: 0
+//  . . . . . . .  side to move: x
+//  . . . . . . .  is terminal: 0
+
+// res = 1 (forced win)
+// Computing distance to mate ...
+// depth = 0, ab = 1, n_nodes = 49578 in 0.000s (150693.009 knps), tt_hits = 0.0000, n_tt_collisions = 0 (nan), wdl_cache_hits = 0.0000
+// depth = 1, ab = 1, n_nodes = 347986 in 0.002s (161403.525 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.0000
+// depth = 2, ab = 1, n_nodes = 857590 in 0.006s (142055.657 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1111
+// depth = 3, ab = 1, n_nodes = 1127162 in 0.008s (142660.676 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1176
+// depth = 4, ab = 1, n_nodes = 1584910 in 0.011s (144700.995 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1176
+// depth = 5, ab = 1, n_nodes = 1667479 in 0.012s (140893.874 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1067
+// depth = 6, ab = 1, n_nodes = 1804537 in 0.012s (144455.411 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1200
+// depth = 7, ab = 1, n_nodes = 2285537 in 0.016s (142828.209 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1221
+// depth = 8, ab = 1, n_nodes = 3070274 in 0.020s (149952.332 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1386
+// depth = 9, ab = 1, n_nodes = 6889538 in 0.041s (169910.674 knps), tt_hits = 0.0000, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1422
+// depth = 10, ab = 1, n_nodes = 7415882 in 0.043s (172530.582 knps), tt_hits = 0.0035, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1549
+// depth = 11, ab = 1, n_nodes = 10077980 in 0.063s (161188.363 knps), tt_hits = 0.0053, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1530
+// depth = 12, ab = 1, n_nodes = 11087820 in 0.067s (166361.386 knps), tt_hits = 0.0060, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1512
+// depth = 13, ab = 1, n_nodes = 15473586 in 0.107s (145256.426 knps), tt_hits = 0.0057, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1396
+// depth = 14, ab = 1, n_nodes = 16970424 in 0.112s (151739.769 knps), tt_hits = 0.0096, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1407
+// depth = 15, ab = 1, n_nodes = 19946783 in 0.175s (114304.937 knps), tt_hits = 0.0124, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1318
+// depth = 16, ab = 1, n_nodes = 21902034 in 0.181s (120672.364 knps), tt_hits = 0.0185, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1398
+// depth = 17, ab = 1, n_nodes = 26430794 in 0.300s (88050.697 knps), tt_hits = 0.0235, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1345
+// depth = 18, ab = 1, n_nodes = 29712146 in 0.312s (95119.959 knps), tt_hits = 0.0307, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1417
+// depth = 19, ab = 1, n_nodes = 37620948 in 0.552s (68136.857 knps), tt_hits = 0.0314, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1329
+// depth = 20, ab = 1, n_nodes = 42098624 in 0.570s (73819.678 knps), tt_hits = 0.0375, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1384
+// depth = 21, ab = 1, n_nodes = 49977683 in 1.022s (48921.468 knps), tt_hits = 0.0370, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1307
+// depth = 22, ab = 1, n_nodes = 55794467 in 1.048s (53259.018 knps), tt_hits = 0.0437, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1359
+// depth = 23, ab = 1, n_nodes = 65479169 in 1.848s (35433.314 knps), tt_hits = 0.0456, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1291
+// depth = 24, ab = 1, n_nodes = 71740712 in 1.880s (38167.323 knps), tt_hits = 0.0531, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1335
+// depth = 25, ab = 1, n_nodes = 84333911 in 3.855s (21876.512 knps), tt_hits = 0.0536, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1205
+// depth = 26, ab = 1, n_nodes = 89574975 in 3.891s (23021.080 knps), tt_hits = 0.0598, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1262
+// depth = 27, ab = 1, n_nodes = 96643853 in 5.641s (17132.874 knps), tt_hits = 0.0621, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1255
+// depth = 28, ab = 1, n_nodes = 100964194 in 5.682s (17767.716 knps), tt_hits = 0.0673, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.1285
+// depth = 29, ab = 1, n_nodes = 123906445 in 22.916s (5406.944 knps), tt_hits = 0.0842, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.0710
+// depth = 30, ab = 1, n_nodes = 124562552 in 23.063s (5400.868 knps), tt_hits = 0.0843, n_tt_collisions = 0 (0.0000), wdl_cache_hits = 0.0713
+// depth = 31, ab = 59, n_nodes = 402843493 in 319.100s (1262.435 knps), tt_hits = 0.1270, n_tt_collisions = 154 (0.0000), wdl_cache_hits = 0.0131
 // Position is 1 (59)
+
+// n_nodes = 402843493 in 319.100s (1262.435 knps)
+
+//   0   1   2   3   4   5   6 
+// -60 -58   0  59   0 -58 -60 
+
+// Best move: 3 with score 59
+
+// n_nodes = 15749233205 in 2247.253s (7008.215 knps)
