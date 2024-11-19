@@ -98,6 +98,20 @@ int main(int argc, char const *argv[]) {
     
     printf("generated %u finished in %.3fs\n", cnt, t);
 
+
+    char filename[50];
+    sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u.csv", WIDTH, HEIGHT, depth);
+    FILE* f = fopen(filename, "w");
+    printf("writing to %s/%s ... \n", folder, filename);
+    assert(f != NULL);
+    for (uint64_t i = 0; i < n_sub_groups; i++) {
+        for (uint64_t j = 0; j < obs[i].count; j++) {
+            openingbook_entry_t entry = obs[i].entries[j];
+            fprintf(f, "%"PRIu64", %d\n", entry.key, entry.value);
+        }
+    }
+    fclose(f);
+
     for (uint64_t i = 0; i < n_sub_groups; i++) {
         free(tts[i].entries);
         free(wdl_caches[i].entries);

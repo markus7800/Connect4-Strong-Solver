@@ -8,7 +8,7 @@
 typedef struct OpeningBookEntry {
     uint32_t next;
     uint64_t key;
-    uint8_t value;
+    int8_t value;
 } openingbook_entry_t;
 
 
@@ -20,7 +20,7 @@ typedef struct OpeningBook {
     uint64_t count;
 } openingbook_t;
 
-void add_position_value(openingbook_t* ob, uint64_t key, uint8_t value) {
+void add_position_value(openingbook_t* ob, uint64_t key, int8_t value) {
     uint32_t target_bucket_ix = hash_64(key) & ob->mask;
 
     uint64_t i = ob->count;
@@ -70,7 +70,7 @@ uint8_t get_value_for_position(openingbook_t* ob, uint64_t key) {
     exit(EXIT_FAILURE);
 }
 
-uint8_t update_value_for_position(openingbook_t* ob, uint64_t key, uint8_t value) {
+uint8_t update_value_for_position(openingbook_t* ob, uint64_t key, int8_t value) {
     uint32_t target_bucket_ix = hash_64(key) & ob->mask;
     uint32_t b = ob->buckets[target_bucket_ix];
     openingbook_entry_t entry;
@@ -161,7 +161,7 @@ void _fill_opening_book_worker_2(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t
         uint64_t hash = hash_64(key);
         // key <-> hash should be almost bijective
         if ((hash % n_workers == worker_id) && !has_position(ob, key)) {
-            uint8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
+            int8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
             add_position_value(ob, key, value);
             cnt++;
             if (worker_id == 0) {
@@ -201,7 +201,7 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         uint64_t mask = mask_from_key(entry->key);
         uint64_t player = entry->key & mask;
         assert(position_key(player, mask) == entry->key);
-        uint8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
+        int8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
         entry->value = value;
         cnt++;
         if (worker_id == 0) {

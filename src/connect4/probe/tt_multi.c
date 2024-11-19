@@ -39,14 +39,14 @@ inline int8_t clamp(int8_t x, int8_t a, int8_t b) {
     return x;
 }
 
-
-int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta, bool* tt_hit) {
+int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, int8_t alpha, int8_t beta, bool* tt_hit, tt_entry_t* _entry) {
     tt_entry_t entry;
     uint64_t entry_key;
     bool found = false;
 #if TT_CLUSTER_SIZE > 0
     for (uint64_t i = 0; i < TT_CLUSTER_SIZE; i++) {
         entry = tt->entries[(key & tt->mask) + i];
+        *_entry = tt->entries[(key & tt->mask) + i];
         entry_key = (uint64_t) entry;
         if (key == entry_key) {
             found = true;
@@ -62,9 +62,62 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta
         uint8_t entry_depth = (uint8_t) (entry >> 64);
         int8_t entry_value = (int8_t) (entry >> 72);
         uint8_t entry_flag = (uint8_t) (entry >> 88);
+        assert(entry_value != 0);
+
         if (entry_flag == FLAG_EXACT) {
-            // either we have a terminal win/loss value (potentially searched at lower depth) or we have searched this node for higher depth
-            *tt_hit = (entry_depth >= depth) || abs(entry_value) > 1;
+            /*
+                example:
+
+                stored:
+                    ply = 3
+                    depth = 6
+                    value = 95 (mate in 5 is exact result because with depth 6 at ply 3 we search until ply 9)
+
+                probe:
+                    entry_ply == ply (need the same number of stones)
+
+                    depth = 7
+                    return 95 because would search at higher depth
+
+                    depth = 4
+                    return 95 because ply=3 + depth=4 > mate=5
+
+                    depth = 1
+                    return 1 because ply=3 + depth=1 < mathe=5
+
+                stored:
+                    ply = 3
+                    depth = 6
+                    value = 1 (unknown number of mate)
+                    
+                probe:
+                    depth = 4
+                    return 1
+
+                    depth 7
+                    no hit
+            */
+
+            if (abs(entry_value) > 1) {
+                if (depth >= entry_depth) {
+                    *tt_hit = true;
+                } else {
+                    if (ply + depth >= 100 - abs(entry_value)) {
+                        *tt_hit = true;
+                    } else {
+                        // the search depth would not be enough to find the mate
+                        entry_value = entry_value > 0 ? 1 : -1;
+                        *tt_hit = true;
+                    }
+                }
+            } else {
+                if (entry_depth >= depth) {
+                    *tt_hit = true;
+                } else {
+                    *tt_hit = false;
+                }
+            }
+
             return clamp(entry_value, alpha, beta);
 
         } else if (entry_flag == FLAG_ALPHA) {

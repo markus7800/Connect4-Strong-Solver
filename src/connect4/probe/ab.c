@@ -145,13 +145,15 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
     return alpha;
 }
 
-#define HORIZON_DEPTH 5
+#define HORIZON_DEPTH 0
 
 uint64_t bestmove_ixs[WIDTH] = {0, 0, 0, 0, 0, 0,};
 
 uint64_t n_nodes = 0;
 int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
+    int8_t orig_alpha = alpha;
+    int8_t orig_beta = beta;
     if (is_terminal(player, mask)) {
         return -MATESCORE + ply; // terminal is always lost
     }
@@ -180,7 +182,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         }
     }
 
-    // int res = probe_board_mmap(player, mask);
+    // res = probe_board_mmap(player, mask);
 
     if (res == 0) {
         return 0; // draw
@@ -209,44 +211,51 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
     
 
-    bool tt_hit = false;
-    int8_t tt_value = probe_tt(tt, hash, depth, alpha, beta, &tt_hit);
-    tt->hits += tt_hit;
-    if (tt_hit) {
-        return tt_value;
+    if (tt != NULL) {
+        bool tt_hit = false;
+        tt_entry_t entry;
+        int8_t tt_value = probe_tt(tt, hash, depth, ply, alpha, beta, &tt_hit, &entry);
+        tt->hits += tt_hit;
+        if (tt_hit) {
+            // uint8_t entry_depth = (uint8_t) (entry >> 64);
+            // int8_t entry_value = (int8_t) (entry >> 72);
+            // uint8_t entry_flag = (uint8_t) (entry >> 88);
+            // if (entry_flag == FLAG_EXACT) {
+            //     if (entry_depth != depth) {
+            //         int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
+            //         if (compare_value != tt_value) {
+            //             printf("probe depth %u, alpha=%d, beta=%d: ab=%d vs tt=%d (%d @ %u)\n", depth, alpha, beta, compare_value, tt_value, entry_value, entry_depth);
+            //             assert(false);
+            //         }
+            //     }
+            // }
+
+            return tt_value;
+        }
     }
 
-    uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     uint64_t move_mask = get_pseudo_legal_moves(mask);
     int8_t value;
 
 
-    uint64_t win_moves = winning_spots(player, mask) & move_mask;
-    if (win_moves) {
-        return MATESCORE - ply - 1;
-    }
+    // uint64_t win_moves = winning_spots(player, mask) & move_mask;
+    // if (win_moves) {
+    //     return MATESCORE - ply - 1;
+    // }
 
-    uint64_t opponent = player ^ mask;
-    uint64_t forced_moves = winning_spots(opponent, mask) & move_mask;
-    if (forced_moves) {
-        if (__builtin_popcountll(forced_moves) > 1) {
-            // cannot stop two mates
-            return -MATESCORE + ply + 1;
-        }
-        uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
-        value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
-        return clamp(value, alpha, beta);
+    // uint64_t opponent = player ^ mask;
+    // uint64_t forced_moves = winning_spots(opponent, mask) & move_mask;
+    // if (forced_moves) {
+    //     if (__builtin_popcountll(forced_moves) > 1) {
+    //         // cannot stop two mates
+    //         return -MATESCORE + ply + 1;
+    //     }
+    //     uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
+    //     value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+    //     return clamp(value, alpha, beta);
+    // }
 
-        // for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
-        //     uint64_t move = forced_moves & column_mask(moves[move_ix]);
-        //     if (move) {
-        //         assert(move == (1ULL << __builtin_ctzl(forced_moves)));
-        //         value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
-        //         return clamp(value, alpha, beta);
-        //     }
-        // }
-    }
-
+    uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     sort_moves(moves, move_mask, player, mask);
 
     uint8_t flag = FLAG_ALPHA;
@@ -276,14 +285,29 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
             if (value >= beta) {
                 flag = FLAG_BETA;
                 alpha = beta;
-
                 break;
             }
         }
     }
-    tt->collisions += store_in_tt(tt, hash, depth, alpha, bestmove, flag);
-    
+    if (tt != NULL) {
+        tt->collisions += store_in_tt(tt, hash, depth, alpha, bestmove, flag);
+    }
+    // if (flag == FLAG_EXACT) {
+    //     int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
+    //     assert(orig_alpha < alpha);
+    //     assert(alpha < orig_beta);
+    //     assert(compare_value == alpha);
+
+    //     if (alpha > 1) {
+    //         assert((alpha + (ply+depth)) >= MATESCORE);
+    //     }
+    //     if (alpha < -1) {
+    //         assert((alpha - (ply+depth)) <= -MATESCORE);
+    //     }
+    // }
+
     bestmove_ixs[bestmove]++;
+
     return alpha;
 }
 
