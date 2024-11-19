@@ -110,11 +110,11 @@ void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint6
 uint64_t n_horizon_nodes = 0;
 int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth) {
     n_horizon_nodes++;
-    uint64_t pos = player ^ mask;
-
-    if (alignment(pos) || mask == BOARD_MASK) {
+    if (alignment(player ^ mask)) {
         return -MATESCORE + ply; // terminal is always lost
     }
+    if (mask == BOARD_MASK) return 0; // draw
+
     if (depth == 0) {
         return 0;
     }
@@ -154,9 +154,12 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     n_nodes++;
     // int8_t orig_alpha = alpha;
     // int8_t orig_beta = beta;
-    if (is_terminal(player, mask)) {
+
+    if (alignment(player ^ mask)) {
         return -MATESCORE + ply; // terminal is always lost
     }
+    if (mask == BOARD_MASK) return 0; // draw
+
     if (MATESCORE - ply <= alpha) {
         return alpha;
     }
@@ -234,7 +237,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         }
     }
 
-    uint64_t move_mask = get_pseudo_legal_moves(mask);
+    uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
     int8_t value;
 
 
