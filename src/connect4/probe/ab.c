@@ -159,7 +159,7 @@ void print_tab(uint8_t depth) {
 
 #define HORIZON_DEPTH 5
 #define DEBUG_AB 0
-#define PV_SEARCH 0
+#define PV_SEARCH 1
 
 uint64_t bestmove_ixs[WIDTH] = {0, 0, 0, 0, 0, 0,};
 
@@ -282,24 +282,38 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
     int8_t value;
 
-    // uint64_t win_spots = winning_spots(player, mask);
-    // uint64_t win_moves = win_spots & move_mask;
-    // if (win_moves) {
-    //     return MATESCORE - ply - 1;
-    // }
+    uint64_t win_spots = winning_spots(player, mask);
+    uint64_t win_moves = win_spots & move_mask;
+    if (tt != NULL && win_moves) {
+        int8_t compare_value = alphabeta(NULL, wdl_cache, player, mask, 1, MATESCORE, ply, depth, rootres);
+        if (compare_value != MATESCORE - ply - 1) {
+            print_board(player, mask, -1);
+            printf("%d vs %d @ d=%u p=%u\n", compare_value, MATESCORE - ply - 1, depth, ply);
+            assert(false);
+        }
+        // printf("win prune\n");
+        return MATESCORE - ply - 1;
+    }
 
-    // uint64_t opponent = player ^ mask;
-    // uint64_t opponent_win_spots = winning_spots(opponent, mask);
-    // uint64_t forced_moves = opponent_win_spots & move_mask;
-    // if (forced_moves) {
-    //     if (__builtin_popcountll(forced_moves) > 1) {
-    //         // cannot stop two mates
-    //         return -MATESCORE + ply + 2; // TODO: this needs to be verified
-    //     }
-    //     uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
-    //     value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
-    //     return clamp(value, alpha, beta);
-    // }
+    uint64_t opponent = player ^ mask;
+    uint64_t opponent_win_spots = winning_spots(opponent, mask);
+    uint64_t forced_moves = opponent_win_spots & move_mask;
+    if (tt != NULL && forced_moves) {
+        if (depth > 1 && __builtin_popcountll(forced_moves) > 1) {
+            // cannot stop two mates
+            int8_t compare_value = alphabeta(NULL, wdl_cache, player, mask, -MATESCORE, -1, ply, depth, rootres);
+            if (compare_value != -MATESCORE + ply + 2) {
+                print_board(player, mask, -1);
+                printf("%d vs %d @ d=%u p=%u\n", compare_value, -MATESCORE + ply + 2, depth, ply);
+                assert(false);
+            }
+            // printf("loss prune\n");
+            return -MATESCORE + ply + 2;
+        }
+        uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
+        value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+        return clamp(value, alpha, beta);
+    }
 
     uint8_t movecount = WIDTH;
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
