@@ -39,6 +39,10 @@ inline int8_t clamp(int8_t x, int8_t a, int8_t b) {
     return x;
 }
 
+inline int8_t max(int8_t x, int8_t y) {
+    return (x < y) ? y : x;
+}
+
 #define MATESCORE 100
 
 int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t horizon_depth, int8_t alpha, int8_t beta, bool* tt_hit, tt_entry_t* _entry) {

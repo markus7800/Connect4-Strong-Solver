@@ -153,24 +153,43 @@ int8_t alphabeta_horizon(uint64_t player, uint64_t mask, int8_t alpha, int8_t be
     return alpha;
 }
 
+void print_tab(uint8_t depth) {
+    for (uint8_t i = 0; i < depth; i++) { printf(" "); }
+}
+
 #define HORIZON_DEPTH 5
+#define DEBUG_AB 0
+#define PV_SEARCH 0
 
 uint64_t bestmove_ixs[WIDTH] = {0, 0, 0, 0, 0, 0,};
 
 uint64_t n_nodes = 0;
 int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
-    // int8_t orig_alpha = alpha;
-    // int8_t orig_beta = beta;
+    int8_t orig_alpha = alpha;
+    int8_t orig_beta = beta;
+
+#if DEBUG_AB
+        print_tab(ply);
+        printf("%u a=%d b=%d\n", ply, alpha, beta);
+#endif
 
 
     if (alignment(player ^ mask)) {
+#if DEBUG_AB
+            print_tab(ply);
+            printf("%u Terminal: Return %d @ d=%u p=%u\n", ply, -MATESCORE + ply, depth, ply);
+#endif
         return -MATESCORE + ply; // terminal is always lost
     }
     if (mask == BOARD_MASK) return 0; // draw
 
 
     if (MATESCORE - ply <= alpha) {
+#if DEBUG_AB
+            print_tab(ply);
+            printf("%u Mate Pruning: Return %d @ d=%u p=%u\n", ply, alpha, depth, ply);
+#endif
         return alpha;
     }
 
@@ -203,6 +222,10 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     if (res == 1) {
         if (beta <= 0) {
             // winning move but we know that opponent has win
+#if DEBUG_AB
+            print_tab(ply);
+            printf("%u WDL: Return %d @ d=%u p=%u\n", depth, beta, depth, ply);
+#endif
             return beta;
         }
     }
@@ -219,102 +242,74 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
             return res;
         }
 #else
+#if DEBUG_AB
+            print_tab(ply);
+            printf("%u D0: Return %d @ d=%u p=%u\n", ply, res, depth, ply);
+#endif
         return res;
 #endif
     }
     
 
     bool tt_hit = false;
-    tt_entry_t entry;
-    int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit, &entry);
-    tt->hits += tt_hit;
-    uint8_t tt_move = tt_hit ? (uint8_t) (entry >> 80) : (uint8_t) -1;
-    if (tt_hit) {
-        // uint8_t entry_depth = (uint8_t) (entry >> 64);
-        // int8_t entry_value = (int8_t) (entry >> 72);
-        // uint8_t entry_flag = (uint8_t) (entry >> 88);
-        // if (entry_flag == FLAG_EXACT) {
-        //     if (entry_depth != depth) {
-        //         int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
-        //         if (compare_value != tt_value) {
-        //             printf("probe depth %u, alpha=%d, beta=%d: ab=%d vs tt=%d (%d @ %u)\n", depth, alpha, beta, compare_value, tt_value, entry_value, entry_depth);
-        //             assert(false);
-        //         }
-        //     }
-        // }
-
-        return tt_value;
+    uint8_t tt_move = (uint8_t) -1;
+    if (tt != NULL) {
+        tt_entry_t entry;
+        int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit, &entry);
+        tt->hits += tt_hit;
+        if (tt_hit) {
+            // uint8_t entry_depth = (uint8_t) (entry >> 64);
+            // int8_t entry_value = (int8_t) (entry >> 72);
+            // uint8_t entry_flag = (uint8_t) (entry >> 88);
+            // if (entry_flag == FLAG_EXACT) {
+            //     if (entry_depth != depth) {
+            //         int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
+            //         if (compare_value != tt_value) {
+            //             printf("probe depth %u, alpha=%d, beta=%d: ab=%d vs tt=%d (%d @ %u)\n", depth, alpha, beta, compare_value, tt_value, entry_value, entry_depth);
+            //             assert(false);
+            //         }
+            //     }
+            // }
+#if DEBUG_AB
+                print_tab(ply);
+                printf("%u TT: Return %d @ d=%u p=%u\n", ply, tt_value, depth, ply);
+#endif
+            tt_move = (uint8_t) (entry >> 80);
+            return tt_value;
+        }
     }
 
     uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
     int8_t value;
 
-    uint64_t win_spots = winning_spots(player, mask);
-    uint64_t win_moves = win_spots & move_mask;
-    if (win_moves) {
-        return MATESCORE - ply - 1;
-    }
-
-    uint64_t opponent = player ^ mask;
-    uint64_t opponent_win_spots = winning_spots(opponent, mask);
-    uint64_t forced_moves = opponent_win_spots & move_mask;
-    if (forced_moves) {
-        if (__builtin_popcountll(forced_moves) > 1) {
-            // cannot stop two mates
-            return -MATESCORE + ply + 2; // TODO: this needs to be verified
-        }
-        uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
-        value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
-        return clamp(value, alpha, beta);
-    }
-
-    // if (__builtin_popcountll(move_mask) == 1) {
-    //     uint64_t move = (1ULL << __builtin_ctzl(move_mask));
-    //     print_board(player, mask, -1);
-    //     print_mask(move);
-    //     assert(false);
+    // uint64_t win_spots = winning_spots(player, mask);
+    // uint64_t win_moves = win_spots & move_mask;
+    // if (win_moves) {
+    //     return MATESCORE - ply - 1;
     // }
-    //     uint64_t sign = 1;
-    //     while (move) {
-    //         player = player ^ mask;
-    //         mask = mask | move;
-    //         ply++;
-    //         sign *= -1;
 
-    //         if (mask == BOARD_MASK) {
-    //             return 0;
-    //         }
-    //         if (alignment(player ^ mask)) {
-    //             return sign * (-MATESCORE + ply);
-    //         }
-    //         move = (move << 1) & BOARD_MASK;
+    // uint64_t opponent = player ^ mask;
+    // uint64_t opponent_win_spots = winning_spots(opponent, mask);
+    // uint64_t forced_moves = opponent_win_spots & move_mask;
+    // if (forced_moves) {
+    //     if (__builtin_popcountll(forced_moves) > 1) {
+    //         // cannot stop two mates
+    //         return -MATESCORE + ply + 2; // TODO: this needs to be verified
     //     }
-    // }
-    // if (__builtin_popcountll(move_mask) - __builtin_popcountll((move_mask << 1) & opponent_win_spots) == 1 ) {
-    // uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
-    // if (__builtin_popcountll(nonlosing_moves) == 1 ) {
-    //     uint8_t move_ix = __builtin_ctzl(nonlosing_moves) % WIDTH;
-    //     uint64_t move = (1ULL << __builtin_ctzl(nonlosing_moves));
-
-    //     // x . o o . x
-    //     // o . x o . o
-    //     // x . o x . x  stones played: 21
-    //     // o . o x . x  side to move: o
-    //     // x o x o . x  is terminal: 0
-    //     print_board(player, mask, move_ix);
-    //     print_mask(nonlosing_moves);
-    //     print_mask(win_spots);
-    //     assert(false);
+    //     uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
+    //     value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+    //     return clamp(value, alpha, beta);
     // }
 
     uint8_t movecount = WIDTH;
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     sort_moves(moves, move_mask, player, mask, tt_move);
 
-    if (res == 1) {
-        uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
-        movecount = __builtin_popcountll(nonlosing_moves);
-    }
+    // if (res == 1) {
+    //     uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
+    //     movecount = __builtin_popcountll(nonlosing_moves);
+    // }
+
 
     uint8_t flag = FLAG_ALPHA;
     uint8_t bestmove = 0;
@@ -324,8 +319,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         uint64_t move = move_mask & column_mask(moves[move_ix]);
 
         if (move) {
-            // value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
-
+#if PV_SEARCH
             if (do_full) {
                 value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
             } else {
@@ -334,8 +328,20 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
                     value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);   
                 }
             }
+#else
+            value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+#endif
+
+#if DEBUG_AB
+                print_tab(ply);
+                printf("%u %u. v=%d\n", ply, move_ix, value);
+#endif
         
             if (value > alpha) {
+#if DEBUG_AB
+                print_tab(ply);
+                printf("%u %u. raised alpha from %d to %d\n", ply, move_ix, alpha, value);
+#endif
                 bestmove = moves[move_ix];
                 bestmove_ix = move_ix;
                 flag = FLAG_EXACT;
@@ -343,32 +349,83 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
                 alpha = value;
             }
             if (value >= beta) {
+#if DEBUG_AB
+                print_tab(ply);
+                printf("%u %u. beta cutoff at %d\n", ply, move_ix, beta);
+#endif
                 flag = FLAG_BETA;
                 alpha = beta;
                 break;
             }
         }
     }
+    value = alpha;
+
     if (tt != NULL) {
-        tt->collisions += store_in_tt(tt, hash, depth, alpha, bestmove, flag);
+        tt->collisions += store_in_tt(tt, hash, depth, value, bestmove, flag);
     }
     // if (flag == FLAG_EXACT) {
     //     int8_t compare_value = alphabeta(NULL, NULL, player, mask, alpha, beta, ply, depth, rootres);
     //     assert(orig_alpha < alpha);
     //     assert(alpha < orig_beta);
     //     assert(compare_value == alpha);
-
-    //     if (alpha > 1) {
-    //         assert((alpha + (ply+depth)) >= MATESCORE);
-    //     }
-    //     if (alpha < -1) {
-    //         assert((alpha - (ply+depth)) <= -MATESCORE);
-    //     }
     // }
+
+#if DEBUG_AB
+    if (flag == FLAG_ALPHA) {
+        print_tab(ply);
+        printf("%u: all node\n", ply);
+        assert(value == orig_alpha);
+    }
+    if (flag == FLAG_BETA) {
+        print_tab(ply);
+        printf("%u: cut node\n", ply);
+        assert(value == orig_beta);
+    }
+    if (flag == FLAG_EXACT) {
+        print_tab(ply);
+        printf("%u: pv node\n", ply);
+        assert(orig_alpha < value);
+        assert(value < orig_beta);
+    }
+#endif
 
     bestmove_ixs[bestmove_ix]++;
 
-    return alpha;
+    /* when making a null-window search, we may return beta that does not lie in bound:
+           7 a=-100 b=-1
+       7 Terminal: Return -93 @ d=0 p=7
+      6 0. v=93
+      6 0. raised alpha from 1 to 93
+      6: pv node
+      6: End: Return 93
+     5 0. v=-93
+     5 0. raised alpha from -100 to -93
+      6 a=91 b=93 (null-window)
+       7 a=-93 b=-91
+       7 D0: Return -1 @ d=0 p=7
+      6 0. v=1
+      6: all node
+    a=91, b=93, d=1, p=6, v=91, b=93 (null-window search size=2)
+    */
+    if (rootres == 1) {
+        assert(0 < orig_alpha);
+        assert(value <= MATESCORE - ply); // tight inequality
+        assert((value == 1) || (MATESCORE - ply - depth - HORIZON_DEPTH - PV_SEARCH <= value)); // tight inequality
+    } else if (rootres == -1) {
+        assert(orig_beta < 0);
+        assert(-MATESCORE + ply <= value); // tight inequality
+        assert((value == -1) || (value <= -MATESCORE + ply + depth + HORIZON_DEPTH + PV_SEARCH)); // tight inequality
+    } else {
+        assert(false);
+    }
+
+#if DEBUG_AB
+    print_tab(ply);
+    printf("%u: End: Return %d\n", ply, value);
+#endif
+
+    return value;
 }
 
 
