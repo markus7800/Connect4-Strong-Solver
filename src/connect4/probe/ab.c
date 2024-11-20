@@ -157,7 +157,13 @@ void print_tab(uint8_t depth) {
     for (uint8_t i = 0; i < depth; i++) { printf(" "); }
 }
 
-#define HORIZON_DEPTH 5
+#if WIDTH == 7
+    #define HORIZON_DEPTH 10
+#else
+    #define HORIZON_DEPTH 5
+#endif
+
+
 #define DEBUG_AB 0
 #define PV_SEARCH 1
 

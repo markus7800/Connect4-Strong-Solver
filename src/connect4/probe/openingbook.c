@@ -142,11 +142,11 @@ void enumerate_nondraw(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_
     if (is_terminal(player, mask)) {
         return;
     }
-    for (uint8_t move = 0; move < WIDTH; move++) {
-        if (is_legal_move(player, mask, move)) {
-            play_column(&player, &mask, move);
-            enumerate_nondraw(ob, player, mask, depth-1);
-            undo_play_column(&player, &mask, move);
+    uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
+    for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
+        uint64_t move = move_mask & column_mask(move_ix);
+        if (move) {
+            enumerate_nondraw(ob, player ^ mask, mask | move, depth-1);
         }
     }
 }

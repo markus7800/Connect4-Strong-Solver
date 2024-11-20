@@ -32,6 +32,7 @@ int main(int argc, char const *argv[]) {
     char * succ;
     uint8_t n_workers = (uint32_t) strtoul(argv[2], &succ, 10);
 
+    // make_mmaps(WIDTH, HEIGHT);
     make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
 
     double t;
