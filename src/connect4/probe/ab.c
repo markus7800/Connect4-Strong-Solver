@@ -83,7 +83,7 @@ uint64_t winning_spots(uint64_t position, uint64_t mask) {
     return r & (BOARD_MASK ^ mask);
 }
 
-void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask, uint8_t tt_move) {
+void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask) {
     int64_t scores[WIDTH];
     uint64_t opponent = player ^ mask;
     uint64_t opponent_win_spots = winning_spots(opponent, mask);
@@ -228,12 +228,9 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     
 
     bool tt_hit = false;
-    uint8_t tt_move = (uint8_t) -1;
-    tt_entry_t entry;
-    int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit, &entry);
+    int8_t tt_value = probe_tt(tt, hash, depth, ply, HORIZON_DEPTH, alpha, beta, &tt_hit);
     tt->hits += tt_hit;
     if (tt_hit) {
-        tt_move = (uint8_t) (entry >> 80);
         return tt_value;
     }
 
@@ -261,7 +258,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint8_t movecount = WIDTH;
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
-    sort_moves(moves, move_mask, player, mask, tt_move);
+    sort_moves(moves, move_mask, player, mask);
 
     if (res == 1) {
         uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
