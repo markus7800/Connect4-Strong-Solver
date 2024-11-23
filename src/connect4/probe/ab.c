@@ -185,32 +185,46 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint64_t hash = hash_for_board(player, mask);
 
-    int8_t res;
-    if (rootres == 1) {
-        // all responses of opponent in lost position lead to winning position
-        res = 1;
-    } else {
+    // int8_t res;
+    // if (rootres == 1) {
+    //     // all responses of opponent in lost position lead to winning position
+    //     res = 1;
+    // } else {
+    //     bool wdl_cache_hit = false;
+    //     res = probe_wdl_cache(wdl_cache, hash, &wdl_cache_hit);
+    //     wdl_cache->hits += wdl_cache_hit;
+    //     if (!wdl_cache_hit) {
+    //         res = probe_board_mmap(player, mask);
+    //         store_in_wdl_cache(wdl_cache, hash, res);
+    //     }
+    // }
+
+
+    // if (res == 0) {
+    //     return 0; // draw
+    // }
+    // if (res == 1) {
+    //     if (beta <= 0) {
+    //         // winning move but we know that opponent has win
+    //         return beta;
+    //     }
+    // }
+
+    // assert(res == rootres);
+
+    if (rootres == -1) {
         bool wdl_cache_hit = false;
-        res = probe_wdl_cache(wdl_cache, hash, &wdl_cache_hit);
+        bool islost = probe_wdl_cache(wdl_cache, hash, &wdl_cache_hit);
         wdl_cache->hits += wdl_cache_hit;
         if (!wdl_cache_hit) {
-            res = probe_board_mmap(player, mask);
-            store_in_wdl_cache(wdl_cache, hash, res);
+            islost = probe_board_mmap_is_lost(player, mask);
+            store_in_wdl_cache(wdl_cache, hash, islost);
+        }
+        // bool islost = probe_board_mmap_is_lost(player, mask);
+        if (!islost) {
+            return 0;
         }
     }
-
-
-    if (res == 0) {
-        return 0; // draw
-    }
-    if (res == 1) {
-        if (beta <= 0) {
-            // winning move but we know that opponent has win
-            return beta;
-        }
-    }
-
-    assert(res == rootres);
 
 
     if (depth == 0) {
@@ -219,10 +233,10 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         if (horizon_res != 0) {
             return horizon_res;
         } else {
-            return res;
+            return rootres;
         }
 #else
-        return res;
+        return rootres;
 #endif
     }
     
@@ -260,7 +274,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     sort_moves(moves, move_mask, player, mask);
 
-    if (res == 1) {
+    if (rootres == 1) {
         uint64_t nonlosing_moves = move_mask & ~(opponent_win_spots >> 1);
         movecount = __builtin_popcountll(nonlosing_moves);
     }

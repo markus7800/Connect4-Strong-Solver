@@ -99,4 +99,36 @@ int probe_board_mmap(uint64_t player, uint64_t mask) {
 
 }
 
+bool _probe_board_mmap_is_(uint64_t player, uint64_t mask, int i) {
+
+    int ply = get_ply(player, mask);
+    bool stm = ply % 2 == 0;
+    uint64_t bitvector = (position_key(player, mask) << 2) | (stm << 1);
+
+    char* map = mmaps[ply][i];
+    if (map == NULL) {
+        perror("Could not read map :()");
+        exit(EXIT_FAILURE);
+    }
+    
+    off_t st_size = st_sizes[ply][i];
+    uint32_t nodecount = st_size / 9;
+    nodeindex_t bdd = nodecount-1;
+
+    return is_sat_mmap(map, bdd, bitvector);
+}
+
+inline bool probe_board_mmap_is_lost(uint64_t player, uint64_t mask) {
+    return _probe_board_mmap_is_(player, mask, 0);
+}
+
+inline bool probe_board_mmap_is_draw(uint64_t player, uint64_t mask) {
+    return _probe_board_mmap_is_(player, mask, 1);
+}
+
+inline bool probe_board_mmap_is_win(uint64_t player, uint64_t mask) {
+    return _probe_board_mmap_is_(player, mask, 2);
+}
+
+
 #endif

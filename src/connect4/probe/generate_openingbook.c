@@ -133,7 +133,7 @@ int main(int argc, char const *argv[]) {
     for (uint64_t i = 0; i < n_sub_groups; i++) {
         free(tts[i].entries);
         free(wdl_caches[i].entries);
-        printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) \n", tts[i].hits, tts[i].collisions, (double) tts[i].collisions / tts[i].stored);
+        printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) wdl_cache_hit=%"PRIu64"\n", tts[i].hits, tts[i].collisions, (double) tts[i].collisions / tts[i].stored, wdl_caches[i].hits);
     }
 
     // printf("null_window_searches: ");
