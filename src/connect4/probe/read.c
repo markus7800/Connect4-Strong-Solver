@@ -13,10 +13,43 @@ char* (*mmaps)[3];
 off_t (*st_sizes)[3];
 bool (*in_memory)[3];
 
-void make_mmap(uint32_t width, uint32_t height, int ply) {
+void bin_filename(char filename[], uint32_t width, uint32_t height, int ply, int i, char* suffix) {
+    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+}
 
+void _make_mmap(uint32_t width, uint32_t height, int ply, int i, char* suffix) {
     char filename[50];
     struct stat st;
+
+    bin_filename(filename, width, height, ply, i, suffix);
+    stat(filename, &st);
+
+    char* map;
+
+    int fd = open(filename, O_RDONLY);
+    if (fd == -1) {
+        mmaps[ply][i] = NULL;
+        return;
+    }
+    assert(mmaps[ply][i] == NULL);
+
+    // printf("%s %llu %"PRIu32"\n", filename, st.st_size, nodecount);
+    map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) {
+        close(fd);
+        perror("Error mmapping the file");
+        exit(EXIT_FAILURE);
+    }
+
+    mmaps[ply][i] = map;
+    st_sizes[ply][i] = st.st_size;
+    in_memory[ply][i] = false;
+    // printf("made mmap %u %u %d %d\n", width, height, ply, i);
+
+    close(fd);
+}
+
+void make_mmap(uint32_t width, uint32_t height, int ply) {
     char* suffix;
 
     for (int i = 0; i < 3; i++) {
@@ -24,43 +57,50 @@ void make_mmap(uint32_t width, uint32_t height, int ply) {
             suffix = "lost";
         } else if (i==1) {
             suffix = "draw";
+            continue;
         } else {
             suffix = "win";
         }
-
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-        stat(filename, &st);
-
-        char* map;
-
-        int fd = open(filename, O_RDONLY);
-        if (fd == -1) {
-            mmaps[ply][i] = NULL;
-            continue;
-        }
-        assert(mmaps[ply][i] == NULL);
-
-        // printf("%s %llu %"PRIu32"\n", filename, st.st_size, nodecount);
-        map = (char*) mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-        if (map == MAP_FAILED) {
-            close(fd);
-            perror("Error mmapping the file");
-            exit(EXIT_FAILURE);
-        }
-
-        mmaps[ply][i] = map;
-        st_sizes[ply][i] = st.st_size;
-        in_memory[ply][i] = false;
-        // printf("made mmap %u %u %d %d\n", width, height, ply, i);
-
-        close(fd);
+        _make_mmap(width, height, ply, i, suffix);
     }
 }
 
-void read_in_memory(uint32_t width, uint32_t height, int ply) {
-
+void _read_in_memory(uint32_t width, uint32_t height, int ply, int i, char* suffix) {
     char filename[50];
     struct stat st;
+
+    bin_filename(filename, width, height, ply, i, suffix);
+    stat(filename, &st);
+
+    char* map;
+
+    FILE* file = fopen(filename, "rb");
+    if (file == NULL) {
+        mmaps[ply][i] = NULL;
+        return;
+    }
+    assert(mmaps[ply][i] == NULL);
+
+    map = (char*) malloc(st.st_size);
+    if (map == NULL) {
+        fclose(file);
+        perror("Error making buffer for file");
+        exit(EXIT_FAILURE);
+    }
+    size_t bytes_read = fread(map, sizeof(char), st.st_size, file);
+    assert(bytes_read == st.st_size);
+
+    mmaps[ply][i] = map;
+    st_sizes[ply][i] = st.st_size;
+    in_memory[ply][i] = true;
+    // printf("read in memory %u %u %d %d\n", width, height, ply, i);
+
+    fclose(file);
+}
+
+
+void read_in_memory(uint32_t width, uint32_t height, int ply) {
+
     char* suffix;
 
     for (int i = 0; i < 3; i++) {
@@ -68,37 +108,12 @@ void read_in_memory(uint32_t width, uint32_t height, int ply) {
             suffix = "lost";
         } else if (i==1) {
             suffix = "draw";
+            continue;
         } else {
             suffix = "win";
         }
 
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
-        stat(filename, &st);
-
-        char* map;
-
-        FILE* file = fopen(filename, "rb");
-        if (file == NULL) {
-            mmaps[ply][i] = NULL;
-            continue;
-        }
-        assert(mmaps[ply][i] == NULL);
-
-        map = (char*) malloc(st.st_size);
-        if (map == NULL) {
-            fclose(file);
-            perror("Error making buffer for file");
-            exit(EXIT_FAILURE);
-        }
-        size_t bytes_read = fread(map, sizeof(char), st.st_size, file);
-        assert(bytes_read == st.st_size);
-
-        mmaps[ply][i] = map;
-        st_sizes[ply][i] = st.st_size;
-        in_memory[ply][i] = true;
-        // printf("read in memory %u %u %d %d\n", width, height, ply, i);
-
-        fclose(file);
+        _read_in_memory(width, height, ply, i, suffix);
     }
 }
 
@@ -109,11 +124,6 @@ void make_mmaps(uint32_t width, uint32_t height) {
     assert(mmaps != NULL);
 
     for (int ply = 0; ply <= width*height; ply++) {
-        // if (ply <= 21) {
-        //     read_in_memory(width, height, ply);
-        // } else {
-        //     make_mmap(width, height, ply);
-        // }
         make_mmap(width, height, ply);
     }       
 }
