@@ -92,7 +92,7 @@ void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint6
     for (uint8_t i = 0; i < WIDTH; i++) {
         uint64_t move = move_mask & column_mask(moves[i]);
         scores[i] = __builtin_popcountll(winning_spots(player | move, mask));
-        scores[i] += __builtin_popcountll(winning_spots(opponent | move, mask)) - __builtin_popcountll(opponent_win_spots); // this improves % first move correct, but is not faster
+        // scores[i] += __builtin_popcountll(winning_spots(opponent | move, mask)) - __builtin_popcountll(opponent_win_spots); // this improves % first move correct, but is not faster
         // scores[i] += (move == tt_move) * (1<<16);
         scores[i] += ((move & nonlosing_moves) > 0) * (1<<20);
     }
@@ -242,14 +242,14 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint64_t win_spots = winning_spots(player, mask);
     uint64_t win_moves = win_spots & move_mask;
-    if (tt != NULL && win_moves) {
+    if (win_moves) {
         return MATESCORE - ply - 1;
     }
 
     uint64_t opponent = player ^ mask;
     uint64_t opponent_win_spots = winning_spots(opponent, mask);
     uint64_t forced_moves = opponent_win_spots & move_mask;
-    if (tt != NULL && forced_moves) {
+    if (forced_moves) {
         if (depth > 1 && __builtin_popcountll(forced_moves) > 1) {
             // cannot stop more than one mate threat
             return -MATESCORE + ply + 2;
@@ -273,7 +273,9 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     uint8_t bestmove = 0;
     uint8_t bestmove_ix = 0;
     bool do_full = true;
+
     for (uint8_t move_ix = 0; move_ix < movecount; move_ix++) {
+
         uint64_t move = move_mask & column_mask(moves[move_ix]);
 
         if (move) {
