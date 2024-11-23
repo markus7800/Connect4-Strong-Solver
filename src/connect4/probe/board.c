@@ -121,7 +121,7 @@ void print_mask(u_int64_t mask) {
         }
         printf("\n");
     }
-    printf("0x%llx\n", mask);
+    printf("0x%"PRIu64"\n", mask);
 }
 
 void play_column(uint64_t* player, uint64_t* mask, uint8_t col) {

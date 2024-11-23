@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+// #include <immintrin.h>
 
 #define FLAG_EMPTY 0
 #define FLAG_ALPHA 1
@@ -45,29 +46,43 @@ inline int8_t max(int8_t x, int8_t y) {
 
 #define MATESCORE 100
 
-int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t horizon_depth, int8_t alpha, int8_t beta, bool* tt_hit, tt_entry_t* _entry) {
+int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t horizon_depth, int8_t alpha, int8_t beta, bool* tt_hit) {
     tt_entry_t entry;
     uint64_t entry_key;
+    uint64_t entry_data;
+    uint32_t entry_checksum;
     bool found = false;
 #if TT_CLUSTER_SIZE > 0
     for (uint64_t i = 0; i < TT_CLUSTER_SIZE; i++) {
         entry = tt->entries[(key & tt->mask) + i];
-        *_entry = tt->entries[(key & tt->mask) + i];
         entry_key = (uint64_t) entry;
-        if (key == entry_key) {
+        entry_data = (uint64_t) (entry >> 64);
+        entry_checksum = (uint32_t) (entry_data >> 32);
+        if (key == entry_key && (uint32_t) key == entry_checksum) {
             found = true;
             break;
         }
     }
 #else
         entry = tt->entries[key & tt->mask];
+        // entry = (tt_entry_t) _mm_load_si128(&tt->entries[key & tt->mask]);
         entry_key = (uint64_t) entry;
-        found = (key == entry_key);
+        entry_data = (uint64_t) (entry >> 64);
+        entry_checksum = (uint32_t) (entry_data >> 32);
+        found = (key == entry_key) && ((uint32_t) key == entry_checksum);
 #endif
     if (found) {
-        uint8_t entry_depth = (uint8_t) (entry >> 64);
-        int8_t entry_value = (int8_t) (entry >> 72);
-        uint8_t entry_flag = (uint8_t) (entry >> 88);
+        // uint8_t entry_depth = (uint8_t) (entry >> 64);
+        // int8_t entry_value = (int8_t) (entry >> 72);
+        // uint8_t entry_flag = (uint8_t) (entry >> 88);
+
+        uint8_t entry_depth = (uint8_t) (entry_data );
+        int8_t entry_value = (int8_t) (entry_data >> 8);
+        // uint8_t entry_move = (uint8_t) (entry_data >> 16);
+        uint8_t entry_flag = (uint8_t) (entry_data >> 24);
+
+
+        // printf("Probe for key=%"PRIu64" (res=%"PRIu64")\n", key, (uint64_t) (entry >> 64));
         assert(entry_value != 0);
 
         if (entry_flag == FLAG_EXACT) {
@@ -136,24 +151,46 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
 }
 
 void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
-    *entry = (
+    assert(value != 0);
+    // printf("Store %d at key=%"PRIu64"\n", value, key);
+    tt_entry_t store_entry = (
         ((uint128_t) key) |
         (((uint128_t) depth) << 64) |
         (((uint128_t) ((uint8_t) value)) << 72) |
         (((uint128_t) move) << 80) |
-        (((uint128_t) flag) << 88)
+        (((uint128_t) flag) << 88) |
+        (((uint128_t) (uint32_t) key) << 96)
     );
+    *entry = store_entry;
+    // _mm_store_si128((__m128i*) entry, (__m128i) store_entry);
 
-    // uint64_t entry_key = (uint64_t) *entry;
-    // uint8_t entry_depth = (uint8_t) (*entry >> 64);
-    // int8_t entry_value = (int8_t) (*entry >> 72);
-    // uint8_t entry_move = (uint8_t) (*entry >> 80);
-    // uint8_t entry_flag = (uint8_t) (*entry >> 88);
+    // uint64_t entry_key = (uint64_t) store_entry;
+    // uint8_t entry_depth = (uint8_t) (store_entry >> 64);
+    // int8_t entry_value = (int8_t) (store_entry >> 72);
+    // uint8_t entry_move = (uint8_t) (store_entry >> 80);
+    // uint8_t entry_flag = (uint8_t) (store_entry >> 88);
+    // uint32_t entry_checksum = (uint32_t) (store_entry >> 96);
     // assert(entry_key == key);
     // assert(entry_depth == depth);
-    // assert(entry_value = value);
+    // assert(entry_value == value);
     // assert(entry_move == move);
     // assert(entry_flag == flag);
+    // assert(entry_checksum == (uint32_t) key);
+
+    // uint64_t entry_key = (uint64_t) store_entry;
+    // uint64_t entry_data = (uint64_t) (store_entry >> 64);
+    // uint8_t entry_depth = (uint8_t) (entry_data );
+    // int8_t entry_value = (int8_t) (entry_data >> 8);
+    // uint8_t entry_move = (uint8_t) (entry_data >> 16);
+    // uint8_t entry_flag = (uint8_t) (entry_data >> 24);
+    // uint32_t entry_checksum = (uint32_t) (entry_data >> 32);
+    // assert(entry_key == key);
+    // assert(entry_depth == depth);
+    // assert(entry_value == value);
+    // assert(entry_move == move);
+    // assert(entry_flag == flag);
+    // assert(entry_checksum == (uint32_t) key);
+
 }
 
 // return true if collision
