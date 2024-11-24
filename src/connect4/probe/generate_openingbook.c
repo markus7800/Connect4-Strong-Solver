@@ -62,10 +62,18 @@ void enumerate_nondraw(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_
     }
 }
 
-atomic_uint cnt = 0;
-uint64_t total_cnt = 0;
-struct timespec t0, t1;
-uint8_t SUBGROUP;
+atomic_uint CNT = 0;
+uint64_t TOTAL_CNT = 0;
+struct timespec T0, T1;
+
+#define DEPTH 8
+
+// PARALLELISATION
+#define SUBGROUP_SIZE 4
+
+// MULTI_PROCESSING
+bool MP = false;
+uint8_t MP_SUBGROUP;
 
 typedef struct OpeningBookPayload {
     tt_t* tt;
@@ -86,11 +94,11 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         assert(position_key(player, mask) == entry->key);
         int8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
         entry->value = value;
-        cnt++;
-        if (worker_id == 0) {
-            clock_gettime(CLOCK_REALTIME, &t1);
-            double t = get_elapsed_time(t0, t1);
-            printf("... %u (%.0f%% in %0.fs)                      \r", cnt, 100.0 * cnt / total_cnt, t);
+        CNT++;
+        if (worker_id == 0 || (MP && worker_id % SUBGROUP_SIZE == 0)) {
+            clock_gettime(CLOCK_REALTIME, &T1);
+            double t = get_elapsed_time(T0, T1);
+            printf("... %u (%.0f%% in %0.fs)                      \r", CNT, 100.0 * CNT / TOTAL_CNT, t);
         }
     }
 }
@@ -104,19 +112,20 @@ void *fill_opening_book_multithreaded_worker(void* arg) {
     return NULL;
 }
 
-void fill_opening_book_multithreaded(tt_t* tts, wdl_cache_t* wdl_caches, openingbook_t* obs, uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers, uint8_t sub_group_size) {
+void fill_opening_book_multithreaded(tt_t* tts, wdl_cache_t* wdl_caches, openingbook_t* obs, uint64_t player, uint64_t mask, uint8_t depth, uint8_t n_workers, uint8_t subgroup_size) {
     pthread_t* tid = malloc(n_workers * sizeof(pthread_t));
     openingbook_payload_t* payloads = malloc(n_workers * sizeof(openingbook_payload_t));
 
+    // if (MP == true) only start and join workers for MP_SUBGROUP
     for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        uint8_t subgroup = worker_id / sub_group_size;
-        if (subgroup != SUBGROUP) continue;
+        uint8_t subgroup = worker_id / subgroup_size;
+        if (MP && subgroup != MP_SUBGROUP) continue;
         payloads[worker_id] = (openingbook_payload_t) {&tts[subgroup], &wdl_caches[subgroup], &obs[worker_id], player, mask, depth, worker_id, n_workers};
         pthread_create(&tid[worker_id], NULL, fill_opening_book_multithreaded_worker, &payloads[worker_id]);
     }
     for  (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        uint8_t subgroup = worker_id / sub_group_size;
-        if (subgroup != SUBGROUP) continue;
+        uint8_t subgroup = worker_id / subgroup_size;
+        if (MP && subgroup != MP_SUBGROUP) continue;
         pthread_join(tid[worker_id], NULL);
     }
 
@@ -127,94 +136,122 @@ void fill_opening_book_multithreaded(tt_t* tts, wdl_cache_t* wdl_caches, opening
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
-    // if (argc < 3) {
-    //     perror("Wrong number of arguments supplied: generate_ob.out folder n_workers\n");
-    //     exit(EXIT_FAILURE);
-    // }
+    if (argc != 3 && argc != 4) {
+        perror("Wrong number of arguments supplied: generate_ob.out folder n_workers [subgroup]\n");
+        exit(EXIT_FAILURE);
+    }
 
     const char *folder = argv[1];
     chdir(folder);
 
     char * succ;
     uint8_t n_workers = (uint32_t) strtoul(argv[2], &succ, 10);
-    SUBGROUP = (uint8_t) strtoul(argv[3], &succ, 10);
+
+    if (argc == 4) {
+        MP_SUBGROUP = (uint8_t) strtoul(argv[3], &succ, 10);
+        MP = true;
+    }
 
     // make_mmaps(WIDTH, HEIGHT);
     make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
 
-    double t;
-
-    clock_gettime(CLOCK_REALTIME, &t0);
 
     uint64_t player = 0;
     uint64_t mask = 0;
     // play_column(&player, &mask, 0);
 
-    uint8_t depth = 8;
-    openingbook_t* obs = (openingbook_t*) malloc(n_workers * sizeof(openingbook_t));
-    for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        init_openingbook(&obs[worker_id], 20);
-    }
-
+    // find all non-draw positions up to given depth
+    uint8_t depth = DEPTH;
 
     openingbook_t nondraw_positions;
     init_openingbook(&nondraw_positions, 20);
     enumerate_nondraw(&nondraw_positions, player, mask, depth);
     printf("Non-draw positions: %"PRIu64"\n", nondraw_positions.count);
-    total_cnt = nondraw_positions.count;
-
-    // nondraw_positions.count = 100;
-
-    // uint8_t sub_group_size = n_workers;
-
-    uint8_t sub_group_size = n_workers < 4 ? n_workers : 4;
+    TOTAL_CNT = nondraw_positions.count;
 
 
-    assert(n_workers % sub_group_size == 0);
-    uint8_t n_sub_groups = n_workers / sub_group_size;
 
-    uint64_t work_per_subgroup =  nondraw_positions.count / n_sub_groups + (nondraw_positions.count % n_sub_groups != 0);
-    uint8_t sub_group = 0;
+    // the workers are split up into subgroups
+    // subgroups share tt and wdl cache
+    // if multi processing (MP = true) only one subgroup is executed
+    // "if (MP && subgroup != MP_SUBGROUP) continue;"
+
+    // if they should not be split up set 
+    // uint8_t subgroup_size = n_workers;
+
+    uint8_t subgroup_size = n_workers < SUBGROUP_SIZE ? n_workers : SUBGROUP_SIZE;
+
+
+    // initialise the openingbook for each worker
+    openingbook_t* obs = (openingbook_t*) malloc(n_workers * sizeof(openingbook_t));
+    for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
+        uint8_t subgroup = worker_id / subgroup_size;
+        if (MP && subgroup != MP_SUBGROUP) continue;
+        init_openingbook(&obs[worker_id], 20);
+    }
+
+
+    // determine number of subgroups
+    assert(n_workers % subgroup_size == 0);
+    uint8_t n_subgroups = n_workers / subgroup_size;
+
+    // split up the work (non-draw positions)
+    uint64_t work_per_subgroup =  nondraw_positions.count / n_subgroups + (nondraw_positions.count % n_subgroups != 0);
+    uint8_t sg = 0;
     for (uint64_t i = 0; i < nondraw_positions.count; i++) {
         if (i % work_per_subgroup == 0) {
-            sub_group++;
+            sg++;
         }
-        uint8_t worker_id = i % sub_group_size + sub_group_size *(sub_group-1);
-        // printf("%llu: %u\n", i, worker_id);
+        uint8_t worker_id = i % subgroup_size + subgroup_size * (sg-1);
+
+        uint8_t subgroup = worker_id / subgroup_size;
+        if (MP && subgroup != MP_SUBGROUP) continue;
         add_position_value(&obs[worker_id], nondraw_positions.entries[i].key, nondraw_positions.entries[i].value);
     }
 
-    tt_t* tts = (tt_t*) malloc(n_sub_groups * sizeof(tt_t));
-    wdl_cache_t* wdl_caches = (wdl_cache_t*) malloc(n_sub_groups * sizeof(wdl_cache_t));
-    for (uint64_t i = 0; i < n_sub_groups; i++) {
-        init_tt(&tts[i], 28);
-        init_wdl_cache(&wdl_caches[i], 24);
+    // initialse tt and wdl cache for each subgroup
+    tt_t* tts = (tt_t*) malloc(n_subgroups * sizeof(tt_t));
+    wdl_cache_t* wdl_caches = (wdl_cache_t*) malloc(n_subgroups * sizeof(wdl_cache_t));
+    for (uint8_t subgroup = 0; subgroup < n_subgroups; subgroup++) {
+        if (MP && subgroup != MP_SUBGROUP) continue;
+        init_tt(&tts[subgroup], 28);
+        init_wdl_cache(&wdl_caches[subgroup], 24);
     }
 
+    // print worker info
     for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
-        sub_group = worker_id / sub_group_size;
-        printf("Worker %u: %"PRIu64" positions, group: %u\n", worker_id, obs[worker_id].count, sub_group);
+        uint8_t subgroup = worker_id / subgroup_size;
+        if (MP && subgroup != MP_SUBGROUP) continue;
+        printf("Worker %u: %"PRIu64" positions, group: %u\n", worker_id, obs[worker_id].count, subgroup);
     }
+
+
+    // start workers
+    clock_gettime(CLOCK_REALTIME, &T0);
+
+    fill_opening_book_multithreaded(tts, wdl_caches, obs, player, mask, depth, n_workers, subgroup_size);
+
+    clock_gettime(CLOCK_REALTIME, &T1);
+    double t = get_elapsed_time(T0, T1);
     
-
-    fill_opening_book_multithreaded(tts, wdl_caches, obs, player, mask, depth, n_workers, sub_group_size);
-
-    // fill_opening_book_multithreaded_2(tts, wdl_caches, obs, player, mask, depth, n_workers, sub_group_size);
-
-    clock_gettime(CLOCK_REALTIME, &t1);
-    t = get_elapsed_time(t0, t1);
-    
-    printf("generated %u finished in %.3fs\n", cnt, t);
+    printf("generated %u finished in %.3fs\n", CNT, t);
 
 
-    openingbook_t ob = obs[0];
-    for (uint64_t i = 1; i < n_workers; i++) {
-        for (uint64_t j = 0; j < obs[i].count; j++) {
-            openingbook_entry_t entry = obs[i].entries[j];
+    // add all results to one big opening book
+    openingbook_t ob;
+    init_openingbook(&ob, 20);
+    for (uint8_t worker_id = 0; worker_id < n_workers; worker_id++) {
+        uint8_t subgroup = worker_id / subgroup_size;
+        if (MP && subgroup != MP_SUBGROUP) continue;
+
+        for (uint64_t j = 0; j < obs[worker_id].count; j++) {
+            openingbook_entry_t entry = obs[worker_id].entries[j];
             assert(!has_position(&ob, entry.key));
             add_position_value(&ob, entry.key, entry.value);
         }
     }
+
+    // sort openingbook by key
     for (uint64_t i = 0; i < ob.count; i++) {
         openingbook_entry_t entry = ob.entries[i];
         uint64_t j;
@@ -223,10 +260,15 @@ int main(int argc, char const *argv[]) {
         }
         ob.entries[j] = entry;
     }
-    printf("Sorted %"PRIu64" entries\n", ob.count);
 
+    // write opening book to file
     char filename[50];
-    sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u.csv", WIDTH, HEIGHT, depth);
+    if (!MP) {
+        sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u.csv", WIDTH, HEIGHT, depth);
+    } else {
+        sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u_g%u.csv", WIDTH, HEIGHT, depth, MP_SUBGROUP);
+    }
+
     FILE* f = fopen(filename, "w");
     printf("writing to %s/%s ... \n", folder, filename);
     assert(f != NULL);
@@ -237,10 +279,14 @@ int main(int argc, char const *argv[]) {
 
     fclose(f);
 
-    for (uint64_t i = 0; i < n_sub_groups; i++) {
-        free(tts[i].entries);
-        free(wdl_caches[i].entries);
-        printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) wdl_cache_hit=%"PRIu64"\n", tts[i].hits, tts[i].collisions, (double) tts[i].collisions / tts[i].stored, wdl_caches[i].hits);
+    // free tt and wdlcache and print stats
+    for (uint8_t subgroup = 0; subgroup < n_subgroups; subgroup++) {
+        if (MP && subgroup != MP_SUBGROUP) continue;
+        tt_t tt = tts[subgroup];
+        wdl_cache_t wdlcache = wdl_caches[subgroup];
+        free(tt.entries);
+        free(wdlcache.entries);
+        printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) wdl_cache_hit=%"PRIu64"\n", tt.hits, tt.collisions, (double) tt.collisions / tt.stored, wdlcache.hits);
     }
 
     return 0;
