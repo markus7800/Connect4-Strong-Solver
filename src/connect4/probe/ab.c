@@ -164,10 +164,7 @@ void print_tab(uint8_t depth) {
 #endif
 
 
-#define DEBUG_AB 0
 #define PV_SEARCH 1
-
-uint64_t bestmove_ixs[WIDTH] = {0, 0, 0, 0, 0, 0,};
 
 uint64_t n_nodes = 0;
 int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
@@ -184,33 +181,6 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
 
     uint64_t hash = hash_for_board(player, mask);
-
-    // int8_t res;
-    // if (rootres == 1) {
-    //     // all responses of opponent in lost position lead to winning position
-    //     res = 1;
-    // } else {
-    //     bool wdl_cache_hit = false;
-    //     res = probe_wdl_cache(wdl_cache, hash, &wdl_cache_hit);
-    //     wdl_cache->hits += wdl_cache_hit;
-    //     if (!wdl_cache_hit) {
-    //         res = probe_board_mmap(player, mask);
-    //         store_in_wdl_cache(wdl_cache, hash, res);
-    //     }
-    // }
-
-
-    // if (res == 0) {
-    //     return 0; // draw
-    // }
-    // if (res == 1) {
-    //     if (beta <= 0) {
-    //         // winning move but we know that opponent has win
-    //         return beta;
-    //     }
-    // }
-
-    // assert(res == rootres);
 
     if (rootres == -1) {
         bool wdl_cache_hit = false;
@@ -282,7 +252,6 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
     uint8_t flag = FLAG_ALPHA;
     uint8_t bestmove = 0;
-    uint8_t bestmove_ix = 0;
     bool do_full = true;
 
     for (uint8_t move_ix = 0; move_ix < movecount; move_ix++) {
@@ -305,7 +274,6 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
 
             if (value > alpha) {
                 bestmove = moves[move_ix];
-                bestmove_ix = move_ix;
                 flag = FLAG_EXACT;
                 do_full = false;
                 alpha = value;
@@ -320,22 +288,6 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     value = alpha;
 
     tt->collisions += store_in_tt(tt, hash, depth, value, bestmove, flag);
-
-    bestmove_ixs[bestmove_ix]++;
-
-#if DEBUG_AB
-    if (rootres == 1) {
-        assert(0 < orig_alpha);
-        assert(value <= MATESCORE - ply); // tight inequality
-        assert((value == 1) || (MATESCORE - ply - depth - HORIZON_DEPTH - PV_SEARCH <= value)); // tight inequality
-    } else if (rootres == -1) {
-        assert(orig_beta < 0);
-        assert(-MATESCORE + ply <= value); // tight inequality
-        assert((value == -1) || (value <= -MATESCORE + ply + depth + HORIZON_DEPTH + PV_SEARCH)); // tight inequality
-    } else {
-        assert(false);
-    }
-#endif
 
     return value;
 }
