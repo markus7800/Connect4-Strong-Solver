@@ -1,9 +1,12 @@
+#ifndef OPENINGBOOK
+#define OPENINGBOOK
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include "utils.c"
 
 typedef struct OpeningBookEntry {
     uint32_t next;
@@ -18,6 +21,7 @@ typedef struct OpeningBook {
     openingbook_entry_t* entries;
     uint64_t size;
     uint64_t count;
+    uint8_t ply;
 } openingbook_t;
 
 void add_position_value(openingbook_t* ob, uint64_t key, int8_t value) {
@@ -107,3 +111,5 @@ void init_openingbook(openingbook_t* ob, uint64_t log2size) {
         ob->entries[i].key = 0;
     }
 }
+
+#endif

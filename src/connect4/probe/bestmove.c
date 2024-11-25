@@ -68,16 +68,7 @@ int main(int argc, char const *argv[]) {
 
     make_mmaps(WIDTH, HEIGHT);
 
-    tt_t tt;
-    init_tt(&tt, 28);
-    wdl_cache_t wdl_cache;
-    init_wdl_cache(&wdl_cache, 28);
-
-
-    struct timespec t0, t1;
-    double t;
-
-    int res = probe_board_mmap(player, mask);
+    int8_t res = probe_board_mmap(player, mask);
     
     if (res == 1) {
         printf("\nres = %d (forced win)\n", res);
@@ -86,6 +77,39 @@ int main(int argc, char const *argv[]) {
     } else {
         printf("\nres = %d (forced loss)\n", res);
     }
+
+    tt_t tt;
+    init_tt(&tt, 28);
+    wdl_cache_t wdl_cache;
+    init_wdl_cache(&wdl_cache, 28);
+
+    openingbook_t ob;
+    init_openingbook(&ob, 20);
+    ob.ply = 8;
+
+    char filename[50];
+    sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u.csv", WIDTH, HEIGHT, ob.ply);
+    FILE* f = fopen(filename, "r");
+
+    openingbook_t* ob_ptr = NULL;
+    if (do_ab && f != NULL) {
+        printf("reading opening book from %s/%s ... \n", folder, filename);
+        uint64_t key;
+        int value;
+        int inc;
+        while(EOF != (inc = fscanf(f,"%"PRIu64", %d\n", &key, &value)) && inc == 2) {
+            add_position_value(&ob, key, (int8_t) value);
+        }
+        printf("read %"PRIu64" entries.\n\n", ob.count);
+        ob_ptr = &ob;
+    } else {
+        ob_ptr = NULL;
+    }
+
+    struct timespec t0, t1;
+    double t;
+
+    
     // return 0;
 
 
@@ -118,11 +142,16 @@ int main(int argc, char const *argv[]) {
     // print_mask(wp);
     // return 0;
 
+    uint8_t bestmove;
     if (do_ab && res != 0) {
         printf("Computing distance to mate ...\n");
         clock_gettime(CLOCK_REALTIME, &t0);
-        int8_t ab = iterdeep(&tt, &wdl_cache, player, mask, 2, 0);
-        printf("Position is %d (%d)\n\n", res, ab);
+        int8_t ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 2, 0);
+        bestmove = get_bestmove(&tt, player, mask);
+        printf("Position is %d (%d)\n", res, ab);
+        if (!is_terminal(player, mask)) {
+            printf("Best move is %u\n\n", bestmove);
+        }
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         uint64_t N = n_nodes + n_horizon_nodes;
@@ -133,8 +162,8 @@ int main(int argc, char const *argv[]) {
 
     if (!is_terminal(player, mask)) {
         printf("\n");
-        int bestmove = -1;
-        int bestscore = -2;
+        bestmove = 0;
+        int8_t bestscore = -MATESCORE;
 
         printf("\033[95m");
         for (move = 0; move < WIDTH; move++) {
@@ -146,7 +175,7 @@ int main(int argc, char const *argv[]) {
             if (is_legal_move(player, mask, move)) {
                 play_column(&player, &mask, move);
                 if (do_ab) {
-                    res = -iterdeep(&tt, &wdl_cache, player, mask, 1, 1);
+                    res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
                 } else {
                     res = -probe_board_mmap(player, mask);
                 }
@@ -170,11 +199,13 @@ int main(int argc, char const *argv[]) {
         // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
         // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     }
-    clock_gettime(CLOCK_REALTIME, &t1);
-    t = get_elapsed_time(t0, t1);
-    uint64_t N = n_nodes + n_horizon_nodes;
-    printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", N, t, N / t / 1000);
-    
+    if (do_ab) {
+        clock_gettime(CLOCK_REALTIME, &t1);
+        t = get_elapsed_time(t0, t1);
+        uint64_t N = n_nodes + n_horizon_nodes;
+        printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", N, t, N / t / 1000);
+    }
+
     free_mmaps(WIDTH, HEIGHT);
     free(mmaps);
     free(st_sizes);

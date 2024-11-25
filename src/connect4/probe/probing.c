@@ -118,15 +118,15 @@ bool _probe_board_mmap_is_(uint64_t player, uint64_t mask, int i) {
     return is_sat_mmap(map, bdd, bitvector);
 }
 
-inline bool probe_board_mmap_is_lost(uint64_t player, uint64_t mask) {
+bool probe_board_mmap_is_lost(uint64_t player, uint64_t mask) {
     return _probe_board_mmap_is_(player, mask, 0);
 }
 
-inline bool probe_board_mmap_is_draw(uint64_t player, uint64_t mask) {
+bool probe_board_mmap_is_draw(uint64_t player, uint64_t mask) {
     return _probe_board_mmap_is_(player, mask, 1);
 }
 
-inline bool probe_board_mmap_is_win(uint64_t player, uint64_t mask) {
+bool probe_board_mmap_is_win(uint64_t player, uint64_t mask) {
     return _probe_board_mmap_is_(player, mask, 2);
 }
 

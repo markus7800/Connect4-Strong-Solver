@@ -8,6 +8,7 @@
 
 #include "board.c"
 #include "probing.c"
+#include "openingbook.c"
 #define MATESCORE 100
 
 // #include "tt.c"
@@ -167,7 +168,7 @@ void print_tab(uint8_t depth) {
 #define PV_SEARCH 1
 
 uint64_t n_nodes = 0;
-int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
+int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
     n_nodes++;
 
     if (alignment(player ^ mask)) {
@@ -175,11 +176,11 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
     if (mask == BOARD_MASK) return 0; // draw
 
-
     if (MATESCORE - ply <= alpha) {
         return alpha;
     }
 
+    int8_t value;
     uint64_t hash = hash_for_board(player, mask);
 
     if (rootres == -1) {
@@ -194,6 +195,11 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         if (!islost) {
             return 0;
         }
+    }
+
+    if (ob != NULL && ob->ply == get_ply(player, mask)) {
+        value = get_value_for_position(ob, position_key(player, mask));
+        return value > 0 ? value - ply : value + ply;
     }
 
 
@@ -219,7 +225,6 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     }
 
     uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
-    int8_t value;
 
     uint64_t win_spots = winning_spots(player, mask);
     uint64_t win_moves = win_spots & move_mask;
@@ -236,7 +241,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
             return -MATESCORE + ply + 2;
         }
         uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
-        value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+        value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
         return clamp(value, alpha, beta);
     }
 
@@ -261,15 +266,15 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
         if (move) {
 #if PV_SEARCH
             if (do_full) {
-                value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+                value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
             } else {
-                value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -alpha-1, -alpha, ply+1, depth-1, -rootres);
+                value = -alphabeta(tt, wdl_cache, ob,  player ^ mask, mask | move, -alpha-1, -alpha, ply+1, depth-1, -rootres);
                 if (value > alpha) {
-                    value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);   
+                    value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);   
                 }
             }
 #else
-            value = -alphabeta(tt, wdl_cache, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+            value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
 #endif
 
             if (value > alpha) {
@@ -292,8 +297,49 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mas
     return value;
 }
 
+int8_t alphabeta_root(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth, int8_t rootres) {
+    n_nodes++;
 
-int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
+    if (alignment(player ^ mask)) {
+        return -MATESCORE + ply; // terminal is always lost
+    }
+    if (mask == BOARD_MASK) return 0; // draw
+
+    uint64_t move_mask = get_pseudo_legal_moves(mask) & BOARD_MASK;
+    uint8_t movecount = WIDTH;
+    uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
+    sort_moves(moves, move_mask, player, mask);
+
+    int8_t value = -MATESCORE;
+    uint8_t flag = FLAG_ALPHA;
+    uint8_t bestmove = 0;
+
+    for (uint8_t move_ix = 0; move_ix < movecount; move_ix++) {
+        uint64_t move = move_mask & column_mask(moves[move_ix]);
+        if (move) {
+            value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+
+            if (value > alpha) {
+                bestmove = moves[move_ix];
+                flag = FLAG_EXACT;
+                alpha = value;
+            }
+            if (value >= beta) {
+                flag = FLAG_BETA;
+                alpha = beta;
+                break;
+            }
+        }
+    }
+    value = alpha;
+
+    uint64_t hash = hash_for_board(player, mask);
+    tt->collisions += store_in_tt(tt, hash, depth, value, bestmove, flag);
+
+    return value;
+}
+
+int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         return 0;
@@ -301,16 +347,16 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
-    uint8_t depth = 0;
+    uint8_t depth = 1;
     int8_t ab;
     while (true) {
         // int8_t mate_bound =  MATESCORE - (depth + HORIZON_DEPTH);
         if (res == 1) {
             // ab = alphabeta(tt, wdl_cache, player, mask, 1, mate_bound, ply, depth, res);
-            ab = alphabeta(tt, wdl_cache, player, mask, 1, MATESCORE, ply, depth, res);
+            ab = alphabeta_root(tt, wdl_cache, ob, player, mask, 1, MATESCORE, ply, depth, res);
         } else {
             // ab = alphabeta(tt, wdl_cache, player, mask, -mate_bound, -1, ply, depth, res);
-            ab = alphabeta(tt, wdl_cache, player, mask, -MATESCORE, -1, ply, depth, res);
+            ab = alphabeta_root(tt, wdl_cache, ob, player, mask, -MATESCORE, -1, ply, depth, res);
         }
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
@@ -337,6 +383,11 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, uint64_t player, uint64_t mask
 
         depth++;
     }
+}
+
+uint8_t get_bestmove(tt_t* tt, uint64_t player, uint64_t mask) {
+    uint64_t hash = hash_for_board(player, mask);
+    return probe_tt_move(tt, hash);
 }
 
 // (sci) markus@Markuss-MacBook-Pro-14 connect4 % ./bestmove_w7_h6.out 'solution_w7_h6' ''

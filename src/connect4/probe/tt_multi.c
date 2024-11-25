@@ -150,6 +150,40 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
     return 0;
 }
 
+uint8_t probe_tt_move(tt_t* tt, uint64_t key) {
+    tt_entry_t entry;
+    uint64_t entry_key;
+    uint64_t entry_data;
+    uint32_t entry_checksum;
+    bool found = false;
+#if TT_CLUSTER_SIZE > 0
+    for (uint64_t i = 0; i < TT_CLUSTER_SIZE; i++) {
+        entry = tt->entries[(key & tt->mask) + i];
+        entry_key = (uint64_t) entry;
+        entry_data = (uint64_t) (entry >> 64);
+        entry_checksum = (uint32_t) (entry_data >> 32);
+        if (key == entry_key && (uint32_t) key == entry_checksum) {
+            found = true;
+            break;
+        }
+    }
+#else
+        entry = tt->entries[key & tt->mask];
+        // entry = (tt_entry_t) _mm_load_si128(&tt->entries[key & tt->mask]);
+        entry_key = (uint64_t) entry;
+        entry_data = (uint64_t) (entry >> 64);
+        entry_checksum = (uint32_t) (entry_data >> 32);
+        found = (key == entry_key) && ((uint32_t) key == entry_checksum);
+#endif
+    assert(found);
+
+    uint8_t entry_move = (uint8_t) (entry_data >> 16);
+    uint8_t entry_flag = (uint8_t) (entry_data >> 24);
+    assert(entry_flag == FLAG_EXACT);
+
+    return entry_move;
+}
+
 void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
     assert(value != 0);
     // printf("Store %d at key=%"PRIu64"\n", value, key);
