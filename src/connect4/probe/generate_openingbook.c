@@ -95,7 +95,7 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         int8_t value = iterdeep(tt, wdl_cache, player, mask, 0, 0);
         entry->value = value;
         CNT++;
-        if (worker_id == 0 || (MP && worker_id % SUBGROUP_SIZE == 0)) {
+        if (worker_id == 0 ) { //|| (MP && worker_id % SUBGROUP_SIZE == 0)) {
             clock_gettime(CLOCK_REALTIME, &T1);
             double t = get_elapsed_time(T0, T1);
             printf("... %u (%.0f%% in %0.fs)                      \r", CNT, 100.0 * CNT / TOTAL_CNT, t);
@@ -152,8 +152,8 @@ int main(int argc, char const *argv[]) {
         MP = true;
     }
 
-    // make_mmaps(WIDTH, HEIGHT);
-    make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
+    make_mmaps(WIDTH, HEIGHT);
+    // make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
 
 
     uint64_t player = 0;
@@ -197,6 +197,10 @@ int main(int argc, char const *argv[]) {
 
     // split up the work (non-draw positions)
     uint64_t work_per_subgroup =  nondraw_positions.count / n_subgroups + (nondraw_positions.count % n_subgroups != 0);
+    if (MP) {
+        TOTAL_CNT = work_per_subgroup;
+    }
+    
     uint8_t sg = 0;
     for (uint64_t i = 0; i < nondraw_positions.count; i++) {
         if (i % work_per_subgroup == 0) {
