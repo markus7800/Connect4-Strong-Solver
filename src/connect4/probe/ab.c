@@ -361,14 +361,15 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
         if (verbose == 1) {
-            uint8_t bound = MATESCORE - (depth + HORIZON_DEPTH) - 1;
-            if (ab == -1) {
-                printf("\033[94m%3d\033[0m\b\b\b", bound); // <
-                // printf("<%3d\n", bound);
-            } 
-            if (ab == 1) {
-                printf("\033[94m%3d\033[0m\b\b\b", -bound); // >
-                // printf(">%3d\n", -bound);
+            uint8_t bound = MATESCORE - (depth + HORIZON_DEPTH + ply);
+            // if (ab == -1 && ply % 2 == 1) {
+            //     printf("\033[94m%3d\033[0m\b\b\b", bound); // <
+            // } 
+            // if (ab == 1 && ply % 2 == 1) {
+            //     printf("\033[94m%3d\033[0m\b\b\b", -bound); // >
+            // }
+            if (abs(ab) == 1) {
+                printf("\033[94m%3d\033[0m\b\b\b", bound * (ply % 2 == 0 ? ab : -ab));
             }
         }
         if (verbose == 2) {

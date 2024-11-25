@@ -83,9 +83,9 @@ int main(int argc, char const *argv[]) {
 
         printf("\n\n");
 
-        printf("( 1 ... move leads to forced win,\n");
-        printf("  0 ... move leads to forced draw,\n");
-        printf(" -1 ... move leads to forced loss )\n\n");
+        printf(" 1 ... move leads to forced win,\n");
+        printf(" 0 ... move leads to forced draw,\n");
+        printf("-1 ... move leads to forced loss\n\n");
     } else {
         printf("\033[95m\nGame over.\033[0m\n\n");
     }
