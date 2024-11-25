@@ -38,12 +38,16 @@ int main(int argc, char const *argv[]) {
     const char *moveseq = argv[2];
 
     bool do_ab = true;
+    bool no_ob = false;
     for (int i = 3; i < argc; i++) {
         if (strcmp(argv[i], "-wdl") == 0) {
             do_ab = false;
         }
         if (strcmp(argv[i], "-dtm") == 0) {
             do_ab = true;
+        }
+        if (strcmp(argv[i], "-xob") == 0) {
+            no_ob = true;
         }
     }
 
@@ -56,7 +60,7 @@ int main(int argc, char const *argv[]) {
     uint64_t player = 0;
     uint64_t mask = 0;
 
-    printf("moveseq: %s\n", moveseq);
+    printf("Input moveseq: %s\n", moveseq);
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');
@@ -64,19 +68,21 @@ int main(int argc, char const *argv[]) {
         assert(is_legal_move(player, mask, move));
         play_column(&player, &mask, move);
     }
-    print_board(player,  mask, -1);
+    print_board(player, mask, -1);
+    printf("\n");
 
     make_mmaps(WIDTH, HEIGHT);
 
     int8_t res = probe_board_mmap(player, mask);
     
     if (res == 1) {
-        printf("\nres = %d (forced win)\n", res);
+        printf("\n\033[95mOverall evaluation = %d (forced win)\033[0m\n", res);
     } else if (res == 0) {
-        printf("\nres = %d (forced draw)\n", res);
+        printf("\n\033[95mOverall evaluation = %d (forced draw)\033[0m\n", res);
     } else {
-        printf("\nres = %d (forced loss)\n", res);
+        printf("\n\033[95mOverall evaluation = %d (forced loss)\033[0m\n", res);
     }
+    printf("\n");
 
     tt_t tt;
     init_tt(&tt, 28);
@@ -92,7 +98,7 @@ int main(int argc, char const *argv[]) {
     FILE* f = fopen(filename, "r");
 
     openingbook_t* ob_ptr = NULL;
-    if (do_ab && f != NULL) {
+    if (do_ab && !no_ob && f != NULL && !is_terminal(player, mask)) {
         printf("reading opening book from %s/%s ... \n", folder, filename);
         uint64_t key;
         int value;
@@ -143,15 +149,13 @@ int main(int argc, char const *argv[]) {
     // return 0;
 
     uint8_t bestmove;
-    if (do_ab && res != 0) {
+    if (do_ab && res != 0 && !is_terminal(player, mask)) {
         printf("Computing distance to mate ...\n");
         clock_gettime(CLOCK_REALTIME, &t0);
         int8_t ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 2, 0);
         bestmove = get_bestmove(&tt, player, mask);
         printf("Position is %d (%d)\n", res, ab);
-        if (!is_terminal(player, mask)) {
-            printf("Best move is %u\n\n", bestmove);
-        }
+        printf("Best move is %u\n\n", bestmove);
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         uint64_t N = n_nodes + n_horizon_nodes;
@@ -165,7 +169,7 @@ int main(int argc, char const *argv[]) {
         bestmove = 0;
         int8_t bestscore = -MATESCORE;
 
-        printf("\033[95m");
+        printf("\033[95mmove evalution:\n");
         for (move = 0; move < WIDTH; move++) {
             printf("%3d ", move);
         }
@@ -176,6 +180,12 @@ int main(int argc, char const *argv[]) {
                 play_column(&player, &mask, move);
                 if (do_ab) {
                     res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
+                    if (res > 0) {
+                        res = MATESCORE - res;
+                    }
+                    if (res < 0) {
+                        res = -MATESCORE - res;
+                    }
                 } else {
                     res = -probe_board_mmap(player, mask);
                 }
@@ -192,14 +202,25 @@ int main(int argc, char const *argv[]) {
             }
         }
         printf("\n\n");
-        printf("Best move: %d with score %d\n\n", bestmove, bestscore);
+
+        printf("(  x ... forced win in x plies,\n");
+        printf("   0 ... move leads to forced draw,\n");
+        printf("  -x ... forced loss in x plies    )\n");
+
+        printf("\n");
+        printf("\033[95mbest move:\033[0m %d with score %d\n\n", bestmove, bestscore);
+        play_column(&player, &mask, bestmove);
+        print_board(player, mask, bestmove);
+        printf("\n");
 
         // clock_gettime(CLOCK_REALTIME, &t1);
         // t = get_elapsed_time(t0, t1);
         // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
         // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
+    } else {
+        printf("\033[95mGame over.\033[0m\n\n");
     }
-    if (do_ab) {
+    if (do_ab && !is_terminal(player, mask)) {
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         uint64_t N = n_nodes + n_horizon_nodes;

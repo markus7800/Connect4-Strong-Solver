@@ -31,6 +31,9 @@ solve:
 bestmove:
 	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o bestmove_w$(WIDTH)_h$(HEIGHT).out
 
+wdl:
+	$(CC) probe/wdl.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o wdl_w$(WIDTH)_h$(HEIGHT).out
+
 openingbook:
 	$(CC) probe/generate_openingbook.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o generate_ob_w$(WIDTH)_h$(HEIGHT).out -lpthread
 
