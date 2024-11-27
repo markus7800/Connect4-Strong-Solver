@@ -72,6 +72,13 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta
     return 0;
 }
 
+uint8_t get_bestmove(tt_t* tt, uint64_t player, uint64_t mask) {
+    uint64_t key = hash_64(position_key(player, mask));
+    tt_entry_t* entry = &tt->entries[key & tt->mask];
+    return entry->move;
+}
+
+
 void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
     entry->key = key;
     entry->depth = depth;
@@ -83,9 +90,26 @@ void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, u
 // return true if collision
 bool store_in_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
     tt_entry_t* entry = &tt->entries[key & tt->mask];
+    
     bool collision = (entry->key != 0) && (entry->key != key);
     store_entry(entry, key, depth, value, move, flag);
     return collision;
+
+    // if (entry->key == 0) {
+    //     store_entry(entry, key, depth, value, move, flag);
+    //     return false;
+    // } else if (entry->key != key) {
+    //     store_entry(entry, key, depth, value, move, flag);
+    //     return true;
+    // } else {
+    //     // entry->key == key
+    //     if (entry->depth < depth) {
+    //         store_entry(entry, key, depth, value, move, flag);
+    //     } else if (entry->depth == depth && entry->flag < flag) {
+    //         store_entry(entry, key, depth, value, move, flag);
+    //     }
+    //     return false;
+    // }
 }
 
 void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask) {
@@ -259,7 +283,17 @@ int main(int argc, char const *argv[]) {
     if (!is_terminal(player, mask)) {
         clock_gettime(CLOCK_REALTIME, &t0);
         int8_t res = wdl_alphabeta(&tt, player, mask, -MATESCORE, MATESCORE, 0, WIDTH*HEIGHT);
+        #if DTM
+            if (res > 0) {
+                res = MATESCORE - res;
+            }
+            if (res < 0) {
+                res = -MATESCORE - res;
+            }
+        #endif
         printf("res = %d\n", res);
+        printf("best move = %u\n", get_bestmove(&tt, player, mask));
+
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         uint64_t N = n_nodes;
