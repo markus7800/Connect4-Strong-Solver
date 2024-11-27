@@ -219,7 +219,7 @@ int main(int argc, char const *argv[]) {
                 printf("  . ");
             }
         }
-        printf("\n\n");
+        printf("\n");
 
         // clock_gettime(CLOCK_REALTIME, &t1);
         // t = get_elapsed_time(t0, t1);
@@ -338,3 +338,7 @@ int main(int argc, char const *argv[]) {
 // Best move: 3 with score 59
 
 // n_nodes = 1217181667250 in 6018.991s (202223.526 knps)
+
+
+// n_nodes = 403077852 in 122.111s (3300.916 knps) -Xob -Xiterdeep
+// n_nodes = 245033064 in 114.560s (2138.911 knps) -Xob
