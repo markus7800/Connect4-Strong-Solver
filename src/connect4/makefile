@@ -31,8 +31,8 @@ solve:
 bestmove:
 	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o bestmove_w$(WIDTH)_h$(HEIGHT).out
 
-wdl_search:
-	$(CC) probe/wdl_search.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o wdl_search_w$(WIDTH)_h$(HEIGHT).out
+full_ab_search:
+	$(CC) probe/full_ab_search.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o full_ab_search_w$(WIDTH)_h$(HEIGHT).out
 
 wdl:
 	$(CC) probe/wdl.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o wdl_w$(WIDTH)_h$(HEIGHT).out

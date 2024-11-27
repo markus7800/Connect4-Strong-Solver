@@ -8,8 +8,7 @@
 #include "probing.c"
 #include "openingbook.c"
 
-// #include "tt.c"
-#include "tt_multi.c"
+#include "tt.c"
 
 #include "utils.c"
 
