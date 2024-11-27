@@ -37,9 +37,13 @@ int main(int argc, char const *argv[]) {
     const char *moveseq = argv[2];
 
     bool no_ob = false;
+    bool no_iterdeep = false;
     for (int i = 3; i < argc; i++) {
         if (strcmp(argv[i], "-Xob") == 0) {
             no_ob = true;
+        }
+        if (strcmp(argv[i], "-Xiterdeep") == 0) {
+            no_iterdeep = true;
         }
     }
 
@@ -145,15 +149,22 @@ int main(int argc, char const *argv[]) {
     if (res != 0 && !is_terminal(player, mask)) {
         printf("Computing distance to mate ... ");
         clock_gettime(CLOCK_REALTIME, &t0);
-        int8_t ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
+
+        int8_t ab;
+        if (no_iterdeep) {
+            ab = fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
+        } else {
+            ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
+        }
+
         if (ab > 0) {
-            sprintf(desc, "win in %d plies", MATESCORE - ab);
+            sprintf(desc, "win in %d plies", ab);
         }
         if (ab == 0) {
             sprintf(desc, "draw");
         }
         if (ab < 0) {
-            sprintf(desc, "loss in %d plies", -MATESCORE - ab);
+            sprintf(desc, "loss in %d plies", ab);
         }
         bestmove = get_bestmove(&tt, player, mask);
         printf("     \n");
@@ -172,7 +183,12 @@ int main(int argc, char const *argv[]) {
         bestmove = 0;
         int8_t bestscore = -MATESCORE;
 
-        printf("\033[95mmove evalution:\n");
+        printf("\033[95mmove evaluation:\033[0m\n\n");
+        printf("\033[94m blue\033[0m ... work in progress\n");
+        printf(" x ... forced win in x plies,\n");
+        printf(" 0 ... move leads to forced draw,\n");
+        printf("-x ... forced loss in x plies\n\n");
+        printf("\033[95m");
         for (move = 0; move < WIDTH; move++) {
             printf("%3d ", move);
         }
@@ -181,13 +197,13 @@ int main(int argc, char const *argv[]) {
         for (move = 0; move < WIDTH; move++) {
             if (is_legal_move(player, mask, move)) {
                 play_column(&player, &mask, move);
-                res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
-                if (res > 0) {
-                    res = MATESCORE - res;
+
+                if (no_iterdeep) {
+                    res = -fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
+                }   else {
+                    res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
                 }
-                if (res < 0) {
-                    res = -MATESCORE - res;
-                }
+                
                 printf("%3d ", res);
 
                 undo_play_column(&player, &mask, move);
@@ -201,10 +217,6 @@ int main(int argc, char const *argv[]) {
             }
         }
         printf("\n\n");
-
-        printf(" x ... forced win in x plies,\n");
-        printf(" 0 ... move leads to forced draw,\n");
-        printf("-x ... forced loss in x plies\n");
 
         printf("\n");
         printf("\033[95mbest move: %d with %s\033[0m\n\n", bestmove, desc);

@@ -124,10 +124,16 @@ void print_tab(uint8_t depth) {
     for (uint8_t i = 0; i < depth; i++) { printf(" "); }
 }
 
-#if WIDTH >= 7
-    #define HORIZON_DEPTH 10
+#define HORIZON_AB 1
+
+#if HORIZON_AB
+    #if WIDTH >= 7
+        #define HORIZON_DEPTH 10
+    #else
+        #define HORIZON_DEPTH 5
+    #endif
 #else
-    #define HORIZON_DEPTH 5
+    #define HORIZON_DEPTH 0
 #endif
 
 
@@ -309,7 +315,7 @@ int8_t alphabeta_root(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint6
     return value;
 }
 
-int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t ply) {
+int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         return 0;
@@ -322,24 +328,20 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
     while (true) {
         // int8_t mate_bound =  MATESCORE - (depth + HORIZON_DEPTH);
         if (res == 1) {
-            // ab = alphabeta(tt, wdl_cache, player, mask, 1, mate_bound, ply, depth, res);
-            ab = alphabeta_root(tt, wdl_cache, ob, player, mask, 1, MATESCORE, ply, depth, res);
+            // ab = alphabeta(tt, wdl_cache, player, mask, 1, mate_bound, offset_ply, depth, res);
+            ab = alphabeta_root(tt, wdl_cache, ob, player, mask, 1, MATESCORE, offset_ply, depth, res);
         } else {
-            // ab = alphabeta(tt, wdl_cache, player, mask, -mate_bound, -1, ply, depth, res);
-            ab = alphabeta_root(tt, wdl_cache, ob, player, mask, -MATESCORE, -1, ply, depth, res);
+            // ab = alphabeta(tt, wdl_cache, player, mask, -mate_bound, -1, offset_ply, depth, res);
+            ab = alphabeta_root(tt, wdl_cache, ob, player, mask, -MATESCORE, -1, offset_ply, depth, res);
         }
+
         clock_gettime(CLOCK_REALTIME, &t1);
         double t = get_elapsed_time(t0, t1);
         if (verbose == 1) {
-            uint8_t bound = MATESCORE - (depth + HORIZON_DEPTH + ply);
-            // if (ab == -1 && ply % 2 == 1) {
-            //     printf("\033[94m%3d\033[0m\b\b\b", bound); // <
-            // } 
-            // if (ab == 1 && ply % 2 == 1) {
-            //     printf("\033[94m%3d\033[0m\b\b\b", -bound); // >
-            // }
+            uint8_t bound = (depth + HORIZON_DEPTH + offset_ply);
+
             if (abs(ab) == 1) {
-                printf("\033[94m%3d\033[0m\b\b\b", bound * (ply % 2 == 0 ? ab : -ab));
+                printf("\033[94m%3d\033[0m\b\b\b", bound * (offset_ply % 2 == 0 ? ab : -ab));
             }
         }
         if (verbose == 2) {
@@ -349,11 +351,42 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
             printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64" (%.4f), wdl_cache_hits = %.4f\n", (double) tt->hits / n_nodes, tt->collisions, (double) tt->collisions / tt->stored, (double) wdl_cache->hits / n_nodes);
         }
         if (abs(ab) > 1) {
+            // transform to mate in ...
+            if (ab > 0) {
+                ab = MATESCORE - ab;
+            }
+            if (ab < 0) {
+                ab = -MATESCORE - ab;
+            }
             return ab;
         }
 
         depth++;
     }
+}
+
+int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply) {
+    int8_t res = probe_board_mmap(player, mask);
+    if (res == 0) {
+        return 0;
+    }
+    if (verbose == 1) {
+        printf("\033[94m%3d\033[0m\b\b\b", res);
+    }
+    int8_t ab;
+    if (res == 1) {
+        ab = alphabeta(tt, wdl_cache, ob, player, mask, 1, MATESCORE, offset_ply, WIDTH*HEIGHT - HORIZON_DEPTH, res);
+    } else {
+        ab = alphabeta(tt, wdl_cache, ob, player, mask, -MATESCORE, -1, offset_ply, WIDTH*HEIGHT - HORIZON_DEPTH, res);
+    }
+    // transform to mate in ...
+    if (ab > 0) {
+        ab = MATESCORE - ab;
+    }
+    if (ab < 0) {
+        ab = -MATESCORE - ab;
+    }
+    return ab;
 }
 
 uint8_t get_bestmove(tt_t* tt, uint64_t player, uint64_t mask) {
