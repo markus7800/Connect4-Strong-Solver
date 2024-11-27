@@ -120,7 +120,7 @@ void print_board(uint64_t player, uint64_t mask, int highlight_col) {
     int bit;
     for (int i = HEIGHT-1; i>= 0; i--) {
         for (int j = 0; j < WIDTH; j++) {
-            if (j == highlight_col) printf("\033[95m");
+            if (j == highlight_col && !is_set(mask, (i+1) + (HEIGHT+1)*j)) printf("\033[95m");
             bit = i + (HEIGHT+1)*j;
             if (is_set(mask, bit)) {
                 if (is_set(player, bit) != to_play) {
@@ -138,6 +138,11 @@ void print_board(uint64_t player, uint64_t mask, int highlight_col) {
         if (i == 2) printf("  stones played: %d", cnt);
         printf("\n");
     }
+    // printf("\033[90m");
+    for (int j = 0; j < WIDTH; j++) {
+        printf(" %d", j);
+    }
+    // printf("\033[0m");
     // printf("stones played: %d\nside to move: %c\n\n", cnt, stm_c, term);
 }
 
