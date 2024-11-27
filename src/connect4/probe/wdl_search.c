@@ -158,18 +158,35 @@ int8_t wdl_alphabeta(tt_t* tt, uint64_t player, uint64_t mask, int8_t alpha, int
     uint64_t opponent_win_spots = winning_spots(opponent, mask);
     uint64_t forced_moves = opponent_win_spots & move_mask;
     if (forced_moves) {
-        if (depth > 1 && __builtin_popcountll(forced_moves) > 1) {
-            // cannot stop more than one mate threat
-            #if DTM
-                return -MATESCORE + ply + 2;
-            #else
-                return -MATESCORE;
-            #endif
+        if (__builtin_popcountll(forced_moves) > 1) {
+            if (depth > 1) {
+                // cannot stop more than one mate threat
+                #if DTM
+                    return -MATESCORE + ply + 2;
+                #else
+                    return -MATESCORE;
+                #endif
+            }
+        } else {
+            uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
+            value = -wdl_alphabeta(tt, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
+            return clamp(value, alpha, beta);
         }
-        uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
-        value = -wdl_alphabeta(tt, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
-        return clamp(value, alpha, beta);
     }
+
+    if ((win_spots | opponent_win_spots) == 0) {
+        uint8_t n_moves = __builtin_popcountll(move_mask);
+        if (n_moves == 1) {
+            return 0;
+        } else if (n_moves == 2) {
+            uint8_t col1 = __builtin_ctzl(move_mask) / (HEIGHT + 1);
+            uint8_t col2 = __builtin_ctzl(move_mask & ~column_mask(col1)) / (HEIGHT + 1);
+            if (abs(col1 - col2) >= 4) {
+                return 0;
+            }
+        }
+    }
+
 
     uint8_t movecount = WIDTH;
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
@@ -255,6 +272,8 @@ int main(int argc, char const *argv[]) {
 
 // res = 100
 // n_nodes = 1431836794 in 144.937s (9879.048 knps)
+// n_nodes = 1351726056 in 133.525s (10123.356 knps) (early draw detection)
 
 // res = 59
 // n_nodes = 2646692883 in 266.468s (9932.500 knps)
+// n_nodes = 2510944816 in 247.103s (10161.548 knps) (early draw detection)

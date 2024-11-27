@@ -202,13 +202,16 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t p
     uint64_t opponent_win_spots = winning_spots(opponent, mask);
     uint64_t forced_moves = opponent_win_spots & move_mask;
     if (forced_moves) {
-        if (depth > 1 && __builtin_popcountll(forced_moves) > 1) {
-            // cannot stop more than one mate threat
-            return -MATESCORE + ply + 2;
+        if (__builtin_popcountll(forced_moves) > 1) {
+            if (depth > 1) {
+                // cannot stop more than one mate threat
+                return -MATESCORE + ply + 2;
+            }
+        } else {
+            uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
+            value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
+            return clamp(value, alpha, beta);
         }
-        uint64_t move = (1ULL << __builtin_ctzl(forced_moves));
-        value = -alphabeta(tt, wdl_cache, ob, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1, -rootres);
-        return clamp(value, alpha, beta);
     }
 
     uint8_t movecount = WIDTH;
