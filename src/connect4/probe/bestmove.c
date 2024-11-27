@@ -190,7 +190,7 @@ int main(int argc, char const *argv[]) {
         printf(" x ... forced win in x plies,\n");
         printf(" 0 ... move leads to forced draw,\n");
         printf("-x ... forced loss in x plies\n");
-        printf("\033[94m±x\033[0m ... search in progress\n\n");
+        printf("\033[94m±x\033[0m ... search in progress (lower bound on final x)\n\n");
         printf("\033[95m");
         for (move = 0; move < WIDTH; move++) {
             printf("%3d ", move);

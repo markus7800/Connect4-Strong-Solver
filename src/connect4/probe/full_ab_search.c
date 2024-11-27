@@ -140,7 +140,9 @@ void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint6
     // }
 }
 
-#define DTM 1
+#ifndef DTM
+    #define DTM 1
+#endif
 
 uint64_t n_nodes = 0;
 int8_t wdl_alphabeta(tt_t* tt, uint64_t player, uint64_t mask, int8_t alpha, int8_t beta, uint8_t ply, uint8_t depth) {
@@ -271,6 +273,7 @@ int main(int argc, char const *argv[]) {
     }
     print_board(player, mask, -1);
     printf("\n");
+    printf("DTM = %u\n\n", DTM);
 
 
     tt_t tt;

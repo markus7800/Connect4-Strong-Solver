@@ -7,6 +7,8 @@ IN_OP_GC = 0		    # should GC be performed during ops?
 ALLOW_ROW_ORDER = 0     # should order by row if height > width?
 COMPRESSED_ENCODING = 1 # use compressed Connect4 encoding?
 
+DTM = 1
+
 WIDTH = 7
 HEIGHT = 6
 
@@ -32,7 +34,7 @@ bestmove:
 	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o bestmove_w$(WIDTH)_h$(HEIGHT).out
 
 full_ab_search:
-	$(CC) probe/full_ab_search.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o full_ab_search_w$(WIDTH)_h$(HEIGHT).out
+	$(CC) probe/full_ab_search.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -DDTM=$(DTM) -o full_ab_search_w$(WIDTH)_h$(HEIGHT).out
 
 wdl:
 	$(CC) probe/wdl.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o wdl_w$(WIDTH)_h$(HEIGHT).out
