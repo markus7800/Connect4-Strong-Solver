@@ -66,8 +66,6 @@ atomic_uint CNT = 0;
 uint64_t TOTAL_CNT = 0;
 struct timespec T0, T1;
 
-#define DEPTH 8
-
 // PARALLELISATION
 #define SUBGROUP_SIZE 4
 
@@ -161,7 +159,7 @@ int main(int argc, char const *argv[]) {
     // play_column(&player, &mask, 0);
 
     // find all non-draw positions up to given depth
-    uint8_t depth = DEPTH;
+    uint8_t depth = OB_PLY;
 
     openingbook_t nondraw_positions;
     init_openingbook(&nondraw_positions, 20);

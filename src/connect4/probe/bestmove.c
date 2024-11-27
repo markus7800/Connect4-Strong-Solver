@@ -38,12 +38,16 @@ int main(int argc, char const *argv[]) {
 
     bool no_ob = false;
     bool no_iterdeep = false;
+    bool no_evalmoves = false;
     for (int i = 3; i < argc; i++) {
         if (strcmp(argv[i], "-Xob") == 0) {
             no_ob = true;
         }
         if (strcmp(argv[i], "-Xiterdeep") == 0) {
             no_iterdeep = true;
+        }
+        if (strcmp(argv[i], "-Xevalmoves") == 0) {
+            no_evalmoves = true;
         }
     }
 
@@ -87,10 +91,9 @@ int main(int argc, char const *argv[]) {
 
     openingbook_t ob;
     init_openingbook(&ob, 20);
-    ob.ply = 8;
 
     char filename[50];
-    sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u.csv", WIDTH, HEIGHT, ob.ply);
+    sprintf(filename, "openingbook_w%"PRIu32"_h%"PRIu32"_d%u.csv", WIDTH, HEIGHT, OB_PLY);
     FILE* f = fopen(filename, "r");
 
     openingbook_t* ob_ptr = NULL;
@@ -147,7 +150,7 @@ int main(int argc, char const *argv[]) {
     uint8_t bestmove;
     char desc[50];
     if (res != 0 && !is_terminal(player, mask)) {
-        printf("Computing distance to mate ... ");
+        printf("\033[94mComputing distance to mate ... \033[90m");
         clock_gettime(CLOCK_REALTIME, &t0);
 
         int8_t ab;
@@ -178,16 +181,16 @@ int main(int argc, char const *argv[]) {
  
     // return 0;
 
-    if (!is_terminal(player, mask)) {
+    if (!no_evalmoves && !is_terminal(player, mask)) {
         printf("\n");
         bestmove = 0;
         int8_t bestscore = -MATESCORE;
 
         printf("\033[95mmove evaluation:\033[0m\n\n");
-        printf("\033[94m blue\033[0m ... work in progress\n");
         printf(" x ... forced win in x plies,\n");
         printf(" 0 ... move leads to forced draw,\n");
-        printf("-x ... forced loss in x plies\n\n");
+        printf("-x ... forced loss in x plies\n");
+        printf("\033[94m±x\033[0m ... search in progress\n\n");
         printf("\033[95m");
         for (move = 0; move < WIDTH; move++) {
             printf("%3d ", move);
@@ -218,19 +221,21 @@ int main(int argc, char const *argv[]) {
         }
         printf("\n\n");
 
+        // clock_gettime(CLOCK_REALTIME, &t1);
+        // t = get_elapsed_time(t0, t1);
+        // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
+        // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
+    }
+    if (!is_terminal(player, mask)) {
         printf("\n");
         printf("\033[95mbest move: %d with %s\033[0m\n\n", bestmove, desc);
         play_column(&player, &mask, bestmove);
         print_board(player, mask, bestmove);
         printf("\n");
-
-        // clock_gettime(CLOCK_REALTIME, &t1);
-        // t = get_elapsed_time(t0, t1);
-        // printf("n_nodes = %"PRIu64" in %.3fs (%.3f knps)\n", n_nodes, t, n_nodes / t / 1000);
-        // printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64", wdl_cache_hits = %.4f\n", (double) n_tt_hits / n_nodes, n_tt_collisions, (double) n_wdl_cache_hits / n_nodes);
     } else {
         printf("\033[95mGame over.\033[0m\n\n");
     }
+
     if (!is_terminal(player, mask)) {
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);

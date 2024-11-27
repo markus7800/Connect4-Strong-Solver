@@ -169,7 +169,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t p
         }
     }
 
-    if (ob != NULL && ob->ply == get_ply(player, mask)) {
+    if (ob != NULL && get_ply(player, mask) == OB_PLY) {
         value = get_value_for_position(ob, position_key(player, mask));
         return value > 0 ? value - ply : value + ply;
     }

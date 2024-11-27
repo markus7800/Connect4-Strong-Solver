@@ -21,8 +21,9 @@ typedef struct OpeningBook {
     openingbook_entry_t* entries;
     uint64_t size;
     uint64_t count;
-    uint8_t ply;
 } openingbook_t;
+
+#define OB_PLY 8
 
 void add_position_value(openingbook_t* ob, uint64_t key, int8_t value) {
     uint32_t target_bucket_ix = hash_64(key) & ob->mask;
