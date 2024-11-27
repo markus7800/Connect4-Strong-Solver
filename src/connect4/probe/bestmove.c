@@ -1,4 +1,3 @@
-// #include "bdd.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -31,7 +30,7 @@ int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
     if (argc < 3) {
-        perror("Wrong number of arguments supplied: connect4_bestmove.out folder moveseq [-wdl | -dtm]\n");
+        perror("Wrong number of arguments supplied: connect4_bestmove.out folder moveseq [-Xob]\n");
         exit(EXIT_FAILURE);
     }
 
@@ -39,7 +38,7 @@ int main(int argc, char const *argv[]) {
 
     bool no_ob = false;
     for (int i = 3; i < argc; i++) {
-        if (strcmp(argv[i], "-xob") == 0) {
+        if (strcmp(argv[i], "-Xob") == 0) {
             no_ob = true;
         }
     }

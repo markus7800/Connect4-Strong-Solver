@@ -13,6 +13,8 @@
     #define HEIGHT 6
 #endif
 
+#define MATESCORE 100
+
 #include "board_constants.c"
 
 // #define BOTTOM_MASK 0x40810204081
@@ -76,6 +78,37 @@ int get_ply(uint64_t player, uint64_t mask) {
 inline uint64_t position_key(uint64_t player, uint64_t mask) {
     uint64_t pos = get_ply(player, mask) % 2 == 1 ? player : player ^ mask;
     return ((mask << 1) | BOTTOM_MASK) ^ pos;
+}
+
+uint64_t winning_spots(uint64_t position, uint64_t mask) {
+    // vertical;
+    uint64_t r = (position << 1) & (position << 2) & (position << 3);
+
+    //horizontal
+    uint64_t p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
+    r |= p & (position << 3 * (HEIGHT + 1));
+    r |= p & (position >> (HEIGHT + 1));
+    p = (position >> (HEIGHT + 1)) & (position >> 2 * (HEIGHT + 1));
+    r |= p & (position << (HEIGHT + 1));
+    r |= p & (position >> 3 * (HEIGHT + 1));
+
+    //diagonal 1
+    p = (position << HEIGHT) & (position << 2 * HEIGHT);
+    r |= p & (position << 3 * HEIGHT);
+    r |= p & (position >> HEIGHT);
+    p = (position >> HEIGHT) & (position >> 2 * HEIGHT);
+    r |= p & (position << HEIGHT);
+    r |= p & (position >> 3 * HEIGHT);
+
+    //diagonal 2
+    p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
+    r |= p & (position << 3 * (HEIGHT + 2));
+    r |= p & (position >> (HEIGHT + 2));
+    p = (position >> (HEIGHT + 2)) & (position >> 2 * (HEIGHT + 2));
+    r |= p & (position << (HEIGHT + 2));
+    r |= p & (position >> 3 * (HEIGHT + 2));
+
+    return r & (BOARD_MASK ^ mask);
 }
 
 void print_board(uint64_t player, uint64_t mask, int highlight_col) {

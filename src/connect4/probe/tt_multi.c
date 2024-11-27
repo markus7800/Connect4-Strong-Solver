@@ -185,7 +185,6 @@ uint8_t probe_tt_move(tt_t* tt, uint64_t key) {
 }
 
 void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
-    assert(value != 0);
     // printf("Store %d at key=%"PRIu64"\n", value, key);
     tt_entry_t store_entry = (
         ((uint128_t) key) |

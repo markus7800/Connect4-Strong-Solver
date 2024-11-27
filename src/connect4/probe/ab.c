@@ -1,5 +1,3 @@
-// '01234560123456' win in 7
-// '012345601234563323451'
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,7 +7,6 @@
 #include "board.c"
 #include "probing.c"
 #include "openingbook.c"
-#define MATESCORE 100
 
 // #include "tt.c"
 #include "tt_multi.c"
@@ -51,37 +48,6 @@ int8_t probe_wdl_cache(wdl_cache_t* wdl_cache, uint64_t key, bool* wdl_cache_hit
 void store_in_wdl_cache(wdl_cache_t* wdl_cache, uint64_t key, int8_t res) {
     uint64_t entry = (key << 2) | (0b11 & ((uint8_t) (res+1)));
     wdl_cache->entries[key & wdl_cache->mask] = entry;
-}
-
-uint64_t winning_spots(uint64_t position, uint64_t mask) {
-    // vertical;
-    uint64_t r = (position << 1) & (position << 2) & (position << 3);
-
-    //horizontal
-    uint64_t p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
-    r |= p & (position << 3 * (HEIGHT + 1));
-    r |= p & (position >> (HEIGHT + 1));
-    p = (position >> (HEIGHT + 1)) & (position >> 2 * (HEIGHT + 1));
-    r |= p & (position << (HEIGHT + 1));
-    r |= p & (position >> 3 * (HEIGHT + 1));
-
-    //diagonal 1
-    p = (position << HEIGHT) & (position << 2 * HEIGHT);
-    r |= p & (position << 3 * HEIGHT);
-    r |= p & (position >> HEIGHT);
-    p = (position >> HEIGHT) & (position >> 2 * HEIGHT);
-    r |= p & (position << HEIGHT);
-    r |= p & (position >> 3 * HEIGHT);
-
-    //diagonal 2
-    p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
-    r |= p & (position << 3 * (HEIGHT + 2));
-    r |= p & (position >> (HEIGHT + 2));
-    p = (position >> (HEIGHT + 2)) & (position >> 2 * (HEIGHT + 2));
-    r |= p & (position << (HEIGHT + 2));
-    r |= p & (position >> 3 * (HEIGHT + 2));
-
-    return r & (BOARD_MASK ^ mask);
 }
 
 void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint64_t mask) {
@@ -158,7 +124,7 @@ void print_tab(uint8_t depth) {
     for (uint8_t i = 0; i < depth; i++) { printf(" "); }
 }
 
-#if WIDTH == 7
+#if WIDTH >= 7
     #define HORIZON_DEPTH 10
 #else
     #define HORIZON_DEPTH 5
@@ -292,6 +258,7 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t p
     }
     value = alpha;
 
+    assert(value != 0);
     tt->collisions += store_in_tt(tt, hash, depth, value, bestmove, flag);
 
     return value;
