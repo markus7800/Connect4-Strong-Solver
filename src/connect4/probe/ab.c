@@ -314,7 +314,7 @@ int8_t alphabeta_root(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint6
     return value;
 }
 
-int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply) {
+int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply, bool rescale) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         return 0;
@@ -350,13 +350,16 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
             printf("tt_hits = %.4f, n_tt_collisions = %"PRIu64" (%.4f), wdl_cache_hits = %.4f\n", (double) tt->hits / n_nodes, tt->collisions, (double) tt->collisions / tt->stored, (double) wdl_cache->hits / n_nodes);
         }
         if (abs(ab) > 1) {
-            // transform to mate in ...
-            if (ab > 0) {
-                ab = MATESCORE - ab;
+            if (rescale) {
+                // transform to mate in ...
+                if (ab > 0) {
+                    ab = MATESCORE - ab;
+                }
+                if (ab < 0) {
+                    ab = -MATESCORE - ab;
+                }
             }
-            if (ab < 0) {
-                ab = -MATESCORE - ab;
-            }
+            
             return ab;
         }
 
@@ -364,7 +367,7 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
     }
 }
 
-int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply) {
+int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply, bool rescale) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         return 0;
@@ -378,12 +381,14 @@ int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_
     } else {
         ab = alphabeta(tt, wdl_cache, ob, player, mask, -MATESCORE, -1, offset_ply, WIDTH*HEIGHT - HORIZON_DEPTH, res);
     }
-    // transform to mate in ...
-    if (ab > 0) {
-        ab = MATESCORE - ab;
-    }
-    if (ab < 0) {
-        ab = -MATESCORE - ab;
+    if (rescale) {
+        // transform to mate in ...
+        if (ab > 0) {
+            ab = MATESCORE - ab;
+        }
+        if (ab < 0) {
+            ab = -MATESCORE - ab;
+        }
     }
     return ab;
 }

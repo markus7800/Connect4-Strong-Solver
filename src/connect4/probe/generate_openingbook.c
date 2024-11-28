@@ -90,7 +90,7 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         uint64_t mask = mask_from_key(entry->key);
         uint64_t player = entry->key & mask;
         assert(position_key(player, mask) == entry->key);
-        int8_t value = iterdeep(tt, wdl_cache, NULL, player, mask, 0, 0);
+        int8_t value = iterdeep(tt, wdl_cache, NULL, player, mask, 0, 0, false);
         entry->value = value;
         CNT++;
         if (worker_id == 0 ) { //|| (MP && worker_id % SUBGROUP_SIZE == 0)) {

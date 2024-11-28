@@ -155,9 +155,9 @@ int main(int argc, char const *argv[]) {
 
         int8_t ab;
         if (no_iterdeep) {
-            ab = fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
+            ab = fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0, true);
         } else {
-            ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
+            ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0, true);
         }
 
         if (ab > 0) {
@@ -202,9 +202,9 @@ int main(int argc, char const *argv[]) {
                 play_column(&player, &mask, move);
 
                 if (no_iterdeep) {
-                    res = -fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
+                    res = -fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1, true);
                 }   else {
-                    res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
+                    res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1, true);
                 }
                 
                 printf("%3d ", res);
