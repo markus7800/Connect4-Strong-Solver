@@ -23,6 +23,8 @@ for subgroup in range(n_workers // 4):
 for proc in procs:
     proc.wait()
 
+for proc in procs:
+    print()
 
 results = []
 for subgroup in range(n_workers // 4):
@@ -33,7 +35,7 @@ for subgroup in range(n_workers // 4):
             key = int(key)
             score = int(score)
             results.append((key, score))
-    # os.remove(file)
+    os.remove(file)
 
 results = sorted(results)
 

@@ -71,6 +71,7 @@ struct timespec T0, T1;
 
 // MULTI_PROCESSING
 bool MP = false;
+uint8_t MP_N_GROUPS;
 uint8_t MP_SUBGROUP;
 
 typedef struct OpeningBookPayload {
@@ -84,6 +85,21 @@ typedef struct OpeningBookPayload {
     uint8_t n_workers;
 } openingbook_payload_t;
 
+void mp_print_top_linebreaks() {
+    if (MP) {
+        for (uint8_t i = 0; i < MP_SUBGROUP; i++) { printf("\n"); }
+    }
+}
+
+void mp_print_bottom_linebreaks_and_reset_cursor() {
+    if (MP) {
+        for (uint8_t i = MP_SUBGROUP; i < MP_N_GROUPS; i++) { printf("\n"); }
+        for (uint8_t i = 0; i < MP_N_GROUPS; i++) { printf("\x1b[1A"); }
+        printf("\r");
+    }
+}
+
+double last_print_time = 0;
 void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth, uint8_t worker_id, uint8_t n_workers) {
     for (uint64_t i = 0; i < ob->count; i++) {
         openingbook_entry_t* entry = &ob->entries[i];
@@ -93,7 +109,17 @@ void _fill_opening_book_worker(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* 
         int8_t value = iterdeep(tt, wdl_cache, NULL, player, mask, 0, 0, false);
         entry->value = value;
         CNT++;
-        if (worker_id == 0 ) { //|| (MP && worker_id % SUBGROUP_SIZE == 0)) {
+        if (MP) {
+            clock_gettime(CLOCK_REALTIME, &T1);
+            double t = get_elapsed_time(T0, T1);
+            if (worker_id % SUBGROUP_SIZE == 0 && t - last_print_time > 0.25) {
+                mp_print_top_linebreaks();
+                printf("group %u ... %u (%.0f%% in %0.fs)                      ", MP_SUBGROUP, CNT, 100.0 * CNT / TOTAL_CNT, t);
+                mp_print_bottom_linebreaks_and_reset_cursor();
+                last_print_time = t;
+            }
+        }
+        else if (worker_id == 0 ) {
             clock_gettime(CLOCK_REALTIME, &T1);
             double t = get_elapsed_time(T0, T1);
             printf("... %u (%.0f%% in %0.fs)                      \r", CNT, 100.0 * CNT / TOTAL_CNT, t);
@@ -105,6 +131,9 @@ void *fill_opening_book_multithreaded_worker(void* arg) {
     openingbook_payload_t* payload = (openingbook_payload_t*) arg;
     printf("Started worker %u\n", payload->worker_id);
 
+    if (MP) {
+        sleep(1);
+    }
     _fill_opening_book_worker(payload->tt, payload->wdl_cache, payload->ob, payload->player, payload->mask, payload->depth, payload->worker_id, payload->n_workers);
 
     return NULL;
@@ -192,6 +221,7 @@ int main(int argc, char const *argv[]) {
     // determine number of subgroups
     assert(n_workers % subgroup_size == 0);
     uint8_t n_subgroups = n_workers / subgroup_size;
+    MP_N_GROUPS = n_subgroups;
 
     // split up the work (non-draw positions)
     uint64_t work_per_subgroup =  nondraw_positions.count / n_subgroups + (nondraw_positions.count % n_subgroups != 0);
@@ -236,7 +266,6 @@ int main(int argc, char const *argv[]) {
     clock_gettime(CLOCK_REALTIME, &T1);
     double t = get_elapsed_time(T0, T1);
     
-    printf("generated %u finished in %.3fs\n", CNT, t);
 
 
     // add all results to one big opening book
@@ -272,7 +301,15 @@ int main(int argc, char const *argv[]) {
     }
 
     FILE* f = fopen(filename, "w");
-    printf("writing to %s/%s ... \n", folder, filename);
+
+
+    mp_print_top_linebreaks();
+    if (MP) { printf("group %u: ", MP_SUBGROUP); }
+    printf("generated %u finished in %.3fs - ", CNT, t);
+    printf("writing to %s/%s. ", folder, filename);
+    mp_print_bottom_linebreaks_and_reset_cursor();
+    if (!MP) { printf("\n\n"); }
+
     assert(f != NULL);
     for (uint64_t i = 0; i < ob.count; i++) {
         openingbook_entry_t entry = ob.entries[i];
@@ -288,7 +325,9 @@ int main(int argc, char const *argv[]) {
         wdl_cache_t wdlcache = wdl_caches[subgroup];
         free(tt.entries);
         free(wdlcache.entries);
-        printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) wdl_cache_hit=%"PRIu64"\n", tt.hits, tt.collisions, (double) tt.collisions / tt.stored, wdlcache.hits);
+        if (!MP) {
+            printf("tt: hits=%"PRIu64" collisions=%"PRIu64" (%.4f) wdl_cache_hit=%"PRIu64"\n", tt.hits, tt.collisions, (double) tt.collisions / tt.stored, wdlcache.hits);
+        }
     }
 
     return 0;
