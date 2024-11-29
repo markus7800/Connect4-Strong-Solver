@@ -324,13 +324,13 @@ void print_nodes(bool statsonly) {
     }
 }
 
-void print_dot() {
+void print_dot(uniquetable_t* set) {
     printf("digraph {\n");
     uniquetable_entry_t entry;
     nodeindex_t index;
     bddnode_t* node;
-    for (uint64_t i = 0; i < uniquetable.count; i++) {
-        entry = uniquetable.entries[i];
+    for (uint64_t i = 0; i < set->count; i++) {
+        entry = set->entries[i];
         index = entry.value;
         node = get_node(index);
         if (!isconstant(node)) {

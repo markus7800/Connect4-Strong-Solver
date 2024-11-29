@@ -105,6 +105,6 @@ void verify_uniquetable();
 void print_nodes(bool statsonly);
 
 // print BDD in dot format for visualising with graphviz
-void print_dot();
+void print_dot(uniquetable_t* set);
 
 #endif
