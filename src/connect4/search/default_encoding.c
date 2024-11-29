@@ -88,8 +88,8 @@ void initialise_variable_sets(nodeindex_t (**X)[2][2], nodeindex_t stm0, nodeind
             }
         }
     }
-    add_variable(vars_board0, stm0);
-    add_variable(vars_board1, stm1);
+    // add_variable(vars_board0, stm0);
+    // add_variable(vars_board1, stm1);
 }
 
 // computes transition relation for single move
@@ -100,13 +100,13 @@ nodeindex_t trans_move(int col, int row, int player, int current_board, nodeinde
     int next_board = current_board == 0 ? 1 : 0;
     
     // precondition (depends variables on of current board)
-    nodeindex_t pre;
+    nodeindex_t pre = ONEINDEX;
     // current player is side-to-move
-    if (current_board == 0) {
-        pre = (player == 0 ? stm0 : not(stm0));
-    } else {
-        pre = (player == 0 ? stm1 : not(stm1));
-    }
+    // if (current_board == 0) {
+    //     pre = (player == 0 ? stm0 : not(stm0));
+    // } else {
+    //     pre = (player == 0 ? stm1 : not(stm1));
+    // }
     // cell is not occupied by player or opponent
     pre = and(pre, not(X[col][row][player][current_board]));
     pre = and(pre, not(X[col][row][opponent][current_board]));
@@ -116,13 +116,13 @@ nodeindex_t trans_move(int col, int row, int player, int current_board, nodeinde
     }
 
     // effect (affects variabels on next board)
-    nodeindex_t eff;
+    nodeindex_t eff = ONEINDEX;
     // side-to-move changes
-    if (current_board == 0) {
-        eff = (player == 0 ? not(stm1) : stm1);
-    } else {
-        eff = (player == 0 ? not(stm0) : stm0);
-    }
+    // if (current_board == 0) {
+    //     eff = (player == 0 ? not(stm1) : stm1);
+    // } else {
+    //     eff = (player == 0 ? not(stm0) : stm0);
+    // }
     // now there is a red/yellow stone at cell in the next board
     // and there is not yellow/red stone at cell
     eff = and(eff, X[col][row][player][next_board]);
@@ -152,9 +152,7 @@ nodeindex_t get_trans(nodeindex_t (**X)[2][2], nodeindex_t stm0, nodeindex_t stm
     nodeindex_t trans = ZEROINDEX;
     for (int col = 0; col < width; col++) {
         for (int row = 0; row < height; row++) {
-            for (int player = 0; player < 2; player++) {
-                trans = or(trans, trans_move(col, row, player, board, stm0, stm1, X, width, height));
-            }
+            trans = or(trans, trans_move(col, row, board, board, stm0, stm1, X, width, height));
         }
     }
     return trans;
@@ -164,7 +162,7 @@ nodeindex_t get_trans(nodeindex_t (**X)[2][2], nodeindex_t stm0, nodeindex_t stm
 // board0, side-to-move is high and all cells are empty
 nodeindex_t connect4_start(nodeindex_t stm0, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height) {
     nodeindex_t s = ONEINDEX;
-    s = and(s, stm0);
+    // s = and(s, stm0);
     for (int c = 0; c < width; c++) {
         for (int r = 0; r < height; r++) {
             for (int p = 0; p < 2; p++) {
@@ -296,9 +294,9 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
     }
 }
 
-inline nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
+nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
     return connect4_substract_or_intersect_term(current, board, player, X, width, height, gc_level, true);
 }
-inline nodeindex_t connect4_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
+nodeindex_t connect4_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
     return connect4_substract_or_intersect_term(current, board, player, X, width, height, gc_level, false);
 }

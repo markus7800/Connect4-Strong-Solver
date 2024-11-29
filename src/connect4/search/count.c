@@ -34,8 +34,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Create all variables
 
     // First, side-to-move
-    nodeindex_t stm0 = create_variable();
-    nodeindex_t stm1 = create_variable();
+    // nodeindex_t stm0 = create_variable();
+    // nodeindex_t stm1 = create_variable();
+    nodeindex_t stm0 = -1;
+    nodeindex_t stm1 = -1;
     
     #if !COMPRESSED_ENCODING
         nodeindex_t (**X)[2][2];
@@ -88,6 +90,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     // PLY 0:
     nodeindex_t current = connect4_start(stm0, X, width, height);
+    // connect4_enumerate(current);
     uint64_t cnt = connect4_satcount(current);
     bdd_nodecount = _nodecount(current, &nodecount_set);
     printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
@@ -187,6 +190,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // print info
         printf(" PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
+        // if (d == 1) {
+        //     // print_dot(&nodecount_set);
+        //     connect4_enumerate(current);
+        //     exit(0);
+        // }
 
 
 #if WRITE_TO_FILE

@@ -90,3 +90,40 @@ nodeindex_t board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
     nodeindex_t res = apply_board0_board1_or(ix1, ix2);
     return res;
 }
+
+void _connect4_enumerate(nodeindex_t ix, uint8_t* assignment, uint64_t i) {
+    bddnode_t* u = get_node(ix);
+    if (isconstant(u)) {
+        if (constant(u) == 1) {
+            for (uint64_t j = 0; j < memorypool.num_variables / 2 + 1; j++) {
+                printf("%2u,", assignment[j]);
+            }
+            printf("\n");
+        }
+        return;
+    }
+
+    variable_t var_level = (level(u) + 1) / 2;
+
+    if (i != var_level) {
+        assignment[i] = 0;
+        _connect4_enumerate(ix, assignment, i + 1);
+        assignment[i] = 1;
+        _connect4_enumerate(ix, assignment, i + 1);
+    } else {
+        assignment[i] = 0;
+        _connect4_enumerate(u->low, assignment, i + 1);
+        assignment[i] = 1;
+        _connect4_enumerate(u->high, assignment, i + 1);
+    }
+}
+    
+
+void connect4_enumerate(nodeindex_t ix) {
+    for (uint64_t j = 0; j < memorypool.num_variables / 2 + 1; j++) {
+        printf("%2llu,", j);
+    }
+    printf("\n");
+    uint8_t* assignment = malloc(memorypool.num_variables / 2 * sizeof(uint8_t));
+    _connect4_enumerate(ix, assignment, 1);
+}
