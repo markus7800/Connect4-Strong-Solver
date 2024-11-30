@@ -80,6 +80,15 @@ inline uint64_t position_key(uint64_t player, uint64_t mask) {
     return ((mask << 1) | BOTTOM_MASK) ^ pos;
 }
 
+// Input moveseq: 112133263526
+// Connect4 width=7 x height=6          winning spots for x
+//  . . . . . . .                       0 0 0 0 0 0 0 
+//  . . . . . . .                       0 0 0 0 0 0 0
+//  . . . . . . .                       0 0 1 0 1 0 0 
+//  . o x x . . .  stones played: 12    0 0 0 0 0 0 0 
+//  . o x o . . o  side to move: x      0 0 0 0 0 0 0 
+//  . x x x . o o  is terminal: 0       1 0 0 0 1 0 0
+//  0 1 2 3 4 5 6
 uint64_t winning_spots(uint64_t position, uint64_t mask) {
     // vertical;
     uint64_t r = (position << 1) & (position << 2) & (position << 3);

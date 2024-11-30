@@ -43,4 +43,4 @@ openingbook:
 	$(CC) probe/generate_openingbook.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o generate_ob_w$(WIDTH)_h$(HEIGHT).out -lpthread
 
 perft:
-	$(CC) probe/perft.c $(BDDFILES) $(CFLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o perft_w$(WIDTH)_h$(HEIGHT).out 
+	$(CC) probe/perft.c $(CFLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o perft_w$(WIDTH)_h$(HEIGHT).out 
