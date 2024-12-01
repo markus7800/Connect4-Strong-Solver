@@ -165,6 +165,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     printf("\n\nRetrograde analysis:\n\n");
 
+    // used for saving BDDs. board0 and board1 are mapped to same variables
     variable_t board_varmap[256];
     board_varmap[0] = 0; board_varmap[1] = 1;
     for (size_t v = 2; v <= 255; v++) {
@@ -214,14 +215,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         keepalive_ix(next_draw); keepalive_ix(next_lost);
 
+        // compute terminal positions for ply
         term = connect4_intersect_term(current, board, player, X, width, height, gc_level);
         term_cnt = connect4_satcount(term);
         keepalive_ix(term);
 
-
+        // compute non-terminal positions for ply
         current = connect4_substract_term(current, board, player, X, width, height, gc_level);
         keepalive_ix(current);
 
+        // pre-image of lost positions of opponent are wins for player
         win_pre_img = image(trans, next_lost, vars_board);
         keepalive_ix(win_pre_img);
         undo_keepalive_ix(next_lost);
@@ -230,6 +233,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             printf("  WIN 1 GC: "); gc(true, true);
         }
     
+        // get wins for ply
         win = and(current, win_pre_img);
         win_cnt = connect4_satcount(win);
         undo_keepalive_ix(win_pre_img);
@@ -244,6 +248,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             printf("  WIN 2 GC: "); gc(true, true);
         }
 
+        // substract wins from all non-terminal positions at ply
         undo_keepalive_ix(current);
         current = and(current, not(win));
         keepalive_ix(current);
@@ -253,14 +258,18 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             printf("  WIN 3 GC: "); gc(true, true);
         }
 
+        // if we cannot win next best result is a draw
+
         if (ply == width*height) {
-            draw = current;
-        } else {
             // if ply == width*height then board is full
             // and there are no moves oven when no post-condition is placed (next_draw=ONE_INDEX)
+            draw = current;
+        } else {
+            // pre-image of opponent draw is also draw for player
             draw_pre_image = image(trans, next_draw, vars_board);
             undo_keepalive_ix(next_draw);
 
+            // get draws for ply
             draw = and(current, draw_pre_image);
         }
         draw_cnt = connect4_satcount(draw);
@@ -275,6 +284,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             printf("  DRAW GC: "); gc(true, true);
         }
 
+        // also substract draws from current = all non-terminal positions at ply - wins - draws
+        // terminals are alays lost so add to result to get lost positions for ply
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
         undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
@@ -284,6 +295,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
 #endif
 
+        // store the results of current ply for next ply
         next_draw = draw;
         next_lost = lost;
 
@@ -342,8 +354,18 @@ make connect4-solve ALLOW_ROW_ORDER=0 COMPRESSED_ENCODING=1 WRITE_TO_FILE=1 SAVE
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+            printf("solve.out log2_tablesize width height\n");
+            printf("  strongly solves connect4 with retrograde symbolic analysis.\n");
+            printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");
+            printf("  width           ... width of connect4 board.\n");
+            printf("  height          ... height of connect4 board.\n");
+            return 0;
+        }
+    }
     if (argc != 4) {
-        perror("Wrong number of arguments supplied: connect4.out log2(tablesize) width height\n");
+        perror("Wrong number of arguments supplied: see solve.out -h\n");
         return 1;
     }
     char * succ;

@@ -273,8 +273,19 @@ i.e. we have 2 << log2(tablesize) allocatable nodes
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+            printf("counts.out log2_tablesize width height\n");
+            printf("  counts the number of positions for connect4 per ply symbolic search.\n");
+            printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");
+            printf("  width           ... width of connect4 board.\n");
+            printf("  height          ... height of connect4 board.\n");
+            return 0;
+        }
+    }
+
     if (argc != 4) {
-        perror("Wrong number of arguments supplied: connect4.out log2(tablesize) width height\n");
+        perror("Wrong number of arguments supplied: see counts.out -h\n");
         return 1;
     }
     char * succ;

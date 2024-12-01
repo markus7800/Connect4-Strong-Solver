@@ -7,7 +7,11 @@ IN_OP_GC = 0		    # should GC be performed during ops?
 ALLOW_ROW_ORDER = 0     # should order by row if height > width?
 COMPRESSED_ENCODING = 1 # use compressed Connect4 encoding?
 
-DTM = 1
+# for solve.c
+SAVE_BDD_TO_DISK = 1    # save BDDs (strong solution) to disk?
+
+# for full_ab_search
+DTM = 1					# compute distance to win/loss? or win/draw/loss score instead
 
 WIDTH = 7
 HEIGHT = 6
@@ -28,7 +32,7 @@ count:
 	$(CC) search/count.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o count.out
 
 solve:
-	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -o solve.out
+	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(C4FLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -o solve.out
 
 bestmove:
 	$(CC) probe/bestmove.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o bestmove_w$(WIDTH)_h$(HEIGHT).out
