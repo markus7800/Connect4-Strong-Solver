@@ -8,6 +8,8 @@
 #include <inttypes.h>
 #include "utils.c"
 
+// implementation of an openingbook as dictionary
+
 typedef struct OpeningBookEntry {
     uint32_t next;
     uint64_t key;
@@ -47,7 +49,7 @@ bool has_position(openingbook_t* ob, uint64_t key) {
     uint32_t b = ob->buckets[target_bucket_ix];
     openingbook_entry_t entry;
 
-    // try to find existing node
+    // try to find existing entry
     while (b != (uint32_t) -1) {
         entry = ob->entries[b];
         if (key == entry.key) {

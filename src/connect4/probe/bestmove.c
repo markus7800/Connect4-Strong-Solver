@@ -43,6 +43,7 @@ int main(int argc, char const *argv[]) {
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
             printf("bestmove.out folder moveseq [-Xob] [-Xiterdeep] [-Xevalmoves] [-Xmmap]\n");
+            printf("  performs alpha-beta search leveraging strong solution to compute evaluation and find best move for given position.\n");
             printf("  folder      ... relative path to folder containing strong solution (bdd_w{width}_h{height}_{ply}_{lost|draw|win}.bin files).\n");
             printf("  moveseq     ... sequence of moves (0 to WIDTH-1) to get position that will be evaluated.\n");
             printf("  -Xob        ... disables opening book. optional.\n");
@@ -94,7 +95,7 @@ int main(int argc, char const *argv[]) {
     }
     print_board(player, mask, -1);
     printf("\n");
-
+    
     // mmap or read in strong solution
     if (no_mmap) {
         printf("WARNING: reading entire folder %s into memory\n",  folder);

@@ -9,6 +9,8 @@
 #include <sys/mman.h> // mmap
 #include <sys/stat.h> // file size
 
+// utility to read in BDD .bin files either as mmap or into memory
+
 char* (*mmaps)[3];
 off_t (*st_sizes)[3];
 bool (*in_memory)[3];

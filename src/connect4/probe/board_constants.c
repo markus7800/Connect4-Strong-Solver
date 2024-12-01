@@ -1,3 +1,5 @@
+// file auto-generated with generate_constants.c
+
 #if (WIDTH == 1 && HEIGHT == 1)
     #define BOARD_MASK 0x1
     #define BOTTOM_MASK 0x1

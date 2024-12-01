@@ -1,15 +1,18 @@
 #include <stdbool.h>
 #include <stdint.h>
-// #include <immintrin.h>
+
+// implementation of thread-safe transpotion table that stores results produced and probed by alphabeta in ab.c
 
 #define FLAG_EMPTY 0
 #define FLAG_ALPHA 1
 #define FLAG_BETA 2
 #define FLAG_EXACT 3
 
+// we also support a clustering. i.e. if the slot a position hashes to is occupied we try up to TT_CLUSTER_SIZE below.
 #define TT_CLUSTER_SIZE 3
 
-
+// entry is two 64bit integers
+// in data there is a checksum to assert that data belongs to key
 typedef struct TTEntry {
     uint64_t key;
     uint64_t data;
@@ -42,10 +45,6 @@ inline int8_t clamp(int8_t x, int8_t a, int8_t b) {
     return x;
 }
 
-inline int8_t max(int8_t x, int8_t y) {
-    return (x < y) ? y : x;
-}
-
 #define MATESCORE 100
 
 int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t horizon_depth, int8_t alpha, int8_t beta, bool* tt_hit) {
@@ -53,9 +52,11 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
     uint32_t entry_checksum;
     bool found = false;
 #if TT_CLUSTER_SIZE > 0
+    // we have TT_CLUSTER_SIZE slots to check for a tt hit
     for (uint64_t i = 0; i < TT_CLUSTER_SIZE; i++) {
         entry = tt->entries[(key & tt->mask) + i];
         entry_checksum = (uint32_t) (entry.data >> 32);
+        // assert that data matches key (entry is not currently modified by other thread)
         if (key == entry.key && (uint32_t) key == entry_checksum) {
             found = true;
             break;
@@ -64,6 +65,7 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
 #else
         entry = tt->entries[key & tt->mask];
         entry_checksum = (uint32_t) (entry.data >> 32);
+        // assert that data matches key (entry is not currently modified by other thread)
         found = (key == entry.key) && ((uint32_t) key == entry_checksum);
 #endif
     if (found) {
@@ -72,11 +74,11 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
         // uint8_t entry_move = (uint8_t) (entry.data >> 16);
         uint8_t entry_flag = (uint8_t) (entry.data >> 24);
 
-
-        // printf("Probe for key=%"PRIu64" (res=%"PRIu64")\n", key, (uint64_t) (entry >> 64));
-        assert(entry_value != 0);
+        assert(entry_value != 0); // in ab.c we do not store draws
 
         if (entry_flag == FLAG_EXACT) {
+            // this case is a bit more complicated and demonstrated by examples.
+            // we want to return results consistent with the search
             /*
                 example:
 
@@ -86,7 +88,7 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
                     value = 95 (mate in 5 is exact result because with depth 6 at ply 3 we search until ply 9)
 
                 probe:
-                    entry_ply == ply (need the same number of stones)
+                    entry_ply == ply (need the same number of stones for matching hash)
 
                     depth = 7
                     return 95 because would search at higher depth
@@ -95,27 +97,28 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
                     return 95 because ply=3 + depth=4 > mate=5
 
                     depth = 1
-                    return 1 because ply=3 + depth=1 < mathe=5
+                    return 1 because ply=3 + depth=1 < mate=5
+                    to be consistent with search (even though we know eval, the search would not be able to find it at the depth)
 
                 stored:
                     ply = 3
                     depth = 6
-                    value = 1 (unknown number of mate)
+                    value = 1 (unknown number of moves to mate)
                     
                 probe:
                     depth = 4
                     return 1
+                    we know this would also not find the number of moves to mate
 
                     depth 7
                     no hit
+                    a search at higher depth could find the number of moves to mate, so it would be inconsistent to have a tt_hit with res=1
             */
 
             if (abs(entry_value) > 1) {
                 if (depth < entry_depth) {
-                    // TODO: change numbers to constants
                     if (ply + depth + horizon_depth < MATESCORE - abs(entry_value)) {
                         // the search depth would not be enough to find the mate
-                        // TODO: can we still use information somehow
                         entry_value = entry_value > 0 ? 1 : -1;
                     }
                 }

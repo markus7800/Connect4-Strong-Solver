@@ -240,6 +240,8 @@ int8_t alphabeta(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t p
         }
     }
 
+    // sort moves
+    
     uint8_t movecount = WIDTH;
     uint8_t moves[WIDTH] = STATIC_MOVE_ORDER;
     sort_moves(moves, move_mask, player, mask);

@@ -56,16 +56,27 @@ uint64_t poscnt(openingbook_t* positions, uint64_t player, uint64_t mask, uint8_
 }
 
 int main(int argc, char const *argv[]) {
-    const char *moveseq = argv[1];
-    char* succ;
-    uint8_t depth = (uint8_t) strtoul(argv[2], &succ, 10);
 
     bool unique = false;
     for (int i = 0; i < argc; i++) {
+        for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+            printf("pertf.out moveseq depth [-unique]\n");
+            printf("  counts the number of (unique) position at given depth\n");
+            printf("  moveseq    ... sequence of moves (0 to WIDTH-1) to get position that will be evaluated.\n");
+            printf("  depth      ... the depth at which positions are counted. optional.\n");
+            printf("  -unique    ... if set only unique positions are counted. optional.\n");
+            return 0;
+        }
+
         if (strcmp(argv[i], "-unique") == 0) {
             unique = true;
         }
     }
+
+    const char *moveseq = argv[1];
+    char* succ;
+    uint8_t depth = (uint8_t) strtoul(argv[2], &succ, 10);
 
     struct timespec t0, t1;
     double t;

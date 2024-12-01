@@ -2,6 +2,13 @@ import sys
 import subprocess
 import os
 
+# this script is used for generating the openingbook with multi-processing
+# python3 generate_openingbook_mp.py folder width height n_workers
+# folder    ... is the folder that contains strong solutions (.bin files)
+# width     ... width of connect4 board
+# height    ... height of connect4 board
+# n_workers ... the number of total workers (has to be multiple of 4, will spawn n_workers / 4 processes with 4 threads each)
+
 folder = sys.argv[1]
 width = int(sys.argv[2])
 height = int(sys.argv[3])
@@ -13,19 +20,23 @@ DEPTH = 8
 assert(n_workers % 4 == 0)
 
 procs = []
+
+# start processes (calling generate_openingbook c program)
 for subgroup in range(n_workers // 4):
     proc = subprocess.Popen([
-        f"./generate_ob_w{width}_h{height}.out", str(folder), str(n_workers), str(subgroup)],
+        f"./generate_openingbook_w{width}_h{height}.out", str(folder), str(n_workers), str(subgroup)],
         )
     procs.append(proc)
-    # proc.wait()
 
+# join processes
 for proc in procs:
     proc.wait()
 
 for proc in procs:
     print()
 
+# read results of each subprocess and sort them by position key
+# deletes files produced by subprocesses
 results = []
 for subgroup in range(n_workers // 4):
     file = folder + f"/openingbook_w{width}_h{height}_d{DEPTH}_g{subgroup}.csv"
@@ -39,6 +50,7 @@ for subgroup in range(n_workers // 4):
 
 results = sorted(results)
 
+# write results to final openingbook file
 with open(folder + f"/openingbook_w{width}_h{height}_d{DEPTH}.csv", "w") as f:
     for key, score in results:
         f.write(f"{key}, {score}\n")

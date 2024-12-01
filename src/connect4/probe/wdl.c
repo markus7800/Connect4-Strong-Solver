@@ -21,9 +21,18 @@
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+            printf("wdl.out folder moveseq\n");
+            printf("  reads the strong solution for given position (no search for distance to win/loss).\n");
+            printf("  folder      ... relative path to folder containing strong solution (bdd_w{width}_h{height}_{ply}_{lost|draw|win}.bin files).\n");
+            printf("  moveseq     ... sequence of moves (0 to WIDTH-1) to get position that will be evaluated.\n");
+            return 0;
+        }
+    }
 
     if (argc < 3) {
-        perror("Wrong number of arguments supplied: connect4_bestmove.out folder moveseq\n");
+        perror("Wrong number of arguments supplied: see wdl.out -h\n");
         exit(EXIT_FAILURE);
     }
 

@@ -1,6 +1,12 @@
 #ifndef PROBING
 #define PROBING
 
+// functionality to check if assignment satisfies BDD stored with .bin file
+// i.e. if connect4 position is won / draw / lost
+// by virtue of our storing method we do not need to parse the file as BDD object,
+// but can directly traverse the binaries.
+// we can use mmap or read .bin into memory
+
 #include "read.c"
 
 typedef uint32_t nodeindex_t;
@@ -24,16 +30,19 @@ void get_mmap_node(char* map, nodeindex_t ix, mmapbddnode_t* node) {
     memcpy(&node->high, &map[i+5], 4);
 }
 
+// checks whether assignment given as bitvector satsifies boolean formula stored at map wit root node ix
+// assignments are given as uint64_t such that (0b1 & (bitvector >> u.var)) corresponds to the true/false assignment of variable u.var
 bool is_sat_mmap(char* map, nodeindex_t ix, uint64_t bitvector) {
     mmapbddnode_t u;
     get_mmap_node(map, ix, &u);
     while (u.var != 0) {
-        ix = (0b1 & (bitvector >> (u.var))) ? u.high : u.low;
+        ix = (0b1 & (bitvector >> u.var)) ? u.high : u.low;
         get_mmap_node(map, ix, &u);
     }
     return u.low == 1;
 }
 
+// returns 1 if connect4 position is won, 0 if draw, and -1 if lost
 int probe_board_mmap(uint64_t player, uint64_t mask) {
     bool win_sat, draw_sat, lost_sat;
     bool win_read, draw_read, lost_read;
@@ -61,7 +70,9 @@ int probe_board_mmap(uint64_t player, uint64_t mask) {
             read_ptr = &win_read;
         }
 
+        // BDD for i=0 win / i=1 draw / i=2 lost 
         char* map = mmaps[ply][i];
+        // we only need to read two BDD to infer position eval, so map can be missing for win, draw, or lost
         if (map == NULL) {
             *read_ptr = false;
             continue;

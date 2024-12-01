@@ -163,8 +163,26 @@ void fill_opening_book_multithreaded(tt_t* tts, wdl_cache_t* wdl_caches, opening
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
-    if (argc != 3 && argc != 4) {
-        perror("Wrong number of arguments supplied: generate_ob.out folder n_workers [subgroup]\n");
+    // parse program arguments
+
+    bool no_mmap = false;
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+            printf("generate_openingbook.out folder n_workers [mp_subgroup] [-Xmmap]\n");
+            printf("  evaluates all non-draw position at depth OB_PLY leveraging strong solution with multi-threading.\n");
+            printf("  folder      ... relative path to folder containing strong solution (bdd_w{width}_h{height}_{ply}_{lost|draw|win}.bin files).\n");
+            printf("  n_workers   ... number of total workers (if mp_subgroup is provided 4 threads will be spawned, otherwise n_workers threads will be spawned\n");
+            printf("  mp_subgroup ... if provided, only the 4 workers belonging to mp_subgroup will be spawned. used for multi-processing. optional.\n");
+            printf("  -Xmmap      ... disables mmap (strong solution will be read into memory instead. large RAM needed). optional.\n");
+            return 0;
+        }
+        if (strcmp(argv[i], "-Xmmap") == 0) {
+            no_mmap = true;
+        }
+    }
+
+    if ((no_mmap && argc != 4 && argc != 5) || (!no_mmap && argc != 3 && argc != 4)) {
+        perror("Wrong number of arguments supplied: see generate_openingbook.out -h for call signature\n");
         exit(EXIT_FAILURE);
     }
 
@@ -174,18 +192,24 @@ int main(int argc, char const *argv[]) {
     char * succ;
     uint8_t n_workers = (uint32_t) strtoul(argv[2], &succ, 10);
 
-    if (argc == 4) {
+    if (argc == (4 + no_mmap)) {
         MP_SUBGROUP = (uint8_t) strtoul(argv[3], &succ, 10);
         MP = true;
     }
+    
+    // mmap or read in strong solution
 
-    make_mmaps(WIDTH, HEIGHT);
-    // make_mmaps_read_in_memory(WIDTH, HEIGHT); // change to read binary
+    if (no_mmap) {
+        printf("WARNING: reading entire folder %s into memory\n",  folder);
+        make_mmaps_read_in_memory(WIDTH, HEIGHT);
+    } else {
+        make_mmaps(WIDTH, HEIGHT);
+    }
 
 
     uint64_t player = 0;
     uint64_t mask = 0;
-    // play_column(&player, &mask, 0);
+
 
     // find all non-draw positions up to given depth
     uint8_t depth = OB_PLY;
@@ -205,6 +229,9 @@ int main(int argc, char const *argv[]) {
 
     // if they should not be split up set 
     // uint8_t subgroup_size = n_workers;
+    
+    // if every worker should get its own tt set 
+    // uint8_t subgroup_size = 1;
 
     uint8_t subgroup_size = n_workers < SUBGROUP_SIZE ? n_workers : SUBGROUP_SIZE;
 
@@ -332,9 +359,3 @@ int main(int argc, char const *argv[]) {
 
     return 0;
 }
-
-// Non-draw positions: 57400
-// Worker 0: 57400 positions, group: 0
-// Started worker 0
-// generated 57400 finished in 132.754s          
-// tt: hits=85199208 collisions=14966105 (0.0662) 

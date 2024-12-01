@@ -17,20 +17,38 @@
 
 #include "board_constants.c"
 
-// #define BOTTOM_MASK 0x40810204081
-// #define BOARD_MASK 0xfdfbf7efdfbf // WIDTH x HEIGHT filled with one
+/*
+ * bit order to encode a 7x6 board
+ * .  .  .  .  .  .  .
+ * 5 12 19 26 33 40 47
+ * 4 11 18 25 32 39 46
+ * 3 10 17 24 31 38 45
+ * 2  9 16 23 30 37 44
+ * 1  8 15 22 29 36 43
+ * 0  7 14 21 28 35 42
+ */
 
+/* returns mask for column = 0 ... WIDTH - 1
+ * e.g. column_mask(1) = 
+ * 0 0 0 0 0 0 0
+ * 0 1 0 0 0 0 0
+ * 0 1 0 0 0 0 0
+ * 0 1 0 0 0 0 0
+ * 0 1 0 0 0 0 0
+ * 0 1 0 0 0 0 0
+ * 0 1 0 0 0 0 0
+ * 0x8064
+*/
 u_int64_t column_mask(uint8_t col) {
     return ((1ULL << HEIGHT) - 1) << col * (HEIGHT + 1);
 }
 
+// returns 1 if i-th bit is set in pos
 inline int is_set(u_int64_t pos, int i) {
     return (1ULL & (pos >> i));
 }
-inline void set(u_int64_t* pos, int i) {
-    *pos = (1ULL << i) | *pos;
-}
 
+// returns true if there is an aligment of 4 bits horizontally, vertically or diagonally
 bool alignment(uint64_t pos) {
     // horizontal 
     uint64_t m = pos & (pos >> (HEIGHT+1));
@@ -50,6 +68,9 @@ bool alignment(uint64_t pos) {
 
     return false;
 }
+
+// returns true if the board is in a terminal state
+// i.e. there is a draw or alignment
 bool is_terminal(uint64_t player, uint64_t mask) {
     uint64_t pos = player ^ mask;
     if (alignment(pos)) {
@@ -62,24 +83,35 @@ bool is_terminal(uint64_t player, uint64_t mask) {
     return false;
 }
 
-bool is_legal_move(uint64_t player, uint64_t mask, uint8_t col) {
-    return (mask + BOTTOM_MASK) & column_mask(col);
-}
-
-
 inline u_int64_t get_pseudo_legal_moves(uint64_t mask) {
     return (mask + BOTTOM_MASK);
+}
+
+bool is_legal_move(uint64_t player, uint64_t mask, uint8_t col) {
+    return (mask + BOTTOM_MASK) & column_mask(col);
 }
 
 int get_ply(uint64_t player, uint64_t mask) {
     return __builtin_popcountll(mask);
 }
 
+// computes position key that uniquely describes position
+// it adds the available moves to the current position
+// Connect4 width=7 x height=6          key
+//  . . . . . . .                       0 0 0 0 0 0 0 
+//  . . . . . . .                       0 0 0 0 0 0 0
+//  . . . . . . .                       0 1 1 1 0 0 0 
+//  . o x x . . .  stones played: 12    0 0 1 1 0 0 1 
+//  . o x o . . o  side to move: x      0 0 1 0 0 1 0 
+//  . x x x . o o  is terminal: 0       1 1 1 1 1 0 0
+//  0 1 2 3 4 5 6
 inline uint64_t position_key(uint64_t player, uint64_t mask) {
     uint64_t pos = get_ply(player, mask) % 2 == 1 ? player : player ^ mask;
     return ((mask << 1) | BOTTOM_MASK) ^ pos;
 }
 
+// Computes winning spots for position
+// i.e. spots that complete 4 stone alignment
 // Input moveseq: 112133263526
 // Connect4 width=7 x height=6          winning spots for x
 //  . . . . . . .                       0 0 0 0 0 0 0 
@@ -147,12 +179,9 @@ void print_board(uint64_t player, uint64_t mask, int highlight_col) {
         if (i == 2) printf("  stones played: %d", cnt);
         printf("\n");
     }
-    // printf("\033[90m");
     for (int j = 0; j < WIDTH; j++) {
         printf(" %d", j);
     }
-    // printf("\033[0m");
-    // printf("stones played: %d\nside to move: %c\n\n", cnt, stm_c, term);
 }
 
 void print_mask(u_int64_t mask) {

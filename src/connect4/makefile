@@ -40,7 +40,7 @@ wdl:
 	$(CC) probe/wdl.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o wdl_w$(WIDTH)_h$(HEIGHT).out
 
 openingbook:
-	$(CC) probe/generate_openingbook.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o generate_ob_w$(WIDTH)_h$(HEIGHT).out -lpthread
+	$(CC) probe/generate_openingbook.c $(CFLAGS) $(C4FLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o generate_openingbook_w$(WIDTH)_h$(HEIGHT).out -lpthread
 
 perft:
 	$(CC) probe/perft.c $(CFLAGS) -DWIDTH=$(WIDTH) -DHEIGHT=$(HEIGHT) -o perft_w$(WIDTH)_h$(HEIGHT).out 
