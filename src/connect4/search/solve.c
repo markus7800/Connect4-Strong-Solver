@@ -170,12 +170,15 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     printf("\n\nRetrograde analysis:\n\n");
 
+
+#if SAVE_BDD_TO_DISK
     // used for saving BDDs. board0 and board1 are mapped to same variables
     variable_t board_varmap[256];
     board_varmap[0] = 0; board_varmap[1] = 1;
     for (size_t v = 2; v <= 255; v++) {
         board_varmap[v] = (v + 1) / 2;
     }
+#endif
 
     nodeindex_t win, draw, lost, term;
 
