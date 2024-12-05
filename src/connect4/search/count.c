@@ -30,6 +30,9 @@
 #include "default_encoding.c"
 #endif
 
+#ifndef IN_OP_GC_EXCL
+#define IN_OP_GC_EXCL 0
+#endif
 
 uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Create all variables
@@ -72,8 +75,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t trans0 = get_trans(X, stm0, stm1, width, height, 0);
     nodeindex_t trans1 = get_trans(X, stm0, stm1, width, height, 1);
     // We always want to keep the trans relations alive (prevent GC)
-    keepalive(get_node(trans0));
-    keepalive(get_node(trans1));
+    keepalive_ix(trans0);
+    keepalive_ix(trans1);
 
     // Phiu, first GC run.
     printf("  INIT GC: ");
@@ -107,7 +110,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if FULLBDD
     nodeindex_t full_bdd = current;
-    keepalive(get_node(full_bdd));
+    keepalive_ix(full_bdd);
 #endif
 
     struct timespec t0, t1;
@@ -120,7 +123,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         clock_gettime(CLOCK_REALTIME, &t0);
 
         // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
-        gc_level = (d >= 10) + (d >= 25);
+        gc_level = IN_OP_GC_EXCL ? 0 : (d >= 10) + (d >= 25);
         if (gc_level) printf("\n");
 
         // first substract all terminal positions and then perform image operatoin
@@ -137,34 +140,34 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         if (gc_level) {
             printf("  IMAGE GC: ");
-            keepalive(get_node(current));
+            keepalive_ix(current);
             gc(true, true);
-            undo_keepalive(get_node(current));
+            undo_keepalive_ix(current);
         }
 
 #if FULLBDD
         // update full bdd (enconding all positions) by performing OR with current
         if ((d % 2) == 1) {
-                undo_keepalive(get_node(full_bdd));
-                keepalive(get_node(current));
+                undo_keepalive_ix(full_bdd);
+                keepalive_ix(current);
                 // current is board1 encoding -> we have to do special OR
                 full_bdd = board0_board1_or(full_bdd, current);
-                undo_keepalive(get_node(current));
-                keepalive(get_node(full_bdd));
+                undo_keepalive_ix(current);
+                keepalive_ix(full_bdd);
         } else {
-                undo_keepalive(get_node(full_bdd));
-                keepalive(get_node(current));
+                undo_keepalive_ix(full_bdd);
+                keepalive_ix(current);
                 // current is board0 encoding -> we can do normal OR
                 full_bdd = or(full_bdd, current);
-                undo_keepalive(get_node(current));
-                keepalive(get_node(full_bdd));
+                undo_keepalive_ix(current);
+                keepalive_ix(full_bdd);
         }
 
         if (gc_level) {
             printf("  FULLBDD GC: ");
-            keepalive(get_node(current));
+            keepalive_ix(current);
             gc(true, true);
-            undo_keepalive(get_node(current));
+            undo_keepalive_ix(current);
         }
 
         // count number of nodes in current full BDD
@@ -208,7 +211,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
     cnt = connect4_satcount(full_bdd);
     printf("\nFullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
-    undo_keepalive(get_node(full_bdd));
+    undo_keepalive_ix(full_bdd);
 #if WRITE_TO_FILE
     // write info to file
     if (f != NULL) {
@@ -303,8 +306,12 @@ int main(int argc, char const *argv[]) {
     } else {
         printf("Does not compute full BDD.\n");
     }
-    if (IN_OP_GC) {
+    if (IN_OP_GC && !IN_OP_GC_EXCL) {
         printf("Performs GC during ops.\n");
+    }
+    if (IN_OP_GC_EXCL) {
+        printf("Performs GC during ops exclusively.\n");
+        assert(IN_OP_GC);
     }
 
     if (!ALLOW_ROW_ORDER || width >= height) {

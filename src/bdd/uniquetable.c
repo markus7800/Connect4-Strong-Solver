@@ -181,6 +181,11 @@ inline void undo_keepalive_ix(nodeindex_t ix) {
     undo_keepalive(get_node(ix));
 }
 
+inline void reassign_and_keepalive(nodeindex_t* target, nodeindex_t value) {
+    undo_keepalive_ix(*target);
+    *target = value;
+    keepalive_ix(*target);
+}
 
 
 double get_elapsed_time(struct timespec t0, struct timespec t1) {

@@ -78,6 +78,7 @@ extern void keepalive(bddnode_t* node);
 extern void undo_keepalive(bddnode_t* node);
 extern  void keepalive_ix(nodeindex_t ix);
 extern void undo_keepalive_ix(nodeindex_t ix);
+extern void reassign_and_keepalive(nodeindex_t* target, nodeindex_t value);
 
 // Perform garbage collection.
 // By default gc is only performed if the unique table is filled more than 50%.

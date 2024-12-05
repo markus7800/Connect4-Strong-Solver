@@ -177,7 +177,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         board_varmap[v] = (v + 1) / 2;
     }
 
-    nodeindex_t win, not_win, draw, lost, term;
+    nodeindex_t win, draw, lost, term;
 
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
 
@@ -221,18 +221,15 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(next_draw); keepalive_ix(next_lost);
 
         // compute terminal positions for ply
-        printf("  connect4_intersect_term(current, board, player, X, width, height, gc_level);\n");
         term = connect4_intersect_term(current, board, player, X, width, height, gc_level);
         term_cnt = connect4_satcount(term);
         keepalive_ix(term);
 
         // compute non-terminal positions for ply
-        printf("  connect4_substract_term(current, board, player, X, width, height, gc_level);\n");
         current = connect4_substract_term(current, board, player, X, width, height, gc_level);
         keepalive_ix(current);
 
         // pre-image of lost positions of opponent are wins for player
-        printf("  image(trans, next_lost, vars_board);\n");
         win_pre_img = image(trans, next_lost, vars_board);
         keepalive_ix(win_pre_img);
         undo_keepalive_ix(next_lost);
@@ -242,7 +239,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
     
         // get wins for ply
-        printf("  and(current, win_pre_img);\n");
         win = and(current, win_pre_img);
         win_cnt = connect4_satcount(win);
         undo_keepalive_ix(win_pre_img);
@@ -258,11 +254,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
 
         // substract wins from all non-terminal positions at ply
-        printf("  and(current, not(win));\n");
-        not_win = not(win);
-        undo_keepalive_ix(current);
-        current = and(current, not_win);
-        keepalive_ix(current);
+        reassign_and_keepalive(&current, and(current, not(win)));
         undo_keepalive_ix(win);
 
         if (gc_level) {
@@ -277,7 +269,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             draw = current;
         } else {
             // pre-image of opponent draw is also draw for player
-            printf("  image(trans, next_draw, vars_board);\n");
             draw_pre_image = image(trans, next_draw, vars_board);
             undo_keepalive_ix(next_draw);
 
@@ -298,7 +289,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // also substract draws from current = all non-terminal positions at ply - wins - draws
         // terminals are alays lost so add to result to get lost positions for ply
-        printf("  or(and(current, not(draw)), term);\n");
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
         undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
@@ -391,8 +381,12 @@ int main(int argc, char const *argv[]) {
     print_RAM_info(log2size);
 
 
-    if (IN_OP_GC) {
+    if (IN_OP_GC && !IN_OP_GC_EXCL) {
         printf("Performs GC during ops.\n");
+    }
+    if (IN_OP_GC_EXCL) {
+        printf("Performs GC during ops exclusively.\n");
+        assert(IN_OP_GC);
     }
 
     if (!ALLOW_ROW_ORDER || width >= height) {

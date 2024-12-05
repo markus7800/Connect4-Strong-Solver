@@ -180,6 +180,9 @@ nodeindex_t connect4_start(nodeindex_t stm0, nodeindex_t (**X)[2][2], uint32_t w
 nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level, bool substract) {
     nodeindex_t a;
     nodeindex_t intersection = ZEROINDEX;
+
+    keepalive_ix(current); keepalive_ix(intersection);
+
     // COLUMN
     if (height >= 4) {
         for (int col = 0; col < width; col++) {
@@ -191,10 +194,10 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                 }
                 if (substract) {
                     // substract from current
-                    current = and(current, not(a));
+                    reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
-                    intersection = or(intersection, and(current, a));
+                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
                 }
             }
             if (gc_level == 2) {
@@ -224,10 +227,10 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                 }
                 if (substract) {
                     // substract from current
-                    current = and(current, not(a));
+                    reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
-                    intersection = or(intersection, and(current, a));
+                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
                 }
             }
         }
@@ -250,10 +253,10 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                 }
                 if (substract) {
                     // substract from current
-                    current = and(current, not(a));
+                    reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
-                    intersection = or(intersection, and(current, a));
+                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
                 }
             }
         }
@@ -274,10 +277,10 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                 }
                 if (substract) {
                     // substract from current
-                    current = and(current, not(a));
+                    reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
-                    intersection = or(intersection, and(current, a));
+                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
                 }
             }
         }
@@ -288,6 +291,8 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
             undo_keepalive_ix(current); undo_keepalive_ix(intersection);
         }
     }
+
+    undo_keepalive_ix(current); undo_keepalive_ix(intersection);
 
     if (substract) {
         return current;
