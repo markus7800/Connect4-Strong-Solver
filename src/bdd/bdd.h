@@ -13,13 +13,6 @@
 #include <stdio.h>
 #include <time.h>
 
-
-// log2size = 29 ... 24GB
-// log2size = 28 ... 12GB
-// log2size = 27 ... 6GB
-// log2size = 26 ... 3GB
-// log2size = 25 ... 1.5GB
-// log2size = 24 ... 0.75GB
 uint64_t print_RAM_info(uint64_t log2size) {
     uint64_t num_nodes = ((uint64_t) 1) << log2size;
     printf("number of allocatable nodes: %g\n", (double) num_nodes);

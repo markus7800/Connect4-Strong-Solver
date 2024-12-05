@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <time.h>
+#include <string.h>
 
 #include "../../bdd/bdd.h"
 
@@ -27,6 +28,10 @@
 
 #ifndef SAVE_BDD_TO_DISK
 #define SAVE_BDD_TO_DISK 1
+#endif
+
+#ifndef IN_OP_GC_EXCL
+#define IN_OP_GC_EXCL 0
 #endif
 
 
@@ -113,7 +118,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         clock_gettime(CLOCK_REALTIME, &t0);
 
         // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
-        gc_level = (ply >= 10) + (ply >= 25);
+        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10) + (ply >= 25);
         if (gc_level) printf("\n");
 
         // first substract all terminal positions and then perform image operatoin
@@ -172,7 +177,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         board_varmap[v] = (v + 1) / 2;
     }
 
-    nodeindex_t win, draw, lost, term;
+    nodeindex_t win, not_win, draw, lost, term;
 
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
 
@@ -194,7 +199,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     for (int ply = width*height; ply >= 0; ply--) {
         printf("Ply %d/%d:\n", ply, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
-        gc_level = (ply >= 10) + (ply >= 25);
+        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10) + (ply >= 25);
 
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
@@ -216,15 +221,18 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(next_draw); keepalive_ix(next_lost);
 
         // compute terminal positions for ply
+        printf("  connect4_intersect_term(current, board, player, X, width, height, gc_level);\n");
         term = connect4_intersect_term(current, board, player, X, width, height, gc_level);
         term_cnt = connect4_satcount(term);
         keepalive_ix(term);
 
         // compute non-terminal positions for ply
+        printf("  connect4_substract_term(current, board, player, X, width, height, gc_level);\n");
         current = connect4_substract_term(current, board, player, X, width, height, gc_level);
         keepalive_ix(current);
 
         // pre-image of lost positions of opponent are wins for player
+        printf("  image(trans, next_lost, vars_board);\n");
         win_pre_img = image(trans, next_lost, vars_board);
         keepalive_ix(win_pre_img);
         undo_keepalive_ix(next_lost);
@@ -234,6 +242,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
     
         // get wins for ply
+        printf("  and(current, win_pre_img);\n");
         win = and(current, win_pre_img);
         win_cnt = connect4_satcount(win);
         undo_keepalive_ix(win_pre_img);
@@ -249,8 +258,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
 
         // substract wins from all non-terminal positions at ply
+        printf("  and(current, not(win));\n");
+        not_win = not(win);
         undo_keepalive_ix(current);
-        current = and(current, not(win));
+        current = and(current, not_win);
         keepalive_ix(current);
         undo_keepalive_ix(win);
 
@@ -266,6 +277,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             draw = current;
         } else {
             // pre-image of opponent draw is also draw for player
+            printf("  image(trans, next_draw, vars_board);\n");
             draw_pre_image = image(trans, next_draw, vars_board);
             undo_keepalive_ix(next_draw);
 
@@ -286,6 +298,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // also substract draws from current = all non-terminal positions at ply - wins - draws
         // terminals are alays lost so add to result to get lost positions for ply
+        printf("  or(and(current, not(draw)), term);\n");
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
         undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
@@ -307,12 +320,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
         }
         
-        assert((win_cnt + draw_cnt + lost_cnt) == cnt);
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         total_t += t;
 
-        printf(" win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64" in %.3f seconds\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt, t);
+        printf("  win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64" in %.3f seconds\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt, t);
+        assert((win_cnt + draw_cnt + lost_cnt) == cnt);
 
 #if WRITE_TO_FILE
         if (f != NULL) {

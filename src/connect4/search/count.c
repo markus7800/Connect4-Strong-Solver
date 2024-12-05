@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <time.h>
+#include <string.h>
 
 #include "../../bdd/bdd.h"
 
