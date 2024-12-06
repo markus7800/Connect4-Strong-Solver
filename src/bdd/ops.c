@@ -7,10 +7,6 @@
 #define IN_OP_GC_keepalive(ix) ;
 #endif
 
-#ifndef IN_OP_GC_THRES
-    #define IN_OP_GC_THRES 0.9999
-#endif
-
 void in_op_gc(uint8_t op) {
     uint64_t prev_num_nodes = memorypool.num_nodes;
     double fill_level = (double) memorypool.num_nodes / memorypool.capacity;

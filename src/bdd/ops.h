@@ -39,6 +39,10 @@ void finished_variablesset(variable_set_t* variable_set);
 #define IN_OP_GC 1
 #endif
 
+#ifndef IN_OP_GC_THRES
+    #define IN_OP_GC_THRES 0.9999
+#endif
+
 nodeindex_t and(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t or(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2);

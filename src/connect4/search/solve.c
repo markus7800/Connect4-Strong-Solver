@@ -193,7 +193,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if WRITE_TO_FILE
     sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32".csv", width, height);
     FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,ply,wincount,drawcount,lostcount,time\n");
+    fprintf(f, "width,height,ply,wincount,drawcount,lostcount,termcount,time\n");
 #endif
 
 
@@ -202,7 +202,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     for (int ply = width*height; ply >= 0; ply--) {
         printf("Ply %d/%d:\n", ply, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
-        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10) + (ply >= 25);
+        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
 
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
@@ -322,7 +322,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if WRITE_TO_FILE
         if (f != NULL) {
-            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %"PRIu64", %.3f\n", width, height, ply, win_cnt, draw_cnt, lost_cnt, t);
+            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %.3f\n", width, height, ply, win_cnt, draw_cnt, lost_cnt, term_cnt, t);
             fflush(f);
         }
 #endif
@@ -385,10 +385,10 @@ int main(int argc, char const *argv[]) {
 
 
     if (IN_OP_GC && !IN_OP_GC_EXCL) {
-        printf("Performs GC during ops.\n");
+        printf("Performs GC during ops. (thres=%.4f)\n", IN_OP_GC_THRES);
     }
     if (IN_OP_GC_EXCL) {
-        printf("Performs GC during ops exclusively.\n");
+        printf("Performs GC during ops exclusively. (thres=%.4f)\n", IN_OP_GC_THRES);
         assert(IN_OP_GC);
     }
 
