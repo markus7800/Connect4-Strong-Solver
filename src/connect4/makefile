@@ -7,8 +7,8 @@ ENTER_TO_CONTINUE = 0   # should require to press enter to start?
 
 # for solve and count
 IN_OP_GC = 0		    # should GC be performed during ops?
-IN_OP_GC_THRES = 0.9999
-IN_OP_GC_EXCL = 0
+IN_OP_GC_THRES = 0.9999 # fill-level at which IN_OP_GC is triggered
+IN_OP_GC_EXCL = 0		# exclusively perform IN_OP_GC?
 
 # for solve and count
 ALLOW_ROW_ORDER = 0     # should order by row if height > width?
@@ -16,14 +16,14 @@ COMPRESSED_ENCODING = 1 # use compressed Connect4 encoding?
 
 # for count
 FULLBDD = 0             # compute a BDD encoding all positions (OR over all BDDs for single plies)
-SUBTRACT_TERM = 1
+SUBTRACT_TERM = 1		# SUBTRACT_TERM = 0 disables terminal condition (connect4 win rule)
 
 # for solve
 SAVE_BDD_TO_DISK = 1    # save BDDs (strong solution) to disk?
 
 # for bestmove, full_ab_search, wdl, openingbook, perft
-WIDTH = 7
-HEIGHT = 6
+WIDTH = 7				# width of connect4 board
+HEIGHT = 6				# height of connect4 board
 
 # for full_ab_search
 DTM = 1					# compute distance to win/loss? or win/draw/loss score instead
