@@ -16,7 +16,8 @@ off_t (*st_sizes)[3];
 bool (*in_memory)[3];
 
 void bin_filename(char filename[], uint32_t width, uint32_t height, int ply, int i, char* suffix) {
-    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.bin", width, height, ply, suffix);
+    // COMPRESSED_ENCODING = 1, ALLOW_ROW_ORDER = 0
+    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.10.bin", width, height, ply, suffix);
 }
 
 void _make_mmap(uint32_t width, uint32_t height, int ply, int i, char* suffix) {

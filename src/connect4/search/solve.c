@@ -4,6 +4,9 @@
 #include <time.h>
 #include <string.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "../../bdd/bdd.h"
 
 #include "ops.c"
@@ -91,6 +94,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t total = 0;
     uint64_t bdd_nodecount;
 
+    char folder[50];
+    sprintf(folder, "solution_w%"PRIu32"_h%"PRIu32"", width, height);
+    mkdir(folder, 0777);
+    printf("Made directory %s.\n\n", folder);
+
     printf("\n\nReachable states computation:\n\n");
     
     // PLY 0:
@@ -104,7 +112,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     struct timespec t0, t1;
     double t;
     double total_t = 0;
-    char filename[50];
+    char filename[100];
 
     nodeindex_t* bdd_per_ply = (nodeindex_t*) malloc((width*height+1)*sizeof(nodeindex_t));
     assert(bdd_per_ply != NULL);
@@ -121,18 +129,18 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10) + (ply >= 25);
         if (gc_level) printf("\n");
 
-        // first substract all terminal positions and then perform image operatoin
+        // first subtract all terminal positions and then perform image operatoin
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // roles of board0 and board1 switch
         if ((ply % 2) == 1) {
             // current is board0
-            current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
+            current = connect4_subtract_term(current, 0, 1, X, width, height, gc_level);
             // trans0 is board0 -> board1
             current = image(current, trans0, &vars_board0);
             // current is now board1
         } else {
             // current is board1
-            current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
+            current = connect4_subtract_term(current, 1, 0, X, width, height, gc_level);
             // trans1 is board1 -> board0
             current = image(current, trans1, &vars_board1);
             // current is now board0
@@ -229,7 +237,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(term);
 
         // compute non-terminal positions for ply
-        current = connect4_substract_term(current, board, player, X, width, height, gc_level);
+        current = connect4_subtract_term(current, board, player, X, width, height, gc_level);
         keepalive_ix(current);
 
         // pre-image of lost positions of opponent are wins for player
@@ -248,7 +256,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(win);
 
 #if SAVE_BDD_TO_DISK
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_win.bin", width, height, ply);
+        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_win.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
         _safe_to_file_with_varmap(win, filename, &map, board_varmap);
 #endif
 
@@ -256,7 +264,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             printf("  WIN 2 GC: "); gc(true, true);
         }
 
-        // substract wins from all non-terminal positions at ply
+        // subtract wins from all non-terminal positions at ply
         reassign_and_keepalive(&current, and(current, not(win)));
         undo_keepalive_ix(win);
 
@@ -282,7 +290,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(draw);
 
 #if SAVE_BDD_TO_DISK
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.bin", width, height, ply);
+        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
         _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
 #endif
 
@@ -290,14 +298,14 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             printf("  DRAW GC: "); gc(true, true);
         }
 
-        // also substract draws from current = all non-terminal positions at ply - wins - draws
+        // also subtract draws from current = all non-terminal positions at ply - wins - draws
         // terminals are alays lost so add to result to get lost positions for ply
         lost = or(and(current, not(draw)), term);
         lost_cnt = connect4_satcount(lost);
         undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
 
 #if SAVE_BDD_TO_DISK
-        sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.bin", width, height, ply);
+        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
         _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
 #endif
 

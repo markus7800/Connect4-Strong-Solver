@@ -125,8 +125,8 @@ nodeindex_t is_valid_cell(nodeindex_t (**X)[2], uint32_t height, int col, int ro
 }
 
 // Subtracts all positions from current which are terminal, i.e. four in a row, column or diagonal
-// Substraction is performed iteratively and also performs GC.
-nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2], uint32_t width, uint32_t height, int gc_level, bool substract) {
+// Subtraction is performed iteratively and also performs GC.
+nodeindex_t connect4_subtract_or_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2], uint32_t width, uint32_t height, int gc_level, bool subtract) {
     nodeindex_t a;
     nodeindex_t x;
     nodeindex_t intersection = ZEROINDEX;
@@ -145,8 +145,8 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                     x = and(x, is_valid_cell(X, height, col, row + i, board));
                     reassign_and_keepalive(&a, and(a, x));
                 }
-                if (substract) {
-                    // substract from current
+                if (subtract) {
+                    // subtract from current
                     reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
@@ -182,8 +182,8 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                     x = and(x, is_valid_cell(X, height, col + i, row, board));
                     reassign_and_keepalive(&a, and(a, x));
                 }
-                if (substract) {
-                    // substract from current
+                if (subtract) {
+                    // subtract from current
                     reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
@@ -212,8 +212,8 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                     x = and(x, is_valid_cell(X, height, col + i, row + i, board));
                     reassign_and_keepalive(&a, and(a, x));
                 }
-                if (substract) {
-                    // substract from current
+                if (subtract) {
+                    // subtract from current
                     reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
@@ -240,8 +240,8 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
                     x = and(x, is_valid_cell(X, height, col - i, row + i, board));
                     reassign_and_keepalive(&a, and(a, x));
                 }
-                if (substract) {
-                    // substract from current
+                if (subtract) {
+                    // subtract from current
                     reassign_and_keepalive(&current, and(current, not(a)));
                 } else {
                     // add to intersection
@@ -260,16 +260,16 @@ nodeindex_t connect4_substract_or_intersect_term(nodeindex_t current, int board,
     
     undo_keepalive_ix(current); undo_keepalive_ix(intersection);
 
-    if (substract) {
+    if (subtract) {
         return current;
     } else {
         return intersection;
     }
 }
 
-inline nodeindex_t connect4_substract_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2], uint32_t width, uint32_t height, int gc_level) {
-    return connect4_substract_or_intersect_term(current, board, player, X, width, height, gc_level, true);
+inline nodeindex_t connect4_subtract_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2], uint32_t width, uint32_t height, int gc_level) {
+    return connect4_subtract_or_intersect_term(current, board, player, X, width, height, gc_level, true);
 }
 inline nodeindex_t connect4_intersect_term(nodeindex_t current, int board, int player, nodeindex_t (**X)[2], uint32_t width, uint32_t height, int gc_level) {
-    return connect4_substract_or_intersect_term(current, board, player, X, width, height, gc_level, false);
+    return connect4_subtract_or_intersect_term(current, board, player, X, width, height, gc_level, false);
 }

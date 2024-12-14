@@ -30,6 +30,10 @@
 #include "default_encoding.c"
 #endif
 
+#ifndef SUBTRACT_TERM
+#define SUBTRACT_TERM 1
+#endif
+
 #ifndef IN_OP_GC_EXCL
 #define IN_OP_GC_EXCL 0
 #endif
@@ -126,15 +130,15 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         gc_level = IN_OP_GC_EXCL ? 0 : (d >= 10) + (d >= 25);
         if (gc_level) printf("\n");
 
-        // first substract all terminal positions and then perform image operatoin
+        // first subtract all terminal positions and then perform image operatoin
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // roles of board0 and board1 switch
         if ((d % 2) == 1) {
-            current = connect4_substract_term(current, 0, 1, X, width, height, gc_level);
+            current = SUBTRACT_TERM ? connect4_subtract_term(current, 0, 1, X, width, height, gc_level) : current;
             current = image(current, trans0, &vars_board0);
 
         } else {
-            current = connect4_substract_term(current, 1, 0, X, width, height, gc_level);
+            current = SUBTRACT_TERM ? connect4_subtract_term(current, 1, 0, X, width, height, gc_level) : current;
             current = image(current, trans1, &vars_board1);
         }
 
@@ -219,17 +223,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         fflush(f);
     }
 #endif
-    nodeindexmap_t map;
-    init_map(&map, log2size-1);
-    _safe_to_file(full_bdd, "full_bdd.bin", &map);
-    gc(true, true);
-
-    nodeindex_t bddfull_from_file = _read_from_file("full_bdd.bin", &map);
-
-    reset_set(&nodecount_set);
-    bdd_nodecount = _nodecount(bddfull_from_file, &nodecount_set);
-    cnt = connect4_satcount(bddfull_from_file);
-    printf("\nRead from file: FullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
 #endif
 
 
@@ -324,6 +317,10 @@ int main(int argc, char const *argv[]) {
         printf("Compressed encoding.\n");
     } else {
         printf("Default encoding.\n");
+    }
+
+    if (!SUBTRACT_TERM) {
+        printf("Do not subtract terminals.\n");
     }
 
 #if ENTER_TO_CONTINUE

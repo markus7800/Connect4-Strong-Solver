@@ -10,14 +10,6 @@
 #include "board.c"
 #include "probing.c"
 
-#ifndef COMPRESSED_ENCODING
-#define COMPRESSED_ENCODING 1
-#endif
-
-#ifndef ALLOW_ROW_ORDER
-#define ALLOW_ROW_ORDER 0
-#endif
-
 
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
@@ -40,9 +32,6 @@ int main(int argc, char const *argv[]) {
 
     const char *folder = argv[1];
     chdir(folder);
-
-    assert(COMPRESSED_ENCODING);
-    assert(!ALLOW_ROW_ORDER);
 
     uint64_t player = 0;
     uint64_t mask = 0;
