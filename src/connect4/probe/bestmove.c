@@ -20,8 +20,8 @@
 int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
-    assert(WIDTH < 10);
-    assert(WIDTH * (HEIGHT+ 1) <= 62);
+    assert(WIDTH <= 10);
+    assert(WIDTH * (HEIGHT+1) <= 62);
 
     // parse program arguments
 
