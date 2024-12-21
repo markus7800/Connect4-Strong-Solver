@@ -14,7 +14,7 @@ void init_unaryopcache(uint64_t log2size) {
     unaryopcache.data = (unaryopcache_entry_t*) malloc(size * sizeof(unaryopcache_entry_t));
     if (unaryopcache.data == NULL) {
         perror("Could not allocate unary op cache :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
     unaryopcache.mask = size - 1;
     for (uint32_t i = 0; i < size; i++) {
@@ -39,7 +39,7 @@ void init_binaryopcache(uint64_t log2size) {
     binaryopcache.data = (binaryopcache_entry_t*) malloc(size * sizeof(binaryopcache_entry_t));
     if (binaryopcache.data == NULL) {
         perror("Could not allocate binary op cache :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
     binaryopcache.mask = size - 1;
     for (uint32_t i = 0; i < size; i++) {
@@ -66,7 +66,7 @@ void init_ternaryopcache(uint64_t log2size) {
     ternaryopcache.data = (ternaryopcache_entry_t*) malloc(size * sizeof(ternaryopcache_entry_t));
     if (binaryopcache.data == NULL) {
         perror("Could not allocate ternaryopcache op cache :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
     ternaryopcache.mask = size - 1;
     for (uint32_t i = 0; i < size; i++) {

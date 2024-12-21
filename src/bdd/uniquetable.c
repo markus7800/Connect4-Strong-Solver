@@ -11,7 +11,7 @@ void init_set(uniquetable_t* set, uint64_t log2size) {
     set->entries = (uniquetable_entry_t*) malloc(size * sizeof(uniquetable_entry_t));
     if (set->buckets == NULL || set->entries == NULL) {
         perror("Could not allocate set :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
     // we do not want to allocate (nodeindex_t) -1 == MAX(uint32_t) in case of log2size = 32
     // also (bucket_t) -1 == MAX(uint32_t) is special value declaring end of linked lists
@@ -48,7 +48,7 @@ nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t targ
     uniquetable.count++;
     if (uniquetable.count == uniquetable.size) {
         perror("Unique table is too small :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
 
     // consume node from memorypool
@@ -124,7 +124,7 @@ void add_nodeindex(uniquetable_t* set, nodeindex_t index) {
     set->count++;
     if (set->count == set->size) {
         perror("Set is too small :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
 
     set->entries[i].value = index;

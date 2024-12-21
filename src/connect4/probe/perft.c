@@ -59,7 +59,6 @@ int main(int argc, char const *argv[]) {
 
     bool unique = false;
     for (int i = 0; i < argc; i++) {
-        for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
             printf("pertf.out moveseq depth [-unique]\n");
             printf("  counts the number of (unique) position at given depth\n");

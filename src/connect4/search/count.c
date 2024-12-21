@@ -104,7 +104,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if WRITE_TO_FILE
     // Write header and ply 0 to file
     char filename[50];
-    sprintf(filename, "results_ply_w%"PRIu32"_h%"PRIu32".csv", width, height);
+    sprintf(filename, "results_ply_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
     FILE* f = fopen(filename, "w");
     fprintf(f, "width,height,ply,poscount,nodecount,time\n");
     if (f != NULL) {
@@ -308,9 +308,9 @@ int main(int argc, char const *argv[]) {
     }
 
     if (!ALLOW_ROW_ORDER || width >= height) {
-        printf("Column order.\n");
+        printf("Column order. (ALLOW_ROW_ORDER=%u)\n", ALLOW_ROW_ORDER);
     } else {
-        printf("Row order.\n");
+        printf("Row order. (ALLOW_ROW_ORDER=%u)\n", ALLOW_ROW_ORDER);
     }
 
     if (COMPRESSED_ENCODING) {
@@ -351,7 +351,7 @@ int main(int argc, char const *argv[]) {
 #if WRITE_TO_FILE
     // write result to file
     char filename[50];
-    sprintf(filename, "results_w%"PRIu32"_h%"PRIu32".csv", width, height);
+    sprintf(filename, "results_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
     FILE* f = fopen(filename, "w");
     fprintf(f, "width,height,count,time,GC_perc,log2_tbsize,bytes_alloc,max_fill_level,max_nodes_alloc\n");
     if (f == NULL) {

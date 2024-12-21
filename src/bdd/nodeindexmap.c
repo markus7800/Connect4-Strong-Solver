@@ -18,7 +18,7 @@ void add_key_value(nodeindexmap_t* map, nodeindex_t key, nodeindex_t value) {
     map->count++;
     if (map->count == map->size) {
         perror("Map is too small :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
 
     map->entries[i].key = key;
@@ -57,7 +57,7 @@ nodeindex_t get_value_for_key(nodeindexmap_t* set, nodeindex_t key) {
         b = entry.next;
     }
     perror("No value for key.\n");
-    assert(0);
+    exit(EXIT_FAILURE);
 }
 
 void init_map(nodeindexmap_t* map, uint64_t log2size) {
@@ -68,7 +68,7 @@ void init_map(nodeindexmap_t* map, uint64_t log2size) {
     map->entries = (nodeindexmap_entry_t*) malloc(size * sizeof(nodeindexmap_entry_t));
     if (map->buckets == NULL || map->entries == NULL) {
         perror("Could not allocate map :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     }
     map->size = size;
     map->count = 0;

@@ -34,7 +34,7 @@ Updates the `next` field to point to a new unused BDDNode.
 nodeindex_t pop_index() {
     if (memorypool.next >= memorypool.capacity) {
         perror("Ran out of nodes :(\n");
-        assert(0);
+        exit(EXIT_FAILURE);
     } else {
         nodeindex_t index = memorypool.next;
         memorypool.next = memorypool.nodes[index].next;

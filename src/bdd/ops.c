@@ -29,7 +29,7 @@ void in_op_gc(uint8_t op) {
         gc(true, true);
         if (memorypool.num_nodes == prev_num_nodes) {
             perror("Could not decrease number of nodes in op GC :(\n.");
-            assert(0);
+            exit(EXIT_FAILURE);
         }
     }
 }
