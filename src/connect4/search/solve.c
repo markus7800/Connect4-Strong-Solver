@@ -122,7 +122,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         clock_gettime(CLOCK_REALTIME, &t0);
 
         // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
-        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10) + (ply >= 25);
+        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
         if (gc_level) printf("\n");
 
         // first subtract all terminal positions and then perform image operatoin

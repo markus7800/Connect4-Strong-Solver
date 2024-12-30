@@ -7,10 +7,10 @@ import pandas as pd
 import shutil
 
 def executable_name(compressed_encoding, allow_row_order):
-    return f"build/count_{int(compressed_encoding)}_{int(allow_row_order)}.out"
+    return f"src/connect4/build/count_{int(compressed_encoding)}_{int(allow_row_order)}.out"
 
 def folder_name(compressed_encoding, allow_row_order):
-    return f"count_positions_results/compenc_{int(compressed_encoding)}_allowrow_{int(allow_row_order)}/"
+    return f"results/count_positions_results/compenc_{int(compressed_encoding)}_allowrow_{int(allow_row_order)}/"
 
 class Setup:
     def __init__(self, compressed_encoding, allow_row_order, boardsizes):
@@ -40,7 +40,7 @@ def count(args):
 
     with open(folder.joinpath(log_file_name), "w") as f:
         
-        res = subprocess.run(["../../"+executable_name(compressed_encoding, allow_row_order), str(log2_tablesize), str(width), str(height)], check=False, stdout=f, stderr=f, cwd=folder)
+        res = subprocess.run(["../../../"+executable_name(compressed_encoding, allow_row_order), str(log2_tablesize), str(width), str(height)], check=False, stdout=f, stderr=f, cwd=folder)
         
         if res.returncode != 0:
             tqdm.write(f"{prefix}: Warning: error during count of width={width} x height={height}!")
@@ -69,9 +69,9 @@ def count_all(setups, RAM, max_worker):
             "FULLBDD=0",
             "SUBTRACT_TERM=1",
             f"COMPRESSED_ENCODING={int(setup.compressed_encoding)}",
-            f"ALLOW_ROW_ORDER={int(setup.allow_row_order)}",
-        ])
-        os.rename("build/count.out", executable_name(setup.compressed_encoding, setup.allow_row_order))
+            f"ALLOW_ROW_ORDER={int(setup.allow_row_order)}"
+        ], cwd="src/connect4")
+        os.rename("src/connect4/build/count.out", executable_name(setup.compressed_encoding, setup.allow_row_order))
 
         folder = Path(folder_name(setup.compressed_encoding, setup.allow_row_order))
         folder.mkdir(parents=True, exist_ok=True)
