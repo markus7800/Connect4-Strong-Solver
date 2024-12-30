@@ -88,28 +88,11 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta
     return 0;
 }
 
-// uint64_t get_hash(uint64_t player, uint64_t mask) {
+// uint64_t hash_for_board(uint64_t player, uint64_t mask) {
 //     return hash_64(position_key(player, mask));
 // }
 
-inline void flip_board(uint64_t player, uint64_t mask, uint64_t* flipped_player, uint64_t* flipped_mask) {
-    *flipped_mask = 0;
-    *flipped_player = 0;
-    int8_t j = WIDTH-1;
-    for (uint8_t i = 0; i < WIDTH; i++) {
-        if (j >= 0) {
-            *flipped_mask |= (mask & column_mask(i)) << (j*(HEIGHT+1));
-            *flipped_player |= (player & column_mask(i)) << (j*(HEIGHT+1));
-        } else {
-            *flipped_mask |= (mask & column_mask(i)) >> (-j*(HEIGHT+1));
-            *flipped_player |= (player & column_mask(i)) >> (-j*(HEIGHT+1));
-        }
-        j -= 2;
-    }
-}
-
-
-uint64_t get_hash(uint64_t player, uint64_t mask) {
+uint64_t hash_for_board(uint64_t player, uint64_t mask) {
     if (__builtin_popcountll(mask & LEFT_BOARD_MASK) > __builtin_popcountll(mask & RIGHT_BOARD_MASK)) {
         return hash_64(position_key(player, mask));
     } else {
@@ -122,7 +105,7 @@ uint64_t get_hash(uint64_t player, uint64_t mask) {
 
 
 uint8_t get_bestmove(tt_t* tt, uint64_t player, uint64_t mask) {
-    uint64_t key = get_hash(player, mask);
+    uint64_t key = hash_for_board(player, mask);
     tt_entry_t* entry = &tt->entries[key & tt->mask];
     if (entry->key == hash_64(position_key(player, mask))) {
         return entry->move;
@@ -208,7 +191,7 @@ int8_t alphabeta(tt_t* tt, uint64_t player, uint64_t mask, int8_t alpha, int8_t 
 
     // probe transposition table
     int8_t value;
-    uint64_t hash = get_hash(player, mask);
+    uint64_t hash = hash_for_board(player, mask);
     
     bool tt_hit = false;
     int8_t tt_value = probe_tt(tt, hash, depth, alpha, beta, &tt_hit);

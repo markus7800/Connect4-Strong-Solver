@@ -12,9 +12,21 @@
 
 #include "utils.c"
 
+// inline uint64_t hash_for_board(uint64_t player, uint64_t mask) {
+//     return hash_64(position_key(player, mask));
+// }
+
 inline uint64_t hash_for_board(uint64_t player, uint64_t mask) {
-    return hash_64(position_key(player, mask));
+    if (__builtin_popcountll(mask & LEFT_BOARD_MASK) > __builtin_popcountll(mask & RIGHT_BOARD_MASK)) {
+        return hash_64(position_key(player, mask));
+    } else {
+        uint64_t flipped_player = 0;
+        uint64_t flipped_mask = 0;
+        flip_board(player, mask, &flipped_player, &flipped_mask);
+        return hash_64(position_key(flipped_player, flipped_mask));
+    }
 }
+
 
 // WDL cache is used to store the result of probing the BDDs
 typedef uint64_t wdl_cache_entry_t;
@@ -354,10 +366,20 @@ int8_t alphabeta_root(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint6
     return value;
 }
 
+int8_t rescale(int8_t ab) {
+    if (ab > 0) {
+        return MATESCORE - ab;
+    }
+    if (ab < 0) {
+        return -MATESCORE - ab;
+    }
+    return ab;
+}
+
 // iterative deepening -> we start with low depth and increase depth until we find exact "win-in-x-moves" "loss-in-x-moves" score
 // transpostion table construced at lower depths helps next depth to perform faster search
 // if rescale parameter is true then scores will be rescaled from 100-x to x -100+x to -x
-int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply, bool rescale) {
+int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         // position is draw, we don't have to to search
@@ -396,18 +418,6 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
 
         if (abs(ab) > 1) {
             // we found exact score for position -> finished search
-
-            // optionally, rescale score
-            if (rescale) {
-                // transform to mate in ...
-                if (ab > 0) {
-                    ab = MATESCORE - ab;
-                }
-                if (ab < 0) {
-                    ab = -MATESCORE - ab;
-                }
-            }
-            
             return ab;
         }
 
@@ -416,7 +426,7 @@ int8_t iterdeep(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t pl
 }
 
 // alpha beta search with maximal depth (no iterative deepening)
-int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply, bool rescale) {
+int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t verbose, uint8_t offset_ply) {
     int8_t res = probe_board_mmap(player, mask);
     if (res == 0) {
         // position is draw, we don't have to to search
@@ -431,19 +441,17 @@ int8_t fulldepth_ab(tt_t* tt, wdl_cache_t* wdl_cache, openingbook_t* ob, uint64_
     } else {
         ab = alphabeta(tt, wdl_cache, ob, player, mask, -MATESCORE, -1, offset_ply, WIDTH*HEIGHT - HORIZON_DEPTH, res);
     }
-    if (rescale) {
-        // transform to mate in ...
-        if (ab > 0) {
-            ab = MATESCORE - ab;
-        }
-        if (ab < 0) {
-            ab = -MATESCORE - ab;
-        }
-    }
     return ab;
 }
 
 uint8_t get_bestmove(tt_t* tt, uint64_t player, uint64_t mask) {
     uint64_t hash = hash_for_board(player, mask);
-    return probe_tt_move(tt, hash);
+    tt_entry_t entry = get_tt_entry(tt, hash);
+    uint8_t move = get_move(entry);
+    if (entry.key == hash_64(position_key(player, mask))) {
+        return move;
+    } else {
+        // have to flip move
+        return (WIDTH-1) - move;
+    }
 }

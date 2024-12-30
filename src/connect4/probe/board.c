@@ -152,6 +152,23 @@ uint64_t winning_spots(uint64_t position, uint64_t mask) {
     return r & (BOARD_MASK ^ mask);
 }
 
+
+inline void flip_board(uint64_t player, uint64_t mask, uint64_t* flipped_player, uint64_t* flipped_mask) {
+    *flipped_mask = 0;
+    *flipped_player = 0;
+    int8_t j = WIDTH-1;
+    for (uint8_t i = 0; i < WIDTH; i++) {
+        if (j >= 0) {
+            *flipped_mask |= (mask & column_mask(i)) << (j*(HEIGHT+1));
+            *flipped_player |= (player & column_mask(i)) << (j*(HEIGHT+1));
+        } else {
+            *flipped_mask |= (mask & column_mask(i)) >> (-j*(HEIGHT+1));
+            *flipped_player |= (player & column_mask(i)) >> (-j*(HEIGHT+1));
+        }
+        j -= 2;
+    }
+}
+
 void print_board(uint64_t player, uint64_t mask, int highlight_col) {
     int cnt = get_ply(player, mask);
     int to_play = cnt % 2;

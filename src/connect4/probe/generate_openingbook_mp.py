@@ -24,7 +24,7 @@ procs = []
 # start processes (calling generate_openingbook c program)
 for subgroup in range(n_workers // 4):
     proc = subprocess.Popen([
-        f"./generate_openingbook_w{width}_h{height}.out", str(folder), str(n_workers), str(subgroup)],
+        f"./build/generate_openingbook_w{width}_h{height}.out", str(folder), str(n_workers), str(subgroup)],
         )
     procs.append(proc)
 
@@ -51,6 +51,8 @@ for subgroup in range(n_workers // 4):
 results = sorted(results)
 
 # write results to final openingbook file
-with open(folder + f"/openingbook_w{width}_h{height}_d{DEPTH}.csv", "w") as f:
+file = folder + f"/openingbook_w{width}_h{height}_d{DEPTH}.csv"
+print(f"Writing combined solutions sorted to {file}.")
+with open(file, "w") as f:
     for key, score in results:
         f.write(f"{key}, {score}\n")

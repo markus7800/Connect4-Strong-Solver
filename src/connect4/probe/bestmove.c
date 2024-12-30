@@ -148,10 +148,11 @@ int main(int argc, char const *argv[]) {
 
         int8_t ab;
         if (no_iterdeep) {
-            ab = fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0, true);
+            ab = fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
         } else {
-            ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0, true);
+            ab = iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 0);
         }
+        ab = rescale(ab);
 
         if (ab > 0) {
             sprintf(desc, "win in %d plies", ab);
@@ -177,7 +178,7 @@ int main(int argc, char const *argv[]) {
     if (!no_evalmoves && !is_terminal(player, mask)) {
         printf("\n");
         bestmove = 0;
-        int8_t bestscore = 0;
+        int8_t bestscore = -MATESCORE;
 
         printf("\033[95mmove evaluation:\033[0m\n\n");
         printf(" x ... forced win in x plies,\n");
@@ -195,20 +196,19 @@ int main(int argc, char const *argv[]) {
                 play_column(&player, &mask, move);
 
                 if (no_iterdeep) {
-                    res = -fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1, true);
+                    res = -fulldepth_ab(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
                 }   else {
-                    res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1, true);
+                    res = -iterdeep(&tt, &wdl_cache, ob_ptr, player, mask, 1, 1);
                 }
-                
-                printf("%3d ", res);
-
-                undo_play_column(&player, &mask, move);
-
-                // abs because of rescale
-                if (abs(res) > abs(bestscore)) {
+                if (res > bestscore) {
                     bestscore = res;
                     bestmove = move;
                 }
+                
+                printf("%3d ", rescale(res));
+
+                undo_play_column(&player, &mask, move);
+
             } else {
                 printf("  . ");
             }
@@ -244,7 +244,7 @@ int main(int argc, char const *argv[]) {
 
     return 0;
 }
-// markus@Markuss-MacBook-Pro-14 connect4 % ./bestmove_w7_h6.out solution_w7_h6/ '' -Xob
+// markus@fedora:~/Documents/Connect4-PositionCount/src/connect4$ ./build/bestmove_w7_h6.out ../../results/solve_w7_h6_results/solution_w7_h6/ ""
 // Input moveseq: 
 // Connect4 width=7 x height=6
 //  . . . . . . .
@@ -261,7 +261,7 @@ int main(int argc, char const *argv[]) {
 // Position is 1 (win in 41 plies)
 // Best move is 3
 
-// n_nodes = 403077852 in 110.137s (3659.787 knps)
+// n_nodes = 226040181 in 9.187s (24603.135 knps)
 
 // move evaluation:
 
@@ -272,7 +272,7 @@ int main(int argc, char const *argv[]) {
 
 //   0   1   2   3   4   5   6 
 // -40 -42   0  41   0 -42 -40 
-// n_nodes = 15573471395 in 561.586s (27731.251 knps)
+// n_nodes = 8422880836 in 69.865s (120558.715 knps)
 
 // best move: 3 with win in 41 plies
 
@@ -284,6 +284,3 @@ int main(int argc, char const *argv[]) {
 //  . . . . . . .  side to move: o
 //  . . . x . . .  is terminal: 0
 //  0 1 2 3 4 5 6
-
-// n_nodes = 403077852 in 122.111s (3300.916 knps) -Xob 
-// n_nodes = 245033064 in 114.560s (2138.911 knps) -Xob -Xiterdeep

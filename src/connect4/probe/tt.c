@@ -144,7 +144,7 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, uint8_t ply, uint8_t hori
     return 0;
 }
 
-uint8_t probe_tt_move(tt_t* tt, uint64_t key) {
+tt_entry_t get_tt_entry(tt_t* tt, uint64_t key) {
     tt_entry_t entry;
     uint32_t entry_checksum;
     bool found = false;
@@ -167,12 +167,17 @@ uint8_t probe_tt_move(tt_t* tt, uint64_t key) {
 #endif
     assert(found);
 
-    uint8_t entry_move = (uint8_t) (entry.data >> 16);
     uint8_t entry_flag = (uint8_t) (entry.data >> 24);
     assert(entry_flag == FLAG_EXACT);
 
+    return entry;
+}
+
+uint8_t get_move(tt_entry_t entry) {
+    uint8_t entry_move = (uint8_t) (entry.data >> 16);
     return entry_move;
 }
+
 
 void store_entry(tt_entry_t* entry, uint64_t key, uint8_t depth, int8_t value, uint8_t move, uint8_t flag) {
     // printf("Store %d at key=%"PRIu64"\n", value, key);
