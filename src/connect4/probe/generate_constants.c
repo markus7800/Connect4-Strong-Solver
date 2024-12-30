@@ -15,7 +15,9 @@ int main(int argc, char const *argv[]) {
 
     for (uint8_t WIDTH = 1; WIDTH <= 13; WIDTH++) {
         for (uint8_t HEIGHT = 1; HEIGHT <= 13; HEIGHT++) {
-            if (WIDTH + HEIGHT > 14) continue;
+            // if (WIDTH + HEIGHT > 14) continue;
+            if (WIDTH * (HEIGHT+1) > 64) continue;
+            if (WIDTH > 10) continue;
             printf("#if (WIDTH == %u && HEIGHT == %u)\n", WIDTH, HEIGHT);
 
             uint64_t board_mask = 0;

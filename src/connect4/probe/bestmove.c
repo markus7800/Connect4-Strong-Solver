@@ -177,7 +177,7 @@ int main(int argc, char const *argv[]) {
     if (!no_evalmoves && !is_terminal(player, mask)) {
         printf("\n");
         bestmove = 0;
-        int8_t bestscore = -MATESCORE;
+        int8_t bestscore = 0;
 
         printf("\033[95mmove evaluation:\033[0m\n\n");
         printf(" x ... forced win in x plies,\n");
@@ -204,7 +204,8 @@ int main(int argc, char const *argv[]) {
 
                 undo_play_column(&player, &mask, move);
 
-                if (res > bestscore) {
+                // abs because of rescale
+                if (abs(res) > abs(bestscore)) {
                     bestscore = res;
                     bestmove = move;
                 }

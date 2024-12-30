@@ -11,10 +11,6 @@
 
 #include "ops.c"
 
-#ifndef FULLBDD
-#define FULLBDD 1
-#endif
-
 #ifndef WRITE_TO_FILE
 #define WRITE_TO_FILE 1
 #endif
@@ -199,7 +195,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     variable_set_t* vars_board;
 
 #if WRITE_TO_FILE
-    sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32".csv", width, height);
+    sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
     FILE* f = fopen(filename, "w");
     fprintf(f, "width,height,ply,wincount,drawcount,lostcount,termcount,time\n");
 #endif

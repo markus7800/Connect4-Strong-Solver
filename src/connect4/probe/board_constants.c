@@ -175,6 +175,13 @@
     #define BOTTOM_MASK 0x2001
     #define STATIC_MOVE_ORDER {1, 0}
 #endif
+#if (WIDTH == 2 && HEIGHT == 13)
+    #define BOARD_MASK 0x7ffdfff
+    #define LEFT_BOARD_MASK 0x1fff
+    #define RIGHT_BOARD_MASK 0x7ffc000
+    #define BOTTOM_MASK 0x4001
+    #define STATIC_MOVE_ORDER {1, 0}
+#endif
 #if (WIDTH == 3 && HEIGHT == 1)
     #define BOARD_MASK 0x15
     #define LEFT_BOARD_MASK 0x5
@@ -252,6 +259,20 @@
     #define BOTTOM_MASK 0x1001001
     #define STATIC_MOVE_ORDER {1, 0, 2}
 #endif
+#if (WIDTH == 3 && HEIGHT == 12)
+    #define BOARD_MASK 0x3ffdffefff
+    #define LEFT_BOARD_MASK 0x1ffefff
+    #define RIGHT_BOARD_MASK 0x3ffdffe000
+    #define BOTTOM_MASK 0x4002001
+    #define STATIC_MOVE_ORDER {1, 0, 2}
+#endif
+#if (WIDTH == 3 && HEIGHT == 13)
+    #define BOARD_MASK 0x1fff7ffdfff
+    #define LEFT_BOARD_MASK 0x7ffdfff
+    #define RIGHT_BOARD_MASK 0x1fff7ffc000
+    #define BOTTOM_MASK 0x10004001
+    #define STATIC_MOVE_ORDER {1, 0, 2}
+#endif
 #if (WIDTH == 4 && HEIGHT == 1)
     #define BOARD_MASK 0x55
     #define LEFT_BOARD_MASK 0x5
@@ -322,6 +343,27 @@
     #define BOTTOM_MASK 0x200400801
     #define STATIC_MOVE_ORDER {2, 1, 3, 0}
 #endif
+#if (WIDTH == 4 && HEIGHT == 11)
+    #define BOARD_MASK 0x7ff7ff7ff7ff
+    #define LEFT_BOARD_MASK 0x7ff7ff
+    #define RIGHT_BOARD_MASK 0x7ff7ff000000
+    #define BOTTOM_MASK 0x1001001001
+    #define STATIC_MOVE_ORDER {2, 1, 3, 0}
+#endif
+#if (WIDTH == 4 && HEIGHT == 12)
+    #define BOARD_MASK 0x7ffbffdffefff
+    #define LEFT_BOARD_MASK 0x1ffefff
+    #define RIGHT_BOARD_MASK 0x7ffbffc000000
+    #define BOTTOM_MASK 0x8004002001
+    #define STATIC_MOVE_ORDER {2, 1, 3, 0}
+#endif
+#if (WIDTH == 4 && HEIGHT == 13)
+    #define BOARD_MASK 0x7ffdfff7ffdfff
+    #define LEFT_BOARD_MASK 0x7ffdfff
+    #define RIGHT_BOARD_MASK 0x7ffdfff0000000
+    #define BOTTOM_MASK 0x40010004001
+    #define STATIC_MOVE_ORDER {2, 1, 3, 0}
+#endif
 #if (WIDTH == 5 && HEIGHT == 1)
     #define BOARD_MASK 0x155
     #define LEFT_BOARD_MASK 0x15
@@ -385,6 +427,20 @@
     #define BOTTOM_MASK 0x10040100401
     #define STATIC_MOVE_ORDER {2, 1, 3, 0, 4}
 #endif
+#if (WIDTH == 5 && HEIGHT == 10)
+    #define BOARD_MASK 0x3ff7feffdffbff
+    #define LEFT_BOARD_MASK 0xffdffbff
+    #define RIGHT_BOARD_MASK 0x3ff7feffc00000
+    #define BOTTOM_MASK 0x100200400801
+    #define STATIC_MOVE_ORDER {2, 1, 3, 0, 4}
+#endif
+#if (WIDTH == 5 && HEIGHT == 11)
+    #define BOARD_MASK 0x7ff7ff7ff7ff7ff
+    #define LEFT_BOARD_MASK 0x7ff7ff7ff
+    #define RIGHT_BOARD_MASK 0x7ff7ff7ff000000
+    #define BOTTOM_MASK 0x1001001001001
+    #define STATIC_MOVE_ORDER {2, 1, 3, 0, 4}
+#endif
 #if (WIDTH == 6 && HEIGHT == 1)
     #define BOARD_MASK 0x555
     #define LEFT_BOARD_MASK 0x15
@@ -441,6 +497,13 @@
     #define BOTTOM_MASK 0x201008040201
     #define STATIC_MOVE_ORDER {3, 2, 4, 1, 5, 0}
 #endif
+#if (WIDTH == 6 && HEIGHT == 9)
+    #define BOARD_MASK 0x7fdff7fdff7fdff
+    #define LEFT_BOARD_MASK 0x1ff7fdff
+    #define RIGHT_BOARD_MASK 0x7fdff7fc0000000
+    #define BOTTOM_MASK 0x4010040100401
+    #define STATIC_MOVE_ORDER {3, 2, 4, 1, 5, 0}
+#endif
 #if (WIDTH == 7 && HEIGHT == 1)
     #define BOARD_MASK 0x1555
     #define LEFT_BOARD_MASK 0x55
@@ -490,6 +553,13 @@
     #define BOTTOM_MASK 0x1010101010101
     #define STATIC_MOVE_ORDER {3, 2, 4, 1, 5, 0, 6}
 #endif
+#if (WIDTH == 7 && HEIGHT == 8)
+    #define BOARD_MASK 0x3fdfeff7fbfdfeff
+    #define LEFT_BOARD_MASK 0x7fbfdfeff
+    #define RIGHT_BOARD_MASK 0x3fdfeff7f8000000
+    #define BOTTOM_MASK 0x40201008040201
+    #define STATIC_MOVE_ORDER {3, 2, 4, 1, 5, 0, 6}
+#endif
 #if (WIDTH == 8 && HEIGHT == 1)
     #define BOARD_MASK 0x5555
     #define LEFT_BOARD_MASK 0x55
@@ -532,6 +602,13 @@
     #define BOTTOM_MASK 0x2040810204081
     #define STATIC_MOVE_ORDER {4, 3, 5, 2, 6, 1, 7, 0}
 #endif
+#if (WIDTH == 8 && HEIGHT == 7)
+    #define BOARD_MASK 0x7f7f7f7f7f7f7f7f
+    #define LEFT_BOARD_MASK 0x7f7f7f7f
+    #define RIGHT_BOARD_MASK 0x7f7f7f7f00000000
+    #define BOTTOM_MASK 0x101010101010101
+    #define STATIC_MOVE_ORDER {4, 3, 5, 2, 6, 1, 7, 0}
+#endif
 #if (WIDTH == 9 && HEIGHT == 1)
     #define BOARD_MASK 0x15555
     #define LEFT_BOARD_MASK 0x155
@@ -567,6 +644,13 @@
     #define BOTTOM_MASK 0x1041041041041
     #define STATIC_MOVE_ORDER {4, 3, 5, 2, 6, 1, 7, 0, 8}
 #endif
+#if (WIDTH == 9 && HEIGHT == 6)
+    #define BOARD_MASK 0x3f7efdfbf7efdfbf
+    #define LEFT_BOARD_MASK 0x3f7efdfbf
+    #define RIGHT_BOARD_MASK 0x3f7efdfbf0000000
+    #define BOTTOM_MASK 0x102040810204081
+    #define STATIC_MOVE_ORDER {4, 3, 5, 2, 6, 1, 7, 0, 8}
+#endif
 #if (WIDTH == 10 && HEIGHT == 1)
     #define BOARD_MASK 0x55555
     #define LEFT_BOARD_MASK 0x155
@@ -595,45 +679,10 @@
     #define BOTTOM_MASK 0x210842108421
     #define STATIC_MOVE_ORDER {5, 4, 6, 3, 7, 2, 8, 1, 9, 0}
 #endif
-#if (WIDTH == 11 && HEIGHT == 1)
-    #define BOARD_MASK 0x155555
-    #define LEFT_BOARD_MASK 0x555
-    #define RIGHT_BOARD_MASK 0x155400
-    #define BOTTOM_MASK 0x155555
-    #define STATIC_MOVE_ORDER {5, 4, 6, 3, 7, 2, 8, 1, 9, 0, 10}
-#endif
-#if (WIDTH == 11 && HEIGHT == 2)
-    #define BOARD_MASK 0xdb6db6db
-    #define LEFT_BOARD_MASK 0x1b6db
-    #define RIGHT_BOARD_MASK 0xdb6d8000
-    #define BOTTOM_MASK 0x49249249
-    #define STATIC_MOVE_ORDER {5, 4, 6, 3, 7, 2, 8, 1, 9, 0, 10}
-#endif
-#if (WIDTH == 11 && HEIGHT == 3)
-    #define BOARD_MASK 0x77777777777
-    #define LEFT_BOARD_MASK 0x777777
-    #define RIGHT_BOARD_MASK 0x77777700000
-    #define BOTTOM_MASK 0x11111111111
-    #define STATIC_MOVE_ORDER {5, 4, 6, 3, 7, 2, 8, 1, 9, 0, 10}
-#endif
-#if (WIDTH == 12 && HEIGHT == 1)
-    #define BOARD_MASK 0x555555
-    #define LEFT_BOARD_MASK 0x555
-    #define RIGHT_BOARD_MASK 0x555000
-    #define BOTTOM_MASK 0x555555
-    #define STATIC_MOVE_ORDER {6, 5, 7, 4, 8, 3, 9, 2, 10, 1, 11, 0}
-#endif
-#if (WIDTH == 12 && HEIGHT == 2)
-    #define BOARD_MASK 0x6db6db6db
-    #define LEFT_BOARD_MASK 0x1b6db
-    #define RIGHT_BOARD_MASK 0x6db6c0000
-    #define BOTTOM_MASK 0x249249249
-    #define STATIC_MOVE_ORDER {6, 5, 7, 4, 8, 3, 9, 2, 10, 1, 11, 0}
-#endif
-#if (WIDTH == 13 && HEIGHT == 1)
-    #define BOARD_MASK 0x1555555
-    #define LEFT_BOARD_MASK 0x1555
-    #define RIGHT_BOARD_MASK 0x1555000
-    #define BOTTOM_MASK 0x1555555
-    #define STATIC_MOVE_ORDER {6, 5, 7, 4, 8, 3, 9, 2, 10, 1, 11, 0, 12}
+#if (WIDTH == 10 && HEIGHT == 5)
+    #define BOARD_MASK 0x7df7df7df7df7df
+    #define LEFT_BOARD_MASK 0x1f7df7df
+    #define RIGHT_BOARD_MASK 0x7df7df7c0000000
+    #define BOTTOM_MASK 0x41041041041041
+    #define STATIC_MOVE_ORDER {5, 4, 6, 3, 7, 2, 8, 1, 9, 0}
 #endif
