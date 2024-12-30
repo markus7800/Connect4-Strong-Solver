@@ -10,7 +10,7 @@ def executable_name(compressed_encoding, allow_row_order):
     return f"build/count_{int(compressed_encoding)}_{int(allow_row_order)}.out"
 
 def folder_name(compressed_encoding, allow_row_order):
-    return f"count_results/compenc_{int(compressed_encoding)}_allowrow_{int(allow_row_order)}/"
+    return f"count_positions_results/compenc_{int(compressed_encoding)}_allowrow_{int(allow_row_order)}/"
 
 class Setup:
     def __init__(self, compressed_encoding, allow_row_order, boardsizes):
@@ -84,7 +84,10 @@ def count_all(setups, RAM, max_worker):
         for width in range(1,14):
             for height in range(1,14):
                 if height + width <= 12:
-                    setup_payloads.append([width,height,26])
+                    if (height,width) == (6,6):
+                        setup_payloads.append([width,height,27])
+                    else:
+                        setup_payloads.append([width,height,26])
                 elif height <= 4 or width <= 4:
                     if (width,height) == (13,4):
                         if boardsizes >= 1: setup_payloads.append([width, height, 29])
@@ -105,8 +108,10 @@ def count_all(setups, RAM, max_worker):
 
         payloads += [[setup.compressed_encoding, setup.allow_row_order] + payload for payload in setup_payloads]
 
-    # TODO: check for duplicates
     payloads.sort(key = lambda t: t[2] * t[3], reverse=True)
+    payloads_df = pd.DataFrame(payloads, columns=["compressed_encoding", "allow_row_order", "width", "height", "log2_tablesize"])
+    # check for duplicates
+    assert not payloads_df.duplicated(subset=["compressed_encoding", "allow_row_order", "width", "height"]).any()
 
     # work on payloads
     for log2_tablesize in range(24,32+1):
@@ -121,7 +126,7 @@ def count_all(setups, RAM, max_worker):
         RAM_per_worker = 2 ** (log2_tablesize - 24)
         if RAM_per_worker > RAM:
             print(f"Not enough RAM for {log2_tablesize} :/")
-            return
+            continue
         
         if RAM % RAM_per_worker != 0:
             print(f"RAM {RAM} is not multiple of RAM_per_worker {RAM_per_worker}.")
@@ -179,13 +184,12 @@ if __name__ == "__main__":
     RAM = args.RAM
     max_worker = args.max_worker
 
-    boardsizes=2
     count_all(
         [
-            Setup(compressed_encoding=False, allow_row_order=True, boardsizes=boardsizes),
-            Setup(compressed_encoding=True, allow_row_order=False, boardsizes=boardsizes),
-            # Setup(compressed_encoding=True, allow_row_order=True, boardsizes=boardsizes),
-            # Setup(compressed_encoding=False, allow_row_order=False, boardsizes=boardsizes)
+            Setup(compressed_encoding=False, allow_row_order=True, boardsizes=2),
+            Setup(compressed_encoding=True, allow_row_order=False, boardsizes=2),
+            Setup(compressed_encoding=True, allow_row_order=True, boardsizes=2),
+            Setup(compressed_encoding=False, allow_row_order=False, boardsizes=1)
         ],
         RAM=RAM,
         max_worker=max_worker
