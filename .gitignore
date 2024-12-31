@@ -6,3 +6,4 @@ lambda_dump
 *.DS_Store
 *.redundant
 results/
+*.7z

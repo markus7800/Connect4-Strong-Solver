@@ -15,6 +15,18 @@ char* (*mmaps)[3];
 off_t (*st_sizes)[3];
 bool (*in_memory)[3];
 
+void init_mmaps(uint32_t width, uint32_t height) {
+    mmaps = malloc((width*height+1) * sizeof(*mmaps));
+    st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
+    in_memory = malloc((width*height+1) * sizeof(*in_memory));
+    assert(mmaps != NULL);
+    for (int ply = 0; ply <= width*height; ply++) {
+        for (int i = 0; i < 3; i++) {
+            mmaps[ply][i] = NULL;
+        }
+    }
+}
+
 void bin_filename(char filename[], uint32_t width, uint32_t height, int ply, int i, char* suffix) {
     // COMPRESSED_ENCODING = 1, ALLOW_ROW_ORDER = 0
     sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.10.bin", width, height, ply, suffix);
@@ -31,8 +43,10 @@ void _make_mmap(uint32_t width, uint32_t height, int ply, int i, char* suffix) {
 
     int fd = open(filename, O_RDONLY);
     if (fd == -1) {
-        mmaps[ply][i] = NULL;
-        return;
+        // mmaps[ply][i] = NULL;
+        // return;
+        printf("Could not open file %s.", filename);
+        exit(EXIT_FAILURE);
     }
     assert(mmaps[ply][i] == NULL);
 
@@ -79,8 +93,10 @@ void _read_in_memory(uint32_t width, uint32_t height, int ply, int i, char* suff
 
     FILE* file = fopen(filename, "rb");
     if (file == NULL) {
-        mmaps[ply][i] = NULL;
-        return;
+        // mmaps[ply][i] = NULL;
+        // return;
+        printf("Could not open file %s.", filename);
+        exit(EXIT_FAILURE);
     }
     assert(mmaps[ply][i] == NULL);
 
@@ -101,12 +117,6 @@ void _read_in_memory(uint32_t width, uint32_t height, int ply, int i, char* suff
     fclose(file);
 }
 
-void init_mmaps(uint32_t width, uint32_t height) {
-    mmaps = malloc((width*height+1) * sizeof(*mmaps));
-    st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
-    in_memory = malloc((width*height+1) * sizeof(*in_memory));
-    assert(mmaps != NULL);
-}
 
 void make_mmaps(uint32_t width, uint32_t height) {
     init_mmaps(width, height);
