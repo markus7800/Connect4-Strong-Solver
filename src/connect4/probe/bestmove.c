@@ -29,6 +29,7 @@ int main(int argc, char const *argv[]) {
     bool no_iterdeep = false;
     bool no_evalmoves = false;
     bool no_mmap = false;
+    bool no_mmap_lost = false;
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
             printf("bestmove.out folder moveseq [-Xob] [-Xiterdeep] [-Xevalmoves] [-Xmmap]\n");
@@ -38,7 +39,8 @@ int main(int argc, char const *argv[]) {
             printf("  -Xob        ... disables opening book. optional.\n");
             printf("  -Xiterdeep  ... disables iterative deepening and does alpha-beta search with maximal depth instead. optional.\n");
             printf("  -Xevalmoves ... disables the evaluation of each move. only evaluations root position. optional.\n");
-            printf("  -Xmmap      ... disables mmap (strong solution will be read into memory instead. large RAM needed). optional.\n");
+            printf("  -Xmmap      ... disables mmap (strong solution will be read into memory instead. large RAM needed, but no mmap functionality needed). optional.\n");
+            printf("  -Xmmaplost  ... disables mmap for \"is-lost\" queries (*lost.10.bin will be read into memory instead. large RAM needed, but may speed-up search). optional.\n");
             return 0;
         }
         if (strcmp(argv[i], "-Xob") == 0) {
@@ -52,6 +54,9 @@ int main(int argc, char const *argv[]) {
         }
         if (strcmp(argv[i], "-Xmmap") == 0) {
             no_mmap = true;
+        }
+        if (strcmp(argv[i], "-Xmmaplost") == 0) {
+            no_mmap_lost = true;
         }
     }
 
@@ -87,8 +92,11 @@ int main(int argc, char const *argv[]) {
     
     // mmap or read in strong solution
     if (no_mmap) {
-        printf("WARNING: reading entire folder %s into memory\n",  folder);
+        printf("WARNING: reading *_win.10.bin and *_lost.10.bin of folder %s into memory\n",  folder);
         make_mmaps_read_in_memory(WIDTH, HEIGHT);
+    } else if (no_mmap_lost) {
+        printf("WARNING: reading *_lost.10.bin of folder %s into memory\n",  folder);
+        make_mmaps_read_lost_in_memory(WIDTH, HEIGHT);
     } else {
         make_mmaps(WIDTH, HEIGHT);
     }

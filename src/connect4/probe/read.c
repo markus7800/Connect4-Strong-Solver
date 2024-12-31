@@ -101,6 +101,19 @@ void _read_in_memory(uint32_t width, uint32_t height, int ply, int i, char* suff
     fclose(file);
 }
 
+void init_mmaps(uint32_t width, uint32_t height) {
+    mmaps = malloc((width*height+1) * sizeof(*mmaps));
+    st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
+    in_memory = malloc((width*height+1) * sizeof(*in_memory));
+    assert(mmaps != NULL);
+}
+
+void make_mmaps(uint32_t width, uint32_t height) {
+    init_mmaps(width, height);
+    for (int ply = 0; ply <= width*height; ply++) {
+        make_mmap(width, height, ply);
+    }       
+}
 
 void read_in_memory(uint32_t width, uint32_t height, int ply) {
 
@@ -120,27 +133,39 @@ void read_in_memory(uint32_t width, uint32_t height, int ply) {
     }
 }
 
-void make_mmaps(uint32_t width, uint32_t height) {
-    mmaps = malloc((width*height+1) * sizeof(*mmaps));
-    st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
-    in_memory = malloc((width*height+1) * sizeof(*in_memory));
-    assert(mmaps != NULL);
-
-    for (int ply = 0; ply <= width*height; ply++) {
-        make_mmap(width, height, ply);
-    }       
-}
 
 void make_mmaps_read_in_memory(uint32_t width, uint32_t height) {
-    mmaps = malloc((width*height+1) * sizeof(*mmaps));
-    st_sizes = malloc((width*height+1) * sizeof(*st_sizes));
-    in_memory = malloc((width*height+1) * sizeof(*in_memory));
-    assert(mmaps != NULL);
-
+    init_mmaps(width, height);
     for (int ply = 0; ply <= width*height; ply++) {
         read_in_memory(width, height, ply);
     }
 }
+
+void read_lost_in_memory(uint32_t width, uint32_t height, int ply) {
+    char* suffix;
+
+    for (int i = 0; i < 3; i++) {
+        if (i==0) {
+            suffix = "lost";
+            _read_in_memory(width, height, ply, i, suffix);
+        } else if (i==1) {
+            suffix = "draw";
+            continue;
+        } else {
+            suffix = "win";
+            _make_mmap(width, height, ply, i, suffix);
+        }
+    }
+}
+
+
+void make_mmaps_read_lost_in_memory(uint32_t width, uint32_t height) {
+    init_mmaps(width, height);
+    for (int ply = 0; ply <= width*height; ply++) {
+        read_lost_in_memory(width, height, ply);
+    }
+}
+
 
 void free_mmap(uint32_t width, uint32_t height, int ply) {
     for (int i = 0; i < 3; i++) {

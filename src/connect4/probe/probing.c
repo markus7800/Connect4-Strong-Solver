@@ -118,7 +118,7 @@ bool _probe_board_mmap_is_(uint64_t player, uint64_t mask, int i) {
 
     char* map = mmaps[ply][i];
     if (map == NULL) {
-        perror("Could not read map :()");
+        perror("Could not read map :(");
         exit(EXIT_FAILURE);
     }
     
