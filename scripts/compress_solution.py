@@ -4,24 +4,27 @@ import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("WIDTH", nargs='?', type=int, default=7)
-    parser.add_argument("HEIGHT", nargs='?', type=int, default=6)
+    parser.add_argument("WIDTH", type=int)
+    parser.add_argument("HEIGHT", type=int)
+    parser.add_argument("COMPRESSED_ENCODING", nargs='?', type=bool, default=True)
+    parser.add_argument("ALLOW_ROW_ORDER", nargs='?', type=bool, default=True)
+    args = parser.parse_args()
     args = parser.parse_args()
 
     WIDTH = args.WIDTH
     HEIGHT = args.HEIGHT
     print(f"{WIDTH=} {HEIGHT=}")
 
-    folder = f"results/solve_w{WIDTH}_h{HEIGHT}_results/"
+    folder = f"results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_allowrow_{ALLOW_ROW_ORDER}"
 
     archive_name = f"strong_solution_w{WIDTH}_h{HEIGHT}_archive.7z"
 
     subprocess.run([
         "7za", "a", "-t7z", "-mx9", archive_name, "-r",
-        f"{folder}*_lost.10.bin",
-        f"{folder}*_win.10.bin",
-        f"{folder}*.csv",
-        f"{folder}*.txt",
+        f"{folder}/*_lost.10.bin",
+        f"{folder}/*_win.10.bin",
+        f"{folder}/*.csv",
+        f"{folder}/*.txt",
     ])
 
 
@@ -30,7 +33,7 @@ if __name__ == "__main__":
     subprocess.run(["chmod", "+x", "compile.sh"])
 
     with open("wdl.sh", "w") as f:
-        f.write(f"#!/bin/bash\n./wdl_w{WIDTH}_h{HEIGHT}.out {folder}solution_w{WIDTH}_h{HEIGHT} \"$1\"")
+        f.write(f"#!/bin/bash\n./wdl_w{WIDTH}_h{HEIGHT}.out {folder}/solution_w{WIDTH}_h{HEIGHT} \"$1\"")
     subprocess.run(["chmod", "+x", "wdl.sh"])
 
     with open("readme.md", "w") as f:

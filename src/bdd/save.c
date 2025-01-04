@@ -18,7 +18,7 @@ uint64_t _collect_nodes_into_map(nodeindex_t ix, nodeindexmap_t* map) {
     }
 }
 
-void _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t* map, variable_t varmap[256]) {
+uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t* map, variable_t varmap[256]) {
     FILE* f = fopen(filename, "wb"); // write binary file
     if (f == NULL) {
         exit(EXIT_FAILURE);
@@ -55,13 +55,14 @@ void _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t*
     }
     fclose(f);
     printf("  Wrote %"PRIu64" nodes to file %s.\n", map->count, filename);
+    return map->count;
 }
-void _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
+uint64_t _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
     variable_t varmap[256];
     for (size_t v = 0; v <= 255; v++) {
         varmap[v] = v;
     }
-    _safe_to_file_with_varmap(root, filename, map, varmap);
+    return _safe_to_file_with_varmap(root, filename, map, varmap);
 }
 
 

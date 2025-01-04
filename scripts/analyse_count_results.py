@@ -50,10 +50,18 @@ if __name__ == "__main__":
     parser.add_argument("-pivot", help="dimension of pivot table (count | time | GC_perc | bytes_alloc | log2_tbsize | max_nodes_alloc | max_fill_level)", default="count")
     parser.add_argument("--list", action="store_true", help="print list of all results")
     parser.add_argument("-comp", help="folder of results to compare to")
+    parser.add_argument("--latex", action="store_true", help="print tables in latex instead of markdown")
+    parser.add_argument("-splitcolumn", help="column to split up the pivot table")
 
     args = parser.parse_args()
 
     results = read_results(args.folder)
+
+    def print_df(df):
+        if args.latex:
+            print(df.to_latex(index=True))
+        else:
+            print(df.to_markdown(index=True, stralign="right"))
 
     name, formatter = formatters[args.pivot]
     if args.comp is not None:
@@ -72,7 +80,7 @@ if __name__ == "__main__":
         print(args.comp)
         p_formatted = format_pivot_table(p2, formatter)
         p_formatted.index.name = "height\\width"
-        print(p_formatted.to_markdown(index=True, stralign="right"))
+        print_df(p_formatted)
         print()
 
         # less is better for every dimension
@@ -84,19 +92,30 @@ if __name__ == "__main__":
 
         print(args.folder)
         p_formatted.index.name = "height\\width"
-        print(p_formatted.to_markdown(index=True, stralign="right"))
+        print_df(p_formatted)
 
     else:
         print("Pivot table for", name)
-        p = pivot_table(results, args.pivot)
+        if args.splitcolumn:
+            p = pivot_table(results[results["width"] <= int(args.splitcolumn)], args.pivot)
+            p = format_pivot_table(p, formatter)
+            p.index.name = "height\\width"
+            print_df(p)
 
-        p = format_pivot_table(p, formatter)
-        p.index.name = "height\\width"
-        print(p.to_markdown(index=True, stralign="right"))
+            p = pivot_table(results[results["width"] > int(args.splitcolumn)], args.pivot)
+            p = format_pivot_table(p, formatter)
+            p.index.name = "height\\width"
+            print_df(p)
+            
+        else:
+            p = pivot_table(results, args.pivot)
+            p = format_pivot_table(p, formatter)
+            p.index.name = "height\\width"
+            print_df(p)
 
     if args.list:
         pretty_results = list_table(results)
-        print(pretty_results.to_markdown(index=False, stralign="right"))
+        print_df(pretty_results)
 
 
 

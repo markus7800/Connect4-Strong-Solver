@@ -115,6 +115,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     keepalive_ix(current);
     bdd_per_ply[0] = current;
 
+    uint64_t* bddnodecount_per_ply = (uint64_t*) malloc((width*height+1)*sizeof(uint64_t));
+    bddnodecount_per_ply[0] = 1;
 
     int gc_level;
     for (int ply = 1; ply <= width*height; ply++) {
@@ -156,7 +158,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // count number of nodes in current BDD
         reset_map(&map);
-        bdd_nodecount = _collect_nodes_into_map(current, &map);;
+        bdd_nodecount = _collect_nodes_into_map(current, &map);
+        bddnodecount_per_ply[ply] = bdd_nodecount;
 
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
@@ -189,6 +192,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
 
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
+    uint64_t win_node_cnt, draw_node_cnt, lost_node_cnt;
 
     int board, player;
     nodeindex_t trans, win_pre_img, draw_pre_image;
@@ -197,7 +201,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if WRITE_TO_FILE
     sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
     FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,ply,wincount,drawcount,lostcount,termcount,time\n");
+    fprintf(f, "width,height,ply,win_count,draw_count,lost_count,term_count,total_count,win_nodecount,draw_nodecount,lost_nodecount,total_nodecount,time\n");
 #endif
 
 
@@ -253,7 +257,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_win.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
-        _safe_to_file_with_varmap(win, filename, &map, board_varmap);
+        win_node_cnt = _safe_to_file_with_varmap(win, filename, &map, board_varmap);
+#else
+        reset_map(&map);
+        win_node_cnt = _collect_nodes_into_map(win, &map);
 #endif
 
         if (gc_level) {
@@ -287,7 +294,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
-        _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
+        draw_node_cnt = _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
+#else
+        reset_map(&map);
+        draw_node_cnt = _collect_nodes_into_map(draw, &map);
 #endif
 
         if (gc_level) {
@@ -302,7 +312,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
-        _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
+        lost_node_cnt = _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
+#else
+        reset_map(&map);
+        lost_node_cnt = _collect_nodes_into_map(lost, &map);
 #endif
 
         // store the results of current ply for next ply
@@ -325,8 +338,14 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         assert((win_cnt + draw_cnt + lost_cnt) == cnt);
 
 #if WRITE_TO_FILE
+
+
         if (f != NULL) {
-            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %.3f\n", width, height, ply, win_cnt, draw_cnt, lost_cnt, term_cnt, t);
+            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %.3f\n",
+                width, height, ply,
+                win_cnt, draw_cnt, lost_cnt, term_cnt, win_cnt + draw_cnt + lost_cnt,
+                win_node_cnt, draw_node_cnt, lost_node_cnt, bddnodecount_per_ply[ply],
+                t);
             fflush(f);
         }
 #endif
@@ -350,6 +369,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         free(X[col]);
     }
     free(X);
+
+    free(bdd_per_ply);
+    free(bddnodecount_per_ply);
 
     return total;
 }
