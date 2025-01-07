@@ -31,7 +31,7 @@ int main(int argc, char const *argv[]) {
     bool no_mmap = false;
     bool no_mmap_lost = false;
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("bestmove.out folder moveseq [-Xob] [-Xiterdeep] [-Xevalmoves] [-Xmmap]\n");
             printf("  performs alpha-beta search leveraging strong solution to compute evaluation and find best move for given position.\n");
             printf("  folder      ... relative path to folder containing strong solution (bdd_w{width}_h{height}_{ply}_{lost|draw|win}.bin files).\n");
@@ -79,7 +79,7 @@ int main(int argc, char const *argv[]) {
 
     const char *moveseq = argv[2];
 
-    printf("Input moveseq: %s\n", moveseq);
+    printf("input move sequence: %s\n", moveseq);
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');
@@ -253,7 +253,7 @@ int main(int argc, char const *argv[]) {
     return 0;
 }
 // markus@fedora:~/Documents/Connect4-PositionCount/src/connect4$ ./build/bestmove_w7_h6.out ../../results/solve_w7_h6_results/solution_w7_h6/ ""
-// Input moveseq: 
+// input move sequence: 
 // Connect4 width=7 x height=6
 //  . . . . . . .
 //  . . . . . . .

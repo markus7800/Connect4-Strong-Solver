@@ -387,7 +387,7 @@ int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("solve.out log2_tablesize width height\n");
             printf("  strongly solves connect4 with retrograde symbolic analysis.\n");
             printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");

@@ -95,7 +95,7 @@ int main(int argc, char const *argv[]) {
 
 
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("queens.out log2_tablesize N\n");
             printf("  counts the number of positions N queens can be placed on N x N chess board such that no two queens share the same row, column, or diagonal.\n");
             printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");

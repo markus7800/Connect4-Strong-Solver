@@ -45,8 +45,12 @@ u_int64_t column_mask(uint8_t col) {
 }
 
 // returns 1 if i-th bit is set in pos
-inline int is_set(u_int64_t pos, int i) {
+inline bool is_set(u_int64_t pos, int i) {
     return (1ULL & (pos >> i));
+}
+
+inline bool is_cell_set(uint64_t pos, int col, int row) {
+    return is_set(pos, row + (HEIGHT+1)*col);
 }
 
 // returns true if there is an aligment of 4 bits horizontally, vertically or diagonally
@@ -164,7 +168,7 @@ inline uint64_t position_key(uint64_t player, uint64_t mask) {
 
 // Computes winning spots for position
 // i.e. spots that complete 4 stone alignment
-// Input moveseq: 112133263526
+// input move sequence: 112133263526
 // Connect4 width=7 x height=6          winning spots for x
 //  . . . . . . .                       0 0 0 0 0 0 0 
 //  . . . . . . .                       0 0 0 0 0 0 0

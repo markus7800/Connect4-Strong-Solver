@@ -17,7 +17,7 @@ IN_OP_GC_THRES = 0.9999
 # exclusively perform IN_OP_GC?
 IN_OP_GC_EXCL = 0
 
-# for solve and count
+# for solve, count, bestmove, wdl, openingbook 
 
 # should order by row if height > width?
 ALLOW_ROW_ORDER = 0
@@ -52,7 +52,9 @@ BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../
 
 SEARCHFLAGS = \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE) \
--DWRITE_TO_FILE=$(WRITE_TO_FILE) \
+-DWRITE_TO_FILE=$(WRITE_TO_FILE)
+
+ENCODING = \
 -DALLOW_ROW_ORDER=$(ALLOW_ROW_ORDER) \
 -DCOMPRESSED_ENCODING=$(COMPRESSED_ENCODING)
 
@@ -66,22 +68,22 @@ GCFLAGS = \
 -DIN_OP_GC_THRES=$(IN_OP_GC_THRES)
 
 count:
-	$(CC) search/count.c $(BDDFILES) $(CFLAGS) $(GCFLAGS) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -o build/count.out
+	$(CC) search/count.c $(BDDFILES) $(CFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -o build/count.out
 
 solve:
-	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(GCFLAGS) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -o build/solve.out
+	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -o build/solve.out
 
 bestmove:
-	$(CC) probe/bestmove.c $(CFLAGS) $(WIDTH_HEIGHT) -o build/bestmove_w$(WIDTH)_h$(HEIGHT).out
+	$(CC) probe/bestmove.c $(CFLAGS) $(ENCODING) $(WIDTH_HEIGHT) -o build/bestmove_w$(WIDTH)_h$(HEIGHT).out
 
 full_ab_search:
 	$(CC) probe/full_ab_search.c $(CFLAGS) $(WIDTH_HEIGHT) -DDTM=$(DTM) -o build/full_ab_search_w$(WIDTH)_h$(HEIGHT).out
 
 wdl:
-	$(CC) probe/wdl.c $(CFLAGS) $(WIDTH_HEIGHT) -o build/wdl_w$(WIDTH)_h$(HEIGHT).out
+	$(CC) probe/wdl.c $(CFLAGS) $(ENCODING) $(WIDTH_HEIGHT) -o build/wdl_w$(WIDTH)_h$(HEIGHT).out
 
 openingbook:
-	$(CC) probe/generate_openingbook.c $(CFLAGS) $(WIDTH_HEIGHT) -o build/generate_openingbook_w$(WIDTH)_h$(HEIGHT).out -lpthread
+	$(CC) probe/generate_openingbook.c $(CFLAGS) $(ENCODING) $(WIDTH_HEIGHT) -o build/generate_openingbook_w$(WIDTH)_h$(HEIGHT).out -lpthread
 
 perft:
 	$(CC) probe/perft.c $(CFLAGS) $(WIDTH_HEIGHT) -o build/perft_w$(WIDTH)_h$(HEIGHT).out 

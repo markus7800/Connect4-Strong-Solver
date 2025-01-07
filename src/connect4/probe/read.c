@@ -11,6 +11,15 @@
 
 // utility to read in BDD .bin files either as mmap or into memory
 
+
+#ifndef COMPRESSED_ENCODING
+#define COMPRESSED_ENCODING 1
+#endif
+
+#ifndef ALLOW_ROW_ORDER
+#define ALLOW_ROW_ORDER 0
+#endif
+
 char* (*mmaps)[3];
 off_t (*st_sizes)[3];
 bool (*in_memory)[3];
@@ -29,7 +38,7 @@ void init_mmaps(uint32_t width, uint32_t height) {
 
 void bin_filename(char filename[], uint32_t width, uint32_t height, int ply, int i, char* suffix) {
     // COMPRESSED_ENCODING = 1, ALLOW_ROW_ORDER = 0
-    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.10.bin", width, height, ply, suffix);
+    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.%u%u.bin", width, height, ply, suffix, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
 }
 
 void _make_mmap(uint32_t width, uint32_t height, int ply, int i, char* suffix) {

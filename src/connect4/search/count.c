@@ -271,7 +271,7 @@ int main(int argc, char const *argv[]) {
     setbuf(stdout,NULL); // do not buffer stdout
 
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("counts.out log2_tablesize width height\n");
             printf("  counts the number of positions for connect4 per ply symbolic search.\n");
             printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");

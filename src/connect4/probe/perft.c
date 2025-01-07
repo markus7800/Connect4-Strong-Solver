@@ -59,7 +59,7 @@ int main(int argc, char const *argv[]) {
 
     bool unique = false;
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("pertf.out moveseq depth [-unique]\n");
             printf("  counts the number of (unique) position at given depth\n");
             printf("  moveseq    ... sequence of moves (0 to WIDTH-1) to get position that will be evaluated.\n");
@@ -83,7 +83,7 @@ int main(int argc, char const *argv[]) {
     uint64_t player = 0;
     uint64_t mask = 0;
 
-    printf("Input moveseq: %s\n", moveseq);
+    printf("input move sequence: %s\n", moveseq);
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');

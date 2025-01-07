@@ -42,6 +42,73 @@ bool is_sat_mmap(char* map, nodeindex_t ix, uint64_t bitvector) {
     return u.low == 1;
 }
 
+uint64_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
+ #if COMPRESSED_ENCODING
+    #if (!ALLOW_ROW_ORDER || WIDTH >= HEIGHT)
+        return (position_key(player, mask) << 2) | (stm << 1);
+    #else
+        uint64_t opponent = mask ^ player;
+        uint64_t pseudo_moves = mask + BOTTOM_MASK;
+        uint8_t i = 1;
+        uint64_t bitvector = (stm << 1);
+        for (int row = 0; row < HEIGHT + 1; row++) {
+            for (int col = 0; col < WIDTH; col++) {
+                i++;
+                if (stm) {
+                    bitvector |= (is_cell_set(player, col, row) << i);
+                } else {
+                    bitvector |= (is_cell_set(opponent, col, row) << i);
+                }
+                bitvector |= (is_cell_set(pseudo_moves, col, row) << i);
+            }
+        }
+        return bitvector;
+    #endif
+#else 
+    #if (!ALLOW_ROW_ORDER || WIDTH >= HEIGHT)
+        uint64_t opponent = mask ^ player;
+        uint8_t i = 1;
+        uint64_t bitvector = (stm << 1);
+        for (int col = 0; col < WIDTH; col++) {
+            for (int row = 0; row < HEIGHT; row++) {
+                if (stm) {
+                    i++;
+                    bitvector |= ((uint64_t) is_cell_set(player, col, row)) << i;
+                    i++;
+                    bitvector |= ((uint64_t) is_cell_set(opponent, col, row)) << i;
+                } else {
+                    i++;
+                    bitvector |= ((uint64_t)is_cell_set(opponent, col, row)) << i;
+                    i++;
+                    bitvector |= ((uint64_t)is_cell_set(player, col, row)) << i;
+                }
+            }
+        }
+        return bitvector;
+    #else
+        uint64_t opponent = mask ^ player;
+        uint8_t i = 1;
+        uint64_t bitvector = (stm << 1);
+        for (int row = 0; row < HEIGHT; row++) {
+            for (int col = 0; col < WIDTH; col++) {
+                if (stm) {
+                    i++;
+                    bitvector |= ((uint64_t) is_cell_set(player, col, row)) << i;
+                    i++;
+                    bitvector |= ((uint64_t) is_cell_set(opponent, col, row)) << i;
+                } else {
+                    i++;
+                    bitvector |= ((uint64_t)is_cell_set(opponent, col, row)) << i;
+                    i++;
+                    bitvector |= ((uint64_t)is_cell_set(player, col, row)) << i;
+                }
+            }
+        }
+        return bitvector;
+    #endif
+#endif    
+}
+
 // returns 1 if connect4 position is won, 0 if draw, and -1 if lost
 int probe_board_mmap(uint64_t player, uint64_t mask) {
     bool win_sat, draw_sat, lost_sat;
@@ -53,7 +120,7 @@ int probe_board_mmap(uint64_t player, uint64_t mask) {
     bool stm = ply % 2 == 0;
 
 
-    uint64_t bitvector = (position_key(player, mask) << 2) | (stm << 1);
+    uint64_t bitvector = get_bitvector(stm, player, mask);
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
@@ -114,7 +181,7 @@ bool _probe_board_mmap_is_(uint64_t player, uint64_t mask, int i) {
 
     int ply = get_ply(player, mask);
     bool stm = ply % 2 == 0;
-    uint64_t bitvector = (position_key(player, mask) << 2) | (stm << 1);
+    uint64_t bitvector = get_bitvector(stm, player, mask);
 
     char* map = mmaps[ply][i];
     if (map == NULL) {

@@ -16,13 +16,18 @@ int main(int argc, char const *argv[]) {
     assert(WIDTH <= 10);
     assert(WIDTH * (HEIGHT+1) <= 62);
 
+    bool no_mmap = false;
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("wdl.out folder moveseq\n");
             printf("  reads the strong solution for given position (no search for distance to win/loss).\n");
             printf("  folder      ... relative path to folder containing strong solution (bdd_w{width}_h{height}_{ply}_{lost|draw|win}.bin files).\n");
             printf("  moveseq     ... sequence of moves (0 to WIDTH-1) to get position that will be evaluated.\n");
+            printf("  -Xmmap      ... disables mmap (strong solution will be read into memory instead. large RAM needed, but no mmap functionality needed). optional.\n");
             return 0;
+        }
+        if (strcmp(argv[i], "-Xmmap") == 0) {
+            no_mmap = true;
         }
     }
 
@@ -39,7 +44,7 @@ int main(int argc, char const *argv[]) {
     uint64_t player = 0;
     uint64_t mask = 0;
 
-    printf("Input moveseq: %s\n", moveseq);
+    printf("input move sequence: %s\n", moveseq);
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');
@@ -50,7 +55,12 @@ int main(int argc, char const *argv[]) {
     print_board(player, mask, -1);
     printf("\n");
 
-    make_mmaps(WIDTH, HEIGHT);
+    if (no_mmap) {
+        printf("WARNING: reading *_win.10.bin and *_lost.10.bin of folder %s into memory\n",  folder);
+        make_mmaps_read_in_memory(WIDTH, HEIGHT);
+    } else {
+        make_mmaps(WIDTH, HEIGHT);
+    }
 
     int8_t res = probe_board_mmap(player, mask);
     
@@ -65,7 +75,7 @@ int main(int argc, char const *argv[]) {
     if (!is_terminal(player, mask)) {
         printf("\n");
 
-        printf("\033[95mmove evalution:\n");
+        printf("\033[95mmove evaluation:\n");
         for (move = 0; move < WIDTH; move++) {
             printf("%3d ", move);
         }

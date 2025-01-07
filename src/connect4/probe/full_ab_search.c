@@ -4,7 +4,7 @@
 // so this file provides a purely search based solution to connect4
 
 // this flag determines if alpha-beta searches for "win/loss in x moves or draw" (distance to mate)
-// or if it only searches for win/draw/loss evalution
+// or if it only searches for win/draw/loss evaluation
 #ifndef DTM
     #define DTM 1
 #endif
@@ -281,7 +281,7 @@ int main(int argc, char const *argv[]) {
     assert(WIDTH <= 10);
     assert(WIDTH * (HEIGHT+1) <= 64);
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("full_ab_search.out moveseq\n");
             printf("  performs alpha-beta search to compute (WDL/DTM) evaluation and find best move for given position.\n");
             printf("  moveseq     ... sequence of moves (0 to WIDTH-1) to get position that will be evaluated.\n");
@@ -304,7 +304,7 @@ int main(int argc, char const *argv[]) {
 
     const char *moveseq = argv[1];
 
-    printf("Input moveseq: %s\n", moveseq);
+    printf("input move sequence: %s\n", moveseq);
     uint8_t move;
     for (int i = 0; i < strlen(moveseq); i++) {
         move = (uint8_t) (moveseq[i] - '0');

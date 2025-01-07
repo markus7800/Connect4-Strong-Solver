@@ -176,18 +176,23 @@ int main(int argc, char const *argv[]) {
     // parse program arguments
 
     bool no_mmap = false;
+    bool no_mmap_lost = false;
     for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("generate_openingbook.out folder n_workers [mp_subgroup] [-Xmmap]\n");
             printf("  evaluates all non-draw position at depth OB_PLY leveraging strong solution with multi-threading.\n");
             printf("  folder      ... relative path to folder containing strong solution (bdd_w{width}_h{height}_{ply}_{lost|draw|win}.bin files).\n");
             printf("  n_workers   ... number of total workers (if mp_subgroup is provided 4 threads will be spawned, otherwise n_workers threads will be spawned\n");
             printf("  mp_subgroup ... if provided, only the 4 workers belonging to mp_subgroup will be spawned. used for multi-processing. optional.\n");
             printf("  -Xmmap      ... disables mmap (strong solution will be read into memory instead. large RAM needed). optional.\n");
+            printf("  -Xmmaplost  ... disables mmap for \"is-lost\" queries (*lost.10.bin will be read into memory instead. large RAM needed, but may speed-up search). optional.\n");
             return 0;
         }
         if (strcmp(argv[i], "-Xmmap") == 0) {
             no_mmap = true;
+        }
+        if (strcmp(argv[i], "-Xmmaplost") == 0) {
+            no_mmap_lost = true;
         }
     }
 
@@ -210,8 +215,11 @@ int main(int argc, char const *argv[]) {
     // mmap or read in strong solution
 
     if (no_mmap) {
-        printf("WARNING: reading entire folder %s into memory\n",  folder);
+        printf("WARNING: reading *_win.10.bin and *_lost.10.bin of folder %s into memory\n",  folder);
         make_mmaps_read_in_memory(WIDTH, HEIGHT);
+    } else if (no_mmap_lost) {
+        printf("WARNING: reading *_lost.10.bin of folder %s into memory\n",  folder);
+        make_mmaps_read_lost_in_memory(WIDTH, HEIGHT);
     } else {
         make_mmaps(WIDTH, HEIGHT);
     }
