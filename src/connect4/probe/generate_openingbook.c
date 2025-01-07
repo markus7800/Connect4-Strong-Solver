@@ -35,13 +35,23 @@ uint64_t mask_from_key(uint64_t key) {
     return mask;
 }
 
-void enumerate_nondraw(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth) {
+void enumerate_nondraw(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_t depth, bool flip) {
     if (depth == 0) {
         uint64_t key = position_key(player, mask);
         uint64_t _mask = mask_from_key(key);
         uint64_t _player = key & _mask;
         assert(_mask == mask);
         assert(_player == player);
+
+        if (flip) {
+            uint64_t flipped_player = 0;
+            uint64_t flipped_mask = 0;
+            flip_board(player, mask, &flipped_player, &flipped_mask);
+            if (has_position(ob, position_key(flipped_player, flipped_mask))) {
+                return;
+            }
+        }
+
         if (!has_position(ob, key)) {
             int8_t res = probe_board_mmap(player, mask);
             if (res != 0) {
@@ -57,7 +67,7 @@ void enumerate_nondraw(openingbook_t* ob, uint64_t player, uint64_t mask, uint8_
     for (uint8_t move_ix = 0; move_ix < WIDTH; move_ix++) {
         uint64_t move = move_mask & column_mask(move_ix);
         if (move) {
-            enumerate_nondraw(ob, player ^ mask, mask | move, depth-1);
+            enumerate_nondraw(ob, player ^ mask, mask | move, depth-1, flip);
         }
     }
 }
@@ -216,10 +226,16 @@ int main(int argc, char const *argv[]) {
 
     openingbook_t nondraw_positions;
     init_openingbook(&nondraw_positions, 20);
-    enumerate_nondraw(&nondraw_positions, player, mask, depth);
+    enumerate_nondraw(&nondraw_positions, player, mask, depth, false);
     printf("Non-draw positions: %"PRIu64"\n", nondraw_positions.count);
-    TOTAL_CNT = nondraw_positions.count;
 
+    openingbook_t nondraw_canoncial_positions;
+    init_openingbook(&nondraw_canoncial_positions, 20);
+    enumerate_nondraw(&nondraw_canoncial_positions, player, mask, depth, true);
+    printf("Non-draw canonical positions: %"PRIu64"\n", nondraw_canoncial_positions.count);
+
+    openingbook_t positions_to_evaluate = nondraw_canoncial_positions;
+    TOTAL_CNT = positions_to_evaluate.count;
 
 
     // the workers are split up into subgroups
@@ -251,13 +267,13 @@ int main(int argc, char const *argv[]) {
     MP_N_GROUPS = n_subgroups;
 
     // split up the work (non-draw positions)
-    uint64_t work_per_subgroup =  nondraw_positions.count / n_subgroups + (nondraw_positions.count % n_subgroups != 0);
+    uint64_t work_per_subgroup =  positions_to_evaluate.count / n_subgroups + (positions_to_evaluate.count % n_subgroups != 0);
     if (MP) {
         TOTAL_CNT = work_per_subgroup;
     }
     
     uint8_t sg = 0;
-    for (uint64_t i = 0; i < nondraw_positions.count; i++) {
+    for (uint64_t i = 0; i < positions_to_evaluate.count; i++) {
         if (i % work_per_subgroup == 0) {
             sg++;
         }
@@ -265,7 +281,7 @@ int main(int argc, char const *argv[]) {
 
         uint8_t subgroup = worker_id / subgroup_size;
         if (MP && subgroup != MP_SUBGROUP) continue;
-        add_position_value(&obs[worker_id], nondraw_positions.entries[i].key, nondraw_positions.entries[i].value);
+        add_position_value(&obs[worker_id], positions_to_evaluate.entries[i].key, positions_to_evaluate.entries[i].value);
     }
 
     // initialse tt and wdl cache for each subgroup
@@ -309,6 +325,29 @@ int main(int argc, char const *argv[]) {
         }
     }
 
+    // add evaluation of flipped positions
+    uint64_t n_flipped_positions = 0;
+    for (uint64_t i = 0; i < nondraw_positions.count; i++) {
+        openingbook_entry_t entry = nondraw_positions.entries[i];
+        if (!has_position(&ob, entry.key)) {
+            uint64_t _mask = mask_from_key(entry.key);
+            uint64_t _player = entry.key & _mask;
+            
+            uint64_t flipped_player = 0;
+            uint64_t flipped_mask = 0;
+            flip_board(_player, _mask, &flipped_player, &flipped_mask);
+            uint64_t flipped_key = position_key(flipped_player, flipped_mask);
+            assert(has_position(&ob, flipped_key));
+
+            int8_t flipped_value = get_value_for_position(&ob, flipped_key);
+            add_position_value(&ob, entry.key, flipped_value);
+            n_flipped_positions++;
+        }
+    }
+    assert(nondraw_canoncial_positions.count + n_flipped_positions == nondraw_positions.count);
+    assert(ob.count == nondraw_positions.count);
+    // printf("Wrote %"PRIu64" flipped positions\n", n_flipped_positions);
+
     // sort openingbook by key
     for (uint64_t i = 0; i < ob.count; i++) {
         openingbook_entry_t entry = ob.entries[i];
@@ -333,7 +372,7 @@ int main(int argc, char const *argv[]) {
     mp_print_top_linebreaks();
     if (MP) { printf("group %u: ", MP_SUBGROUP); }
     printf("generated %u finished in %.3fs - ", CNT, t);
-    printf("writing to %s/%s. ", folder, filename);
+    printf("writing file %s in folder%s. ", filename, folder);
     mp_print_bottom_linebreaks_and_reset_cursor();
     if (!MP) { printf("\n\n"); }
 

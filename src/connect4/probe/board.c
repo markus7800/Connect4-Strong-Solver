@@ -15,6 +15,7 @@
 
 #define MATESCORE 100
 
+#include "utils.c"
 #include "board_constants.c"
 
 /*
@@ -83,16 +84,67 @@ bool is_terminal(uint64_t player, uint64_t mask) {
     return false;
 }
 
+
+int get_ply(uint64_t player, uint64_t mask) {
+    return __builtin_popcountll(mask);
+}
+
+
+void print_board(uint64_t player, uint64_t mask, int highlight_col) {
+    int cnt = get_ply(player, mask);
+    int to_play = cnt % 2;
+    char stm_c = (to_play == 0) ? 'x' : 'o';
+    bool term = is_terminal(player, mask);
+    printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", WIDTH, HEIGHT);
+    int bit;
+    for (int i = HEIGHT-1; i>= 0; i--) {
+        for (int j = 0; j < WIDTH; j++) {
+            if (j == highlight_col && !is_set(mask, (i+1) + (HEIGHT+1)*j)) printf("\033[95m");
+            bit = i + (HEIGHT+1)*j;
+            if (is_set(mask, bit)) {
+                if (is_set(player, bit) != to_play) {
+                    printf(" x");
+                } else {
+                    printf(" o");
+                }
+            } else {
+                printf(" .");
+            }
+            if (j == highlight_col) printf("\033[0m");
+        }
+        if (i == 0) printf("  is terminal: %d", term);
+        if (i == 1) printf("  side to move: %c", stm_c);
+        if (i == 2) printf("  stones played: %d", cnt);
+        printf("\n");
+    }
+    for (int j = 0; j < WIDTH; j++) {
+        printf(" %d", j);
+    }
+}
+
+void print_mask(u_int64_t mask) {
+    int bit;
+    for (int i = HEIGHT; i>= 0; i--) {
+        for (int j = 0; j < WIDTH; j++) {
+            bit = i + (HEIGHT+1)*j;
+            if (is_set(mask, bit) > 0) {
+                printf("1 ");
+            } else {
+                printf("0 ");
+            }
+        }
+        printf("\n");
+    }
+    printf("0x%"PRIu64"\n", mask);
+}
+
+
 inline u_int64_t get_pseudo_legal_moves(uint64_t mask) {
     return (mask + BOTTOM_MASK);
 }
 
 bool is_legal_move(uint64_t player, uint64_t mask, uint8_t col) {
     return (mask + BOTTOM_MASK) & column_mask(col);
-}
-
-int get_ply(uint64_t player, uint64_t mask) {
-    return __builtin_popcountll(mask);
 }
 
 // computes position key that uniquely describes position
@@ -169,53 +221,34 @@ inline void flip_board(uint64_t player, uint64_t mask, uint64_t* flipped_player,
     }
 }
 
-void print_board(uint64_t player, uint64_t mask, int highlight_col) {
-    int cnt = get_ply(player, mask);
-    int to_play = cnt % 2;
-    char stm_c = (to_play == 0) ? 'x' : 'o';
-    bool term = is_terminal(player, mask);
-    printf("Connect4 width=%"PRIu32" x height=%"PRIu32"\n", WIDTH, HEIGHT);
-    int bit;
-    for (int i = HEIGHT-1; i>= 0; i--) {
-        for (int j = 0; j < WIDTH; j++) {
-            if (j == highlight_col && !is_set(mask, (i+1) + (HEIGHT+1)*j)) printf("\033[95m");
-            bit = i + (HEIGHT+1)*j;
-            if (is_set(mask, bit)) {
-                if (is_set(player, bit) != to_play) {
-                    printf(" x");
-                } else {
-                    printf(" o");
-                }
-            } else {
-                printf(" .");
-            }
-            if (j == highlight_col) printf("\033[0m");
-        }
-        if (i == 0) printf("  is terminal: %d", term);
-        if (i == 1) printf("  side to move: %c", stm_c);
-        if (i == 2) printf("  stones played: %d", cnt);
-        printf("\n");
-    }
-    for (int j = 0; j < WIDTH; j++) {
-        printf(" %d", j);
+
+// uint64_t hash_for_board(uint64_t player, uint64_t mask) {
+//     return hash_64(position_key(player, mask));
+// }
+
+uint64_t hash_for_board(uint64_t player, uint64_t mask) {
+    if (__builtin_popcountll(mask & LEFT_BOARD_MASK) >= __builtin_popcountll(mask & RIGHT_BOARD_MASK)) {
+        return hash_64(position_key(player, mask));
+    } else {
+        uint64_t flipped_player = 0;
+        uint64_t flipped_mask = 0;
+        flip_board(player, mask, &flipped_player, &flipped_mask);
+        // assert(__builtin_popcountll(flipped_mask & LEFT_BOARD_MASK) >= __builtin_popcountll(flipped_mask & RIGHT_BOARD_MASK));
+        return hash_64(position_key(flipped_player, flipped_mask));
     }
 }
 
-void print_mask(u_int64_t mask) {
-    int bit;
-    for (int i = HEIGHT; i>= 0; i--) {
-        for (int j = 0; j < WIDTH; j++) {
-            bit = i + (HEIGHT+1)*j;
-            if (is_set(mask, bit) > 0) {
-                printf("1 ");
-            } else {
-                printf("0 ");
-            }
-        }
-        printf("\n");
-    }
-    printf("0x%"PRIu64"\n", mask);
-}
+// uint64_t hash_for_board(uint64_t player, uint64_t mask) {
+//     uint64_t flipped_player = 0;
+//     uint64_t flipped_mask = 0;
+//     flip_board(player, mask, &flipped_player, &flipped_mask);
+    
+//     uint64_t key_normal = position_key(player, mask);
+//     uint64_t key_flipped = position_key(flipped_player, flipped_mask);
+
+//     return (key_normal < key_flipped) ? hash_64(key_normal) : hash_64(key_flipped);
+// }
+
 
 void play_column(uint64_t* player, uint64_t* mask, uint8_t col) {
     uint64_t move = get_pseudo_legal_moves(*mask) & column_mask(col);

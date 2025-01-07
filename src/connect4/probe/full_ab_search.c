@@ -88,21 +88,6 @@ int8_t probe_tt(tt_t* tt, uint64_t key, uint8_t depth, int8_t alpha, int8_t beta
     return 0;
 }
 
-// uint64_t hash_for_board(uint64_t player, uint64_t mask) {
-//     return hash_64(position_key(player, mask));
-// }
-
-uint64_t hash_for_board(uint64_t player, uint64_t mask) {
-    if (__builtin_popcountll(mask & LEFT_BOARD_MASK) > __builtin_popcountll(mask & RIGHT_BOARD_MASK)) {
-        return hash_64(position_key(player, mask));
-    } else {
-        uint64_t flipped_player = 0;
-        uint64_t flipped_mask = 0;
-        flip_board(player, mask, &flipped_player, &flipped_mask);
-        return hash_64(position_key(flipped_player, flipped_mask));
-    }
-}
-
 
 uint8_t get_bestmove(tt_t* tt, uint64_t player, uint64_t mask) {
     uint64_t key = hash_for_board(player, mask);

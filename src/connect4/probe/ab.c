@@ -12,22 +12,6 @@
 
 #include "utils.c"
 
-// inline uint64_t hash_for_board(uint64_t player, uint64_t mask) {
-//     return hash_64(position_key(player, mask));
-// }
-
-inline uint64_t hash_for_board(uint64_t player, uint64_t mask) {
-    if (__builtin_popcountll(mask & LEFT_BOARD_MASK) > __builtin_popcountll(mask & RIGHT_BOARD_MASK)) {
-        return hash_64(position_key(player, mask));
-    } else {
-        uint64_t flipped_player = 0;
-        uint64_t flipped_mask = 0;
-        flip_board(player, mask, &flipped_player, &flipped_mask);
-        return hash_64(position_key(flipped_player, flipped_mask));
-    }
-}
-
-
 // WDL cache is used to store the result of probing the BDDs
 typedef uint64_t wdl_cache_entry_t;
 
