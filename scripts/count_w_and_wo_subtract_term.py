@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import argparse
 
 def get_prefix(compressed_encoding, subtract_term):
-    return f"compenc={int(compressed_encoding)}_subterm={int(subtract_term)}"
+    return f"compenc_{int(compressed_encoding)}_subterm_{int(subtract_term)}"
 
 def get_suffix(WIDTH, HEIGHT, LOG_TB_SIZE):
     return f"w{WIDTH}_h{HEIGHT}_ls{LOG_TB_SIZE}"
@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("HEIGHT", nargs='?', type=int, default=6)
     parser.add_argument("LOG_TB_SIZE", nargs='?', type=int, default=29)
     parser.add_argument("--skip-search", action="store_true")
+    parser.add_argument("--exists-ok", action="store_true")
     args = parser.parse_args()
 
 
@@ -27,9 +28,9 @@ if __name__ == "__main__":
     print(f"{WIDTH=} {HEIGHT=} {LOG_TB_SIZE=}")
 
     folder = Path(f"results/count_w{WIDTH}_h{HEIGHT}_results")
-    folder.mkdir(exist_ok=True)
-
     if not args.skip_search:
+        folder.mkdir(exist_ok=args.exists_ok)
+
         for compressed_encoding, subtract_term in [(True, False), (False, False), (True, True), (False, True)]:
             subprocess.run([
                 "make", "count",
@@ -65,25 +66,26 @@ if __name__ == "__main__":
         res = res[:-1].convert_dtypes()
         return res["poscount"]
     suffix = get_suffix(WIDTH, HEIGHT, LOG_TB_SIZE)
-    fig, axs = plt.subplots(2,1, figsize=(6,7))
-    axs[0].set_yscale("log")
-    axs[0].plot(get_states_counts(False, False), c="tab:blue", marker="+", label="Ignored Terminals (States)")
-    axs[0].plot(get_states_counts(False, True), c="tab:orange", marker="s", markerfacecolor='none', label="Stopped at Terminals (States)")
-    axs[0].plot(get_node_counts(False, False), c="tab:blue", marker="o", markerfacecolor='none', label="Ignored Terminals (Nodes)")
-    axs[0].plot(get_node_counts(False, True), c="tab:orange", marker="x", label="Stopped at Terminals (Nodes)")
-    axs[0].set_ylabel("Number of States or BDD Nodes")
-    axs[0].grid()
-    axs[0].legend()
-
-    #axs[1].set_yscale("log")
-    # axs[1].plot(get_node_counts(True, False), c="tab:blue", marker="+", label="Ignored Terminals (Compressend)")
-    axs[1].plot(get_node_counts(True, True), c="tab:blue", marker="s", markerfacecolor='none', label="Stopped at Terminals (Compressed)")
-    # axs[1].plot(get_node_counts(False, False), c="tab:orange", marker="o", markerfacecolor='none', label="Ignored Terminals (Default)")
-    axs[1].plot(get_node_counts(False, True), c="tab:orange", marker="x", label="Stopped at Terminals (Default)")
-    axs[1].set_ylabel("Number of BDD Nodes")
-    axs[1].set_xlabel("Ply")
-    axs[1].grid()
-    axs[1].legend()
-
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_yscale("log")
+    ax.plot(get_states_counts(False, False), c="tab:blue", marker="+", label="Ignored Terminals (States)")
+    ax.plot(get_states_counts(False, True), c="tab:orange", marker="s", markerfacecolor='none', label="Stopped at Terminals (States)")
+    ax.plot(get_node_counts(False, False), c="tab:blue", marker="o", markerfacecolor='none', label="Ignored Terminals (Nodes)")
+    ax.plot(get_node_counts(False, True), c="tab:orange", marker="x", label="Stopped at Terminals (Nodes)")
+    ax.set_ylabel("Number of States or BDD Nodes")
+    ax.grid()
+    ax.legend()
     plt.tight_layout()
-    plt.savefig(folder.joinpath("bdd_node_count.pdf"))
+    plt.savefig(folder.joinpath("bdd_node_count_term_vs_nonterm.pdf"))
+
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    #ax.set_yscale("log")
+    ax.plot(get_node_counts(True, True), c="tab:blue", marker="s", markerfacecolor='none', label="Stopped at Terminals (Compressed)")
+    ax.plot(get_node_counts(False, True), c="tab:orange", marker="x", label="Stopped at Terminals (Standard)")
+    ax.set_ylabel("Number of BDD Nodes")
+    ax.set_xlabel("Ply")
+    ax.grid()
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(folder.joinpath("bdd_node_count_compenc_vs_standard.pdf"))
+
