@@ -45,7 +45,7 @@ void _make_mmap(uint32_t width, uint32_t height, int ply, int i, char* suffix) {
     if (fd == -1) {
         // mmaps[ply][i] = NULL;
         // return;
-        printf("Could not open file %s.", filename);
+        printf("Could not open file %s.\n", filename);
         exit(EXIT_FAILURE);
     }
     assert(mmaps[ply][i] == NULL);
@@ -95,7 +95,7 @@ void _read_in_memory(uint32_t width, uint32_t height, int ply, int i, char* suff
     if (file == NULL) {
         // mmaps[ply][i] = NULL;
         // return;
-        printf("Could not open file %s.", filename);
+        printf("Could not open file %s.\n", filename);
         exit(EXIT_FAILURE);
     }
     assert(mmaps[ply][i] == NULL);
