@@ -48,7 +48,8 @@ Similarly, run `./compile_bestmove.sh` to build bestmove evaluation.
 
 # Example Usage
 
-`./wdl.out solution_w7_h6 "332"` to evaluate position after playing in the fourth-column twice and then playing in the third column.
+`./wdl.out solution_w7_h6 "332"` to evaluate position after playing in the fourth-column twice and then playing in the third column.  
+It provides a win-draw-loss evaluation by directly reading from the binary decision diagrams stored in the *.bin files.
 
 Output for 7x6 board:
 ```
@@ -73,8 +74,9 @@ move evaluation:
 -1 ... move leads to forced loss
 ```
                 
-Run `./bestmove.out solution_w7_h6 "332"` to find the best move with respect to shortest win or longest loss.
-
+Run `./bestmove.out solution_w7_h6 "332"` to find the best move with respect to shortest win or longest loss.  
+This will perform an alpha-beta pruning type search guided by the win-draw-loss evaluation.  
+It also uses the openingbook stored in the openingbook_w<WIDTH>_h<HEIGHT>_d8.csv file.  
 Also see `./bestmove.out --help`.
                 
 # More Information

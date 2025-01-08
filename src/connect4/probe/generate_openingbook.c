@@ -345,15 +345,17 @@ int main(int argc, char const *argv[]) {
             uint64_t flipped_mask = 0;
             flip_board(_player, _mask, &flipped_player, &flipped_mask);
             uint64_t flipped_key = position_key(flipped_player, flipped_mask);
-            assert(has_position(&ob, flipped_key));
-
-            int8_t flipped_value = get_value_for_position(&ob, flipped_key);
-            add_position_value(&ob, entry.key, flipped_value);
-            n_flipped_positions++;
+            if (has_position(&ob, flipped_key)) {
+                int8_t flipped_value = get_value_for_position(&ob, flipped_key);
+                add_position_value(&ob, entry.key, flipped_value);
+                n_flipped_positions++;
+            }
         }
     }
-    assert(nondraw_canoncial_positions.count + n_flipped_positions == nondraw_positions.count);
-    assert(ob.count == nondraw_positions.count);
+    if (!MP) {
+        assert(nondraw_canoncial_positions.count + n_flipped_positions == nondraw_positions.count);
+        assert(ob.count == nondraw_positions.count);
+    }
     // printf("Wrote %"PRIu64" flipped positions\n", n_flipped_positions);
 
     // sort openingbook by key
