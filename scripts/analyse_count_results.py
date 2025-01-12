@@ -27,7 +27,7 @@ formatters = {
     "count": ("#positions", lambda x: f"{int(x):,}"),
     "time": ("comp.time", lambda x: str(datetime.timedelta(seconds=x))[:-4]),
     "GC_perc": ("GC perc.", lambda x: "{:.2f}%".format(x*100)),
-    "bytes_alloc": ("RAM used", lambda x: "{:.2f}GB".format(x/1e9)),
+    "bytes_alloc": ("RAM", lambda x: "{:.2f}GB".format(x/1e9)),
     "log2_tbsize": ("#allocatable", lambda x: "2^{:d}".format(int(x))),
     "max_nodes_alloc": ("#allocated", lambda x: f"{int(x):,}"),
     "max_fill_level": ("perc. allocated", lambda x: "{:.2f}%".format(x*100)),
@@ -38,6 +38,16 @@ def list_table(results):
     results = results.copy()
     cols = []
     for col in ["count", "time", "GC_perc", "bytes_alloc", "log2_tbsize", "max_nodes_alloc", "max_fill_level", "min_log2_tbsize"]:
+        name, formatter = formatters[col]
+        cols.append(name)
+        results[name] = results[col].apply(formatter)
+
+    return results[["width","height", *cols]]
+
+def list_small_table(results):
+    results = results.copy()
+    cols = []
+    for col in ["count", "time", "GC_perc", "bytes_alloc", "max_nodes_alloc"]:
         name, formatter = formatters[col]
         cols.append(name)
         results[name] = results[col].apply(formatter)
@@ -114,8 +124,8 @@ if __name__ == "__main__":
             print_df(p)
 
     if args.list:
-        pretty_results = list_table(results)
-        print_df(pretty_results)
+        # pretty_results = list_table(results)
+        # print_df(pretty_results)
 
-
+        print(list_small_table(results).to_latex(index=False))
 

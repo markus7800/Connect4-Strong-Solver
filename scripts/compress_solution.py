@@ -9,7 +9,6 @@ if __name__ == "__main__":
     parser.add_argument("COMPRESSED_ENCODING", nargs='?', type=int)
     parser.add_argument("ALLOW_ROW_ORDER", nargs='?', type=int)
     args = parser.parse_args()
-    args = parser.parse_args()
 
     WIDTH = args.WIDTH
     HEIGHT = args.HEIGHT
