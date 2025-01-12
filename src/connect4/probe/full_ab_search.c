@@ -148,6 +148,9 @@ void sort_moves(uint8_t moves[WIDTH], uint64_t move_mask, uint64_t player, uint6
     // }
 }
 
+
+#define PV_SEARCH 1
+
 // this is the same alphabeta implementation as in ab.c except for following differences:
 // 1. we do not use strong solution
 // 2. we added draw pruning idea
@@ -246,17 +249,36 @@ int8_t alphabeta(tt_t* tt, uint64_t player, uint64_t mask, int8_t alpha, int8_t 
 
     uint8_t flag = FLAG_ALPHA;
     uint8_t bestmove = 0;
+    bool do_full = true;
 
     for (uint8_t move_ix = 0; move_ix < movecount; move_ix++) {
 
         uint64_t move = move_mask & column_mask(moves[move_ix]);
 
         if (move) {
+#if PV_SEARCH
+            // principal variation search, we assume that first move that raises alpha is the best move in the position (principal variation)
+            if (do_full) {
+                // until we have found best move we do full window search
+                value = -alphabeta(tt, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
+            } else {
+                // we already have good move, do "null-window" search for remaining move
+                // a null window search only checks if move is better than current alpha, but does not check by how much
+                value = -alphabeta(tt, player ^ mask, mask | move, -alpha-1, -alpha, ply+1, depth-1);
+                if (value > alpha) {
+                    // we know move is better than current best -> re-search with full window to get exact value
+                    value = -alphabeta(tt, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
+                }
+            }
+#else
+            // always to full-window search
             value = -alphabeta(tt, player ^ mask, mask | move, -beta, -alpha, ply+1, depth-1);
+#endif
 
             if (value > alpha) {
                 bestmove = moves[move_ix];
                 flag = FLAG_EXACT;
+                do_full = false;
                 alpha = value;
             }
             if (value >= beta) {
