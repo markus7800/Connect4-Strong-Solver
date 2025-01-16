@@ -22,14 +22,14 @@ if __name__ == "__main__":
     second_player = df["ply"] % 2 == 1
 
     if args.subtract_term:
-        df["lost_count"] = df["lost_count"] - df["term_count"]
+        df["loss_count"] = df["loss_count"] - df["term_count"]
     
     df["states (won)"] = df["win_count"]
-    df.loc[second_player, "states (won)"] = df["lost_count"][second_player]
+    df.loc[second_player, "states (won)"] = df["loss_count"][second_player]
 
     df["states (drawn)"] = df["draw_count"]
     
-    df["states (lost)"] = df["lost_count"]
+    df["states (lost)"] = df["loss_count"]
     df.loc[second_player, "states (lost)"] = df["win_count"][second_player]
 
 
@@ -38,11 +38,11 @@ if __name__ == "__main__":
 
 
     df["nodes (won)"] = df["win_nodecount"]
-    df.loc[second_player, "nodes (won)"] = df["lost_nodecount"][second_player]
+    df.loc[second_player, "nodes (won)"] = df["loss_nodecount"][second_player]
 
     df["nodes (drawn)"] = df["draw_nodecount"]
     
-    df["nodes (lost)"] = df["lost_nodecount"]
+    df["nodes (lost)"] = df["loss_nodecount"]
     df.loc[second_player, "nodes (lost)"] = df["win_nodecount"][second_player]
     df["ply"] = df.index
 

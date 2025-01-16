@@ -18,8 +18,9 @@ if __name__ == "__main__":
     HEIGHT = args.HEIGHT
     COMPRESSED_ENCODING = int(args.COMPRESSED_ENCODING)
     ALLOW_ROW_ORDER = int(args.ALLOW_ROW_ORDER)
+    ROW_ORDER = int(bool(ALLOW_ROW_ORDER) and (HEIGHT > WIDTH))
     N_WORKERS = args.N_WORKERS
-    print(f"{WIDTH=} {HEIGHT=} {COMPRESSED_ENCODING=} {ALLOW_ROW_ORDER=} {N_WORKERS=}")
+    print(f"{WIDTH=} {HEIGHT=} {COMPRESSED_ENCODING=} {ALLOW_ROW_ORDER=} {ROW_ORDER=} {N_WORKERS=}")
 
 
     subprocess.run([
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     t0 = time.time()
     subprocess.run([
         "python3", "probe/generate_openingbook_mp.py",
-        f"../../results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_allowrow_{ALLOW_ROW_ORDER}/solution_w{WIDTH}_h{HEIGHT}",
+        f"../../results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_row_{ROW_ORDER}/solution_w{WIDTH}_h{HEIGHT}",
         str(WIDTH),
         str(HEIGHT),
         str(N_WORKERS)

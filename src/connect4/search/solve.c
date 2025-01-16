@@ -19,6 +19,7 @@
 #define COMPRESSED_ENCODING 1
 #endif
 
+
 #if COMPRESSED_ENCODING
 #include "compressed_encoding.c"
 #else
@@ -201,7 +202,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if WRITE_TO_FILE
     sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
     FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,ply,win_count,draw_count,lost_count,term_count,total_count,win_nodecount,draw_nodecount,lost_nodecount,total_nodecount,time\n");
+    fprintf(f, "width,height,ply,win_count,draw_count,loss_count,term_count,total_count,win_nodecount,draw_nodecount,loss_nodecount,total_nodecount,time\n");
 #endif
 
 
@@ -256,7 +257,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(win);
 
 #if SAVE_BDD_TO_DISK
-        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_win.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
+        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_win.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
         win_node_cnt = _safe_to_file_with_varmap(win, filename, &map, board_varmap);
 #else
         reset_map(&map);
@@ -293,7 +294,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(draw);
 
 #if SAVE_BDD_TO_DISK
-        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
+        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
         draw_node_cnt = _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
 #else
         reset_map(&map);
@@ -311,7 +312,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
 
 #if SAVE_BDD_TO_DISK
-        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_lost.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
+        sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_loss.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
         lost_node_cnt = _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
 #else
         reset_map(&map);
@@ -334,7 +335,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         t = get_elapsed_time(t0, t1);
         total_t += t;
 
-        printf("  win=%"PRIu64" draw=%"PRIu64" lost=%"PRIu64" term=%"PRIu64" / total=%"PRIu64" in %.3f seconds\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt, t);
+        printf("  win=%"PRIu64" draw=%"PRIu64" loss=%"PRIu64" term=%"PRIu64" / total=%"PRIu64" in %.3f seconds\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt, t);
         assert((win_cnt + draw_cnt + lost_cnt) == cnt);
 
 #if WRITE_TO_FILE

@@ -38,7 +38,7 @@ void init_mmaps(uint32_t width, uint32_t height) {
 
 void bin_filename(char filename[], uint32_t width, uint32_t height, int ply, int i, char* suffix) {
     // COMPRESSED_ENCODING = 1, ALLOW_ROW_ORDER = 0
-    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.%u%u.bin", width, height, ply, suffix, COMPRESSED_ENCODING, ALLOW_ROW_ORDER);
+    sprintf(filename, "bdd_w%"PRIu32"_h%"PRIu32"_%d_%s.%u%u.bin", width, height, ply, suffix, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
 }
 
 void _make_mmap(uint32_t width, uint32_t height, int ply, int i, char* suffix) {
@@ -80,7 +80,7 @@ void make_mmap(uint32_t width, uint32_t height, int ply) {
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
-            suffix = "lost";
+            suffix = "loss";
         } else if (i==1) {
             suffix = "draw";
             continue;
@@ -140,7 +140,7 @@ void read_in_memory(uint32_t width, uint32_t height, int ply) {
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
-            suffix = "lost";
+            suffix = "loss";
         } else if (i==1) {
             suffix = "draw";
             continue;
@@ -165,7 +165,7 @@ void read_lost_in_memory(uint32_t width, uint32_t height, int ply) {
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
-            suffix = "lost";
+            suffix = "loss";
             _read_in_memory(width, height, ply, i, suffix);
         } else if (i==1) {
             suffix = "draw";

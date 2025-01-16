@@ -15,16 +15,17 @@ if __name__ == "__main__":
     HEIGHT = args.HEIGHT
     COMPRESSED_ENCODING = int(args.COMPRESSED_ENCODING)
     ALLOW_ROW_ORDER = int(args.ALLOW_ROW_ORDER)
-    print(f"{WIDTH=} {HEIGHT=} {COMPRESSED_ENCODING=} {ALLOW_ROW_ORDER=}")
+    ROW_ORDER = int(bool(ALLOW_ROW_ORDER) and (HEIGHT > WIDTH))
+    print(f"{WIDTH=} {HEIGHT=} {COMPRESSED_ENCODING=} {ALLOW_ROW_ORDER=} {ROW_ORDER=}")
 
-    folder = f"results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_allowrow_{ALLOW_ROW_ORDER}"
+    folder = f"results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_row_{ROW_ORDER}"
 
     archive_name = f"strong_solution_w{WIDTH}_h{HEIGHT}_archive.7z"
 
     subprocess.run([
         "7za", "a", "-t7z", "-mx9", "../../"+archive_name, "-r",
-        f"*_lost.{COMPRESSED_ENCODING}{ALLOW_ROW_ORDER}.bin",
-        f"*_win.{COMPRESSED_ENCODING}{ALLOW_ROW_ORDER}.bin",
+        f"*_loss.{COMPRESSED_ENCODING}{ROW_ORDER}.bin",
+        f"*_win.{COMPRESSED_ENCODING}{ROW_ORDER}.bin",
         f"*.csv",
         f"*.txt",
     ], cwd=folder)
@@ -36,6 +37,8 @@ if __name__ == "__main__":
     subprocess.run(["./compile_wdl.sh"])
     res_wdl = subprocess.run(["./wdl.out", f"{folder}/solution_w{WIDTH}_h{HEIGHT}", "332"], capture_output=True)
     os.remove("wdl.out")
+    print("Example WDL:")
+    print(res_wdl.stdout.decode())
 
     with open("compile_bestmove.sh", "w") as f:
         f.write(f"#!/bin/bash\ngcc src/connect4/probe/bestmove.c -O3 -flto -Wall -O3 -DWIDTH={WIDTH} -DHEIGHT={HEIGHT} -DCOMPRESSED_ENCODING={COMPRESSED_ENCODING} -DALLOW_ROW_ORDER={ALLOW_ROW_ORDER} -o bestmove.out")
@@ -45,6 +48,8 @@ if __name__ == "__main__":
 
     res_bestmove = subprocess.run(["./bestmove.out", f"{folder}/solution_w{WIDTH}_h{HEIGHT}", "332"], capture_output=True)
     os.remove("bestmove.out")
+    print("Example best move:")
+    print(res_bestmove.stdout.decode())
 
 
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')

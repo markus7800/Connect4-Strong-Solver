@@ -22,9 +22,10 @@ if __name__ == "__main__":
     LOG_TB_SIZE = args.LOG_TB_SIZE
     COMPRESSED_ENCODING = int(args.COMPRESSED_ENCODING)
     ALLOW_ROW_ORDER = int(args.ALLOW_ROW_ORDER)
-    print(f"{WIDTH=} {HEIGHT=} {LOG_TB_SIZE=} {COMPRESSED_ENCODING=} {ALLOW_ROW_ORDER=}")
+    ROW_ORDER = int(bool(ALLOW_ROW_ORDER) and (HEIGHT > WIDTH))
+    print(f"{WIDTH=} {HEIGHT=} {LOG_TB_SIZE=} {COMPRESSED_ENCODING=} {ALLOW_ROW_ORDER=} {ROW_ORDER=}")
 
-    folder = Path(f"results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_allowrow_{ALLOW_ROW_ORDER}")
+    folder = Path(f"results/solve_w{WIDTH}_h{HEIGHT}_results_compenc_{COMPRESSED_ENCODING}_row_{ROW_ORDER}")
     folder.mkdir(exist_ok=args.exists_ok)
 
     subprocess.run([

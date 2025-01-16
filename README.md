@@ -76,10 +76,10 @@ Some examples to demonstrate flags:
     - `./build/count.out 28 7 6`: uses <16 GB RAM, fill-level: 56.99 %, finsihes in 6879.484 seconds.
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=0 IN_OP_GC=1`
-    - `./build/count.out 27 7 6`: uses <8 GB RAM, IN_OP_GC triggerd 3 times, finishes 10816.522 seconds.
+    - `./build/count.out 27 7 6`: uses <8 GB RAM, triggers IN_OP_GC 3 times, finishes in 10816.522 seconds.
 
 - `make count COMPRESSED_ENCODING=0 FULLBDD=0 IN_OP_GC=0`
-    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: .
+    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 44.43 %, finsihes in 10083.400 seconds.
     - `./build/count.out 28 7 6` uses <16 GB RAM, fill-level: 88.86 %, finishes in 11715.221 seconds.
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=1 IN_OP_GC=0`
