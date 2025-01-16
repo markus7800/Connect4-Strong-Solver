@@ -1,6 +1,6 @@
 CC = clang
 
-ENTER_TO_CONTINUE = 0   # should require to press enter to start?
+ENTER_TO_CONTINUE = 0 # should require to press enter to start?
 
 CFLAGS = -O3 -flto -Wall -O3
 

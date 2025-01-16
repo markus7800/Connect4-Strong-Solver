@@ -150,9 +150,11 @@ int main(int argc, char const *argv[]) {
 
     uint8_t bestmove;
     char desc[50];
+    sprintf(desc, "draw");
+    clock_gettime(CLOCK_REALTIME, &t0);
+
     if (res != 0 && !is_terminal(player, mask)) {
         printf("\033[94mComputing distance to mate ... \033[90m");
-        clock_gettime(CLOCK_REALTIME, &t0);
 
         int8_t ab;
         if (no_iterdeep) {
