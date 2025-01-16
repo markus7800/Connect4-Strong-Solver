@@ -92,10 +92,10 @@ int main(int argc, char const *argv[]) {
     
     // mmap or read in strong solution
     if (no_mmap) {
-        printf("WARNING: reading *_win.10.bin and *_lost.10.bin of folder %s into memory\n",  folder);
+        printf("WARNING: reading *_win.10.bin and *_loss.10.bin of folder %s into memory\n",  folder);
         make_mmaps_read_in_memory(WIDTH, HEIGHT);
     } else if (no_mmap_lost) {
-        printf("WARNING: reading *_lost.10.bin of folder %s into memory\n",  folder);
+        printf("WARNING: reading *_loss.10.bin of folder %s into memory\n",  folder);
         make_mmaps_read_lost_in_memory(WIDTH, HEIGHT);
     } else {
         make_mmaps(WIDTH, HEIGHT);
@@ -171,7 +171,7 @@ int main(int argc, char const *argv[]) {
             sprintf(desc, "draw");
         }
         if (ab < 0) {
-            sprintf(desc, "loss in %d plies", ab);
+            sprintf(desc, "loss in %d plies", -ab);
         }
         bestmove = get_bestmove(&tt, player, mask);
         printf("     \n");

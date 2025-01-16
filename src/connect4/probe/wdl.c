@@ -56,7 +56,7 @@ int main(int argc, char const *argv[]) {
     printf("\n");
 
     if (no_mmap) {
-        printf("WARNING: reading *_win.10.bin and *_lost.10.bin of folder %s into memory\n",  folder);
+        printf("WARNING: reading *_win.10.bin and *_loss.10.bin of folder %s into memory\n",  folder);
         make_mmaps_read_in_memory(WIDTH, HEIGHT);
     } else {
         make_mmaps(WIDTH, HEIGHT);

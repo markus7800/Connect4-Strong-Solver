@@ -16,6 +16,23 @@ typedef uint32_t nodeindex_t;
 
 typedef uint8_t variable_t;
 
+// stm + var level 0
+#if COMPRESSED_ENCODING
+    #if (WIDTH*(HEIGHT+1) + 1 + 1) <= 64
+        typedef uint64_t bitvector_t;
+    #else
+        #define uint128_t __uint128_t
+        typedef uint128_t bitvector_t;
+    #endif
+#else
+    #if (2*WIDTH*HEIGHT + 1 + 1) <= 64
+        typedef uint64_t bitvector_t;
+    #else
+        #define uint128_t __uint128_t
+        typedef uint128_t bitvector_t;
+    #endif
+#endif
+
 typedef struct MMapBDDNode {
     variable_t var;       // variable 1 to 255
     nodeindex_t low;      // index to low node
@@ -32,7 +49,7 @@ void get_mmap_node(char* map, nodeindex_t ix, mmapbddnode_t* node) {
 
 // checks whether assignment given as bitvector satsifies boolean formula stored at map wit root node ix
 // assignments are given as uint64_t such that (0b1 & (bitvector >> u.var)) corresponds to the true/false assignment of variable u.var
-bool is_sat_mmap(char* map, nodeindex_t ix, uint64_t bitvector) {
+bool is_sat_mmap(char* map, nodeindex_t ix, bitvector_t bitvector) {
     mmapbddnode_t u;
     get_mmap_node(map, ix, &u);
     while (u.var != 0) {
@@ -42,7 +59,7 @@ bool is_sat_mmap(char* map, nodeindex_t ix, uint64_t bitvector) {
     return u.low == 1;
 }
 
-uint64_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
+bitvector_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
  #if COMPRESSED_ENCODING
     #if (!ALLOW_ROW_ORDER || WIDTH >= HEIGHT)
         return (position_key(player, mask) << 2) | (stm << 1);
@@ -51,15 +68,15 @@ uint64_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
         uint64_t pseudo_moves = mask + BOTTOM_MASK;
         uint8_t i = 1;
         uint64_t bitvector = (stm << 1);
-        for (int row = 0; row < HEIGHT + 1; row++) {
-            for (int col = 0; col < WIDTH; col++) {
+        for (uint8_t row = 0; row < HEIGHT + 1; row++) {
+            for (uint8_t col = 0; col < WIDTH; col++) {
                 i++;
                 if (stm) {
-                    bitvector |= (is_cell_set(player, col, row) << i);
+                    bitvector |= ((bitvector_t) is_cell_set(player, col, row) << i);
                 } else {
-                    bitvector |= (is_cell_set(opponent, col, row) << i);
+                    bitvector |= ((bitvector_t) is_cell_set(opponent, col, row) << i);
                 }
-                bitvector |= (is_cell_set(pseudo_moves, col, row) << i);
+                bitvector |= ((bitvector_t) is_cell_set(pseudo_moves, col, row) << i);
             }
         }
         return bitvector;
@@ -68,19 +85,19 @@ uint64_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
     #if (!ALLOW_ROW_ORDER || WIDTH >= HEIGHT)
         uint64_t opponent = mask ^ player;
         uint8_t i = 1;
-        uint64_t bitvector = (stm << 1);
-        for (int col = 0; col < WIDTH; col++) {
-            for (int row = 0; row < HEIGHT; row++) {
+        bitvector_t bitvector = (stm << 1);
+        for (uint8_t col = 0; col < WIDTH; col++) {
+            for (uint8_t row = 0; row < HEIGHT; row++) {
                 if (stm) {
                     i++;
-                    bitvector |= ((uint64_t) is_cell_set(player, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(player, col, row) << i;
                     i++;
-                    bitvector |= ((uint64_t) is_cell_set(opponent, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(opponent, col, row) << i;
                 } else {
                     i++;
-                    bitvector |= ((uint64_t)is_cell_set(opponent, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(opponent, col, row) << i;
                     i++;
-                    bitvector |= ((uint64_t)is_cell_set(player, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(player, col, row) << i;
                 }
             }
         }
@@ -89,18 +106,18 @@ uint64_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
         uint64_t opponent = mask ^ player;
         uint8_t i = 1;
         uint64_t bitvector = (stm << 1);
-        for (int row = 0; row < HEIGHT; row++) {
-            for (int col = 0; col < WIDTH; col++) {
+        for (uint8_t row = 0; row < HEIGHT; row++) {
+            for (uint8_t col = 0; col < WIDTH; col++) {
                 if (stm) {
                     i++;
-                    bitvector |= ((uint64_t) is_cell_set(player, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(player, col, row) << i;
                     i++;
-                    bitvector |= ((uint64_t) is_cell_set(opponent, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(opponent, col, row) << i;
                 } else {
                     i++;
-                    bitvector |= ((uint64_t)is_cell_set(opponent, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(opponent, col, row) << i;
                     i++;
-                    bitvector |= ((uint64_t)is_cell_set(player, col, row)) << i;
+                    bitvector |= (bitvector_t) is_cell_set(player, col, row) << i;
                 }
             }
         }
@@ -110,7 +127,7 @@ uint64_t get_bitvector(bool stm, uint64_t player, uint64_t mask) {
 }
 
 // returns 1 if connect4 position is won, 0 if draw, and -1 if lost
-int probe_board_mmap(uint64_t player, uint64_t mask) {
+int8_t probe_board_mmap(uint64_t player, uint64_t mask) {
     bool win_sat, draw_sat, lost_sat;
     bool win_read, draw_read, lost_read;
     bool* sat_ptr;
@@ -120,7 +137,7 @@ int probe_board_mmap(uint64_t player, uint64_t mask) {
     bool stm = ply % 2 == 0;
 
 
-    uint64_t bitvector = get_bitvector(stm, player, mask);
+    bitvector_t bitvector = get_bitvector(stm, player, mask);
 
     for (int i = 0; i < 3; i++) {
         if (i==0) {
@@ -152,6 +169,9 @@ int probe_board_mmap(uint64_t player, uint64_t mask) {
 
         *sat_ptr = is_sat_mmap(map, bdd, bitvector);
     }
+    // printf("win_read: %d, win_sat: %d\n", win_read, win_sat);
+    // printf("draw_read: %d, draw_sat: %d\n", draw_read, draw_sat);
+    // printf("lost_read: %d, lost_sat: %d\n", lost_read, lost_sat);
 
     // have to read at least two files
     assert(win_read + draw_read + lost_read >= 2);
@@ -181,7 +201,7 @@ bool _probe_board_mmap_is_(uint64_t player, uint64_t mask, int i) {
 
     int ply = get_ply(player, mask);
     bool stm = ply % 2 == 0;
-    uint64_t bitvector = get_bitvector(stm, player, mask);
+    bitvector_t bitvector = get_bitvector(stm, player, mask);
 
     char* map = mmaps[ply][i];
     if (map == NULL) {

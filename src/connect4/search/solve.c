@@ -45,13 +45,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     #if !COMPRESSED_ENCODING
         nodeindex_t (**X)[2][2];
         X = malloc(width * sizeof(*X));
-        for (int col = 0; col < width; col++) {
+        for (uint8_t col = 0; col < width; col++) {
             X[col] = malloc(height * sizeof(*X[col]));
         }
     #else
         nodeindex_t (**X)[2];
         X = malloc(width * sizeof(*X));
-        for (int col = 0; col < width; col++) {
+        for (uint8_t col = 0; col < width; col++) {
             X[col] = malloc((height+1) * sizeof(*X[col]));
         }
 
@@ -195,7 +195,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
     uint64_t win_node_cnt, draw_node_cnt, lost_node_cnt;
 
-    int board, player;
+    uint8_t board, player;
     nodeindex_t trans, win_pre_img, draw_pre_image;
     variable_set_t* vars_board;
 

@@ -156,7 +156,7 @@ nodeindex_t not(nodeindex_t ix) {
 void init_variableset(variable_set_t* variable_set) {
     variable_set->index = ONEINDEX;
     variable_set->variables = (bool*) malloc(memorypool.num_variables * sizeof(bool));
-    for (int i = 0; i < memorypool.num_variables; i++) {
+    for (size_t i = 0; i < memorypool.num_variables; i++) {
         variable_set->variables[i] = false;
     }
 }

@@ -91,8 +91,8 @@ nodeindex_t _read_from_file(char* filename, nodeindexmap_t* map) {
         // printf("Read %"PRIu32" %"PRIu32" %"PRIu32" %"PRIu32"\n", src_ix, var, low, high);
 
         dst_ix = make(var, get_value_for_key(map, low), get_value_for_key(map, high));
-        add_key_value(map, src_ix, dst_ix);
         // printf("Map %"PRIu32" -> %"PRIu32"\n", src_ix, dst_ix);
+        add_key_value(map, src_ix, dst_ix);
 
         src_ix++;
     }

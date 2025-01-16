@@ -359,7 +359,7 @@ int main(int argc, char const *argv[]) {
             }
             if (res < 0) {
                 res = -MATESCORE - res;
-                sprintf(desc, "loss in %d plies", res);
+                sprintf(desc, "loss in %d plies", -res);
             }
         #else
             if (res > 0) {

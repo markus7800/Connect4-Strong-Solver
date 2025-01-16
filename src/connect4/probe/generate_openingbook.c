@@ -245,7 +245,6 @@ int main(int argc, char const *argv[]) {
     openingbook_t positions_to_evaluate = nondraw_canoncial_positions;
     TOTAL_CNT = positions_to_evaluate.count;
 
-
     // the workers are split up into subgroups
     // subgroups share tt and wdl cache
     // if multi processing (MP = true) only one subgroup is executed

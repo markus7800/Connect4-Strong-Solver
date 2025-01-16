@@ -48,13 +48,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     #if !COMPRESSED_ENCODING
         nodeindex_t (**X)[2][2];
         X = malloc(width * sizeof(*X));
-        for (int col = 0; col < width; col++) {
+        for (uint8_t col = 0; col < width; col++) {
             X[col] = malloc(height * sizeof(*X[col]));
         }
     #else
         nodeindex_t (**X)[2];
         X = malloc(width * sizeof(*X));
-        for (int col = 0; col < width; col++) {
+        for (uint8_t col = 0; col < width; col++) {
             X[col] = malloc((height+1) * sizeof(*X[col]));
         }
 

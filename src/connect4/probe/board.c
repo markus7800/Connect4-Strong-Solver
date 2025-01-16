@@ -45,12 +45,12 @@ u_int64_t column_mask(uint8_t col) {
 }
 
 // returns 1 if i-th bit is set in pos
-inline bool is_set(u_int64_t pos, int i) {
+uint64_t is_set(u_int64_t pos, uint64_t i) {
     return (1ULL & (pos >> i));
 }
 
-inline bool is_cell_set(uint64_t pos, int col, int row) {
-    return is_set(pos, row + (HEIGHT+1)*col);
+uint64_t is_cell_set(uint64_t pos, uint8_t col, uint8_t row) {
+    return is_set(pos, row + ((uint64_t) (HEIGHT+1))*col);
 }
 
 // returns true if there is an aligment of 4 bits horizontally, vertically or diagonally
