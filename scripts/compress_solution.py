@@ -1,6 +1,7 @@
 import subprocess
 import os
 import argparse
+import re
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -32,56 +33,58 @@ if __name__ == "__main__":
     with open("compile_wdl.sh", "w") as f:
         f.write(f"#!/bin/bash\ngcc src/connect4/probe/wdl.c -O3 -flto -Wall -O3 -DWIDTH={WIDTH} -DHEIGHT={HEIGHT} -DCOMPRESSED_ENCODING={COMPRESSED_ENCODING} -DALLOW_ROW_ORDER={ALLOW_ROW_ORDER} -o wdl.out")
     subprocess.run(["chmod", "+x", "compile_wdl.sh"])
+    subprocess.run(["./compile_wdl.sh"])
+    res_wdl = subprocess.run(["./wdl.out", f"{folder}/solution_w{WIDTH}_h{HEIGHT}", "332"], capture_output=True)
+    os.remove("wdl.out")
 
     with open("compile_bestmove.sh", "w") as f:
         f.write(f"#!/bin/bash\ngcc src/connect4/probe/bestmove.c -O3 -flto -Wall -O3 -DWIDTH={WIDTH} -DHEIGHT={HEIGHT} -DCOMPRESSED_ENCODING={COMPRESSED_ENCODING} -DALLOW_ROW_ORDER={ALLOW_ROW_ORDER} -o bestmove.out")
     subprocess.run(["chmod", "+x", "compile_bestmove.sh"])
+    subprocess.run(["./compile_bestmove.sh"])
+
+
+    res_bestmove = subprocess.run(["./bestmove.out", f"{folder}/solution_w{WIDTH}_h{HEIGHT}", "332"], capture_output=True)
+    os.remove("bestmove.out")
+
+
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+    res_wdl_str = ansi_escape.sub("", res_wdl.stdout.decode().replace("\x08", "\b"))
+    res_bestmove_str = ansi_escape.sub("", res_bestmove.stdout.decode().replace("\x08", "\b"))
 
     with open("readme.md", "w") as f:
         f.write(f"""
 # Build
 
-Run `./compile_wdl.sh` or `bash compile_wdl.sh` to build wdl evaluation (requires gcc).
+Run `./compile_wdl.sh` or `bash compile_wdl.sh` to build win-draw-loss evaluation (requires gcc).
                 
 Similarly, run `./compile_bestmove.sh` to build bestmove evaluation.
 
 # Example Usage
 
-`./wdl.out solution_w7_h6 "332"` to evaluate position after playing in the fourth-column twice and then playing in the third column.  
+`./wdl.out solution_w{WIDTH}_h{HEIGHT} "332"` to evaluate position after playing in the fourth-column twice and then playing in the third column.  
 It provides a win-draw-loss evaluation by directly reading from the binary decision diagrams stored in the *.bin files.
 
-Output for 7x6 board:
+Example Output:
 ```
-input move sequence: 332
-Connect4 width=7 x height=6
- . . . . . . .
- . . . . . . .
- . . . . . . .
- . . . . . . .  stones played: 3
- . . . o . . .  side to move: o
- . . x x . . .  is terminal: 0
- 0 1 2 3 4 5 6
-
-Overall evaluation = 1 (forced win)
-
-move evaluation:
-  0   1   2   3   4   5   6 
- -1   1  -1  -1   1  -1  -1 
-
- 1 ... move leads to forced win,
- 0 ... move leads to forced draw,
--1 ... move leads to forced loss
+{res_wdl_str}
 ```
                 
-Run `./bestmove.out solution_w7_h6 "332"` to find the best move with respect to shortest win or longest loss.  
-This will perform an alpha-beta pruning type search guided by the win-draw-loss evaluation.  
-It also uses the openingbook stored in the openingbook_w<WIDTH>_h<HEIGHT>_d8.csv file.  
+Run `./bestmove.out solution_w{WIDTH}_h{HEIGHT} "332"` to find the best move with respect to fastest win or slowest loss.  
+This will perform an alpha-beta search guided by the win-draw-loss evaluation.  
+It also uses the openingbook stored in the solution_w{WIDTH}_h{HEIGHT}/openingbook_w{WIDTH}_h{HEIGHT}_d8.csv file.  
 Also see `./bestmove.out --help`.
-                
+
+Example Output:
+```
+{res_bestmove_str}
+```
+
 # More Information
 
 Visit https://github.com/markus7800/Connect4-Strong-Solver.
         """)
+    
 
     subprocess.run([
         "7za", "a", "-t7z", "-mx9", archive_name,

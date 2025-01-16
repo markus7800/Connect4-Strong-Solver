@@ -7,6 +7,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--latex", action="store_true", help="print tables in latex")
     parser.add_argument("--md", action="store_true", help="print tables in markdown")
+    parser.add_argument("--all", action="store_true", help="print entire table instead of only position counts")
     parser.add_argument("--nodes", action="store_true", help="print node count instead of state count")
     parser.add_argument("--subtract-term", action="store_true", help="subtract terminal states from won/lost count")
 
@@ -32,8 +33,8 @@ if __name__ == "__main__":
     df.loc[second_player, "states (lost)"] = df["win_count"][second_player]
 
 
-    df["states"] = df["total_count"]
-    df["terminal"] = df["term_count"]
+    df["states (total)"] = df["total_count"]
+    df["states (terminal)"] = df["term_count"]
 
 
     df["nodes (won)"] = df["win_nodecount"]
@@ -51,10 +52,15 @@ if __name__ == "__main__":
 
 
     print("Classification from first players perspective")
-    df_states = df[["ply", "states (won)", "states (drawn)", "states (lost)", "states", "terminal"]]
+    df_states = df[["ply", "states (won)", "states (drawn)", "states (lost)", "states (total)", "states (terminal)"]]
     df_nodes = df[["nodes (won)", "nodes (drawn)", "nodes (lost)", "nodes (total)", "nodes (won+drawn+lost)"]]
     
-    _df  = df_nodes if args.nodes else df_states
+    if args.all:
+        _df = df_states.join(df_nodes)
+    elif args.nodes:
+        _df  = df_nodes
+    else:
+        _df = df_states
     str_df = _df.map(lambda x: "{:,}".format(x))
 
     if args.latex:
@@ -65,7 +71,7 @@ if __name__ == "__main__":
         print(str_df)
 
     if not args.nodes:
-        print(df[["states (won)", "states (drawn)", "states (lost)", "states"]].sum(axis=0).map(lambda x: "{:,}".format(x)))
+        print(df[["states (won)", "states (drawn)", "states (lost)", "states (total)"]].sum(axis=0).map(lambda x: "{:,}".format(x)))
 
 
     # plt.figure()
