@@ -47,7 +47,7 @@ Go to `src/connect4`.
 Compile with `make count`.
 Options:
 - `COMPRESSED_ENCODING`: whether to use compressed encoding (default: `1`)
-- `ALLOW_ROW_ORDER`: whether to sort variables by row instead of column if `heigth > width` (default: `0`)
+- `ALLOW_ROW_ORDER`: whether to sort variables by row instead of column if `heigth > width`. Is irrelevant if `height <= width` (default: `0`)
 - `FULLBDD`: whether to compute BDD that represents all unique positions (= union of positions per ply, default: `0`)
 - `SUBTRACT_TERM`: whether to use Connect4 termination criterion (default: `1`)
 - `ENTER_TO_CONTINUE`: whether to require to press enter to start computation (default: `0`)
@@ -90,6 +90,123 @@ Some examples to demonstrate flags:
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=1 IN_OP_GC=0 SUBTRACT_TERM=0`
     - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 0.17 %, finishes in 67.398 seconds.
+
+If this takes too long on your computer you may try:
+
+- `make count COMPRESSED_ENCODING=1 FULLBDD=0 IN_OP_GC=0`
+    - `./build/count.out 26 6 6`: uses <4 GB RAM, fill-level: 60.02 %, finishes in in 978.566 seconds.
+
+#### Solving Connect-4
+Compile with `make solve`.
+Options:
+- `COMPRESSED_ENCODING`
+- `ALLOW_ROW_ORDER`
+- `ENTER_TO_CONTINUE`
+- `WRITE_TO_FILE`
+- `IN_OP_GC`
+- `IN_OP_GC_THRES`
+- `IN_OP_GC_EXCL`
+- `SAVE_BDD_TO_DISK`: whether to save the strong solution as BDD to disk (default: `1`)
+
+Run with `./build/solve.out log2_tablesize width height`.
+
+If `SAVE_BDD_TO_DISK=1`, then for each ply three files will be generated. One BDD that is sat for won positions, one for drawn, and one for lost positions.
+These files will be stored in the `solution_w{WIDTH}_h{HEIGHT}` folder.
+For information on other options, see previous section.
+
+Some example runs:
+
+- `make solve COMPRESSED_ENCODING=1`
+    - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 51.79 %, finishes in 7659.027 seconds.
+    - `./build/solve.out 24 6 4`: uses <1 GB RAM, fill-level: 12.87 %, finishes in 32.617 seconds.
+    - `./build/solve.out 24 5 5`: uses <1 GB RAM, fill-level:  14.22 %, finishes in 40.008 seconds.
+- `make solve COMPRESSED_ENCODING=0 IN_OP_GC=1 IN_OP_GC_THRES=0.9`
+    - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 90.00 %, finishes in 15383.985 seconds.
+- `make solve COMPRESSED_ENCODING=1 IN_OP_GC=1 IN_OP_GC_THRES=0.9`
+    - `./build/solve.out 28 6 6`: uses <16 GB RAM, fill-level: 90.00 %, finishes in ?? seconds.
+    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in 167967.311 seconds. (See results section for output)
+
+#### Win-Draw-Loss Query
+
+To query the solution generated with `solve.out` build the `wdl.out` program with `make wdl`.
+Options:
+- `COMPRESSED_ENCODING`
+- `ALLOW_ROW_ORDER`
+- `WIDTH`: the width of the Connect4 board
+- `HEIGHT`: the height of the Connect4 board
+
+The options have to be set to be compatable with the solutoin generated with `solve.out`.
+Same encoding + same height and width.
+
+Example:
+
+`make wdl COMPRESSED_ENCODING=1 WIDTH=6 HEIGHT=6`
+
+Output of `./build/wdl_w6_h6.out solution_w6_6/ "332"`  
+    
+```
+asd
+```
+
+
+#### Bestmove search
+To find the move that leads to the fastest win or slowest loss compile with `make bestmove`
+Options:
+- `COMPRESSED_ENCODING`
+- `ALLOW_ROW_ORDER`
+- `WIDTH`: the width of the Connect4 board
+- `HEIGHT`: the height of the Connect4 board
+
+The options have to be set to be compatable with the solutoin generated with `solve.out`.
+Same encoding + same height and width.
+
+`make wdl COMPRESSED_ENCODING=1 WIDTH=6 HEIGHT=6`
+
+Output of `./build/bestmove_w6_h6.out solution_w6_6/ "332"`  
+    
+```
+asd
+```
+
+#### Generating Openingbook
+The bestmove search can be sped up by creating an openingbook by evaluating all positions at a given ply (default = 8).
+Compile with `make openingbook`.
+Options:
+- `COMPRESSED_ENCODING`
+- `ALLOW_ROW_ORDER`
+- `WIDTH`: the width of the Connect4 board
+- `HEIGHT`: the height of the Connect4 board
+
+The options have to be set to be compatable with the solutoin generated with `solve.out`.
+Same encoding + same height and width.
+
+Run with `generate_openingbook_w{WIDTH}_h{HEIGHT}.out folder n_workers`.  
+For example `generate_openingbook_w6_h6.out solution_w6_h6/ 4` creates the openingbook with `4` threads.
+
+It may be beneficial to do multi-processing as well.  
+For this execute `python3 probe/generate_openingbook_mp.py folder width height n_workers`.  
+It will spawn `n_workers / 4` processes.
+
+#### Full Alpha-Beta Search
+
+The bestmove search does alpha-beta pruning by leveraging the strong-solution found with `solve.out`.
+
+For comparison, we also implemented an equivalent alpha-beta search that does not make use of the strong solution.
+
+Compile with `make full_ab_search`.
+
+Options:
+- `WIDTH`: the width of the Connect4 board
+- `HEIGHT`: the height of the Connect4 board
+- `DTM`: whether search move with respect to distance to mate (fastest win, slowest loss). Otherwise, only produces a win-draw-loss evaluation.
+
+Run with `./build/full_ab_search_w{WIDTH}_h{HEIGHT}.out moveseq`.
+
+Examples:
+- `make full_ab_search WIDTH=7 HEIGHT=6 DTM=1`
+    - finds solution in 131.918 seconds and 946,511,712 nodes
+- `make full_ab_search WIDTH=7 HEIGHT=6 DTM=0`
+    - finds solution in 114.841 seconds and 827,622,460 nodes
 
 ## Scripts to Reproduce Paper
 
