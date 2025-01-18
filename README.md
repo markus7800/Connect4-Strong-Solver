@@ -43,6 +43,23 @@ You may play around with trading of speed versus memory usage. E.g. `queens.out 
 
 Go to `src/connect4`.
 
+#### Encoding
+There are multiple ways to encode a Connect4 position with Boolean variables.
+Edelkamp and Kissmann use `2 * width * height + 1` variables: one variable denotes the side-to-move and there are two variables per board cell indicating whether it is empty, occupied by the first player, or occupied by the second player.
+For this cell-wise encoding, Edelkamp and Kissmann proved that the algorithmic complexity of counting all unique positions is exponential in `min(width, height)`, independent of variable ordering.
+We have implemented their encoding for both a row-wise and column-wise order.
+To encode transititoins, we need two sets of variable, i.e. two boards.
+While they have not explicitly mentioned how to order the variables belonging to the same cell we take following approach: player-1-board-1, player-1-board-2, player-2-board-1, player-2-board-2, as illustrated below on the left.
+![connect4_encoding](connect4_encoding.png)
+
+Inspired by bitboard representations~\cite{tromp2008solving,Herzberg}, we have also implemented a more compressed encoding with only `width * (height + 1)`variables, illustrated above on the right.
+In this encoding, each cell has only one variable.
+The lowest available cell per column is always `true`.
+All cells below the lowest available cell are occupied and `true` if the disc belongs to the first player else `false` (the disc belongs to the second player).
+To facilitate this logic, we need an additional row.
+This encoding outperforms the standard encoding for the 7 x 6 board configuration, but performs poorly if the number of rows is large.
+
+
 #### Counting number of unique positions
 Compile with `make count`.
 Options:
@@ -58,7 +75,6 @@ Options:
 
 Run with `./build/counts.out log2_tablesize width height`.
 
-For more information about the encoding see ??.
 Generally, if you have enough memory available, `log2_tablesize` should be chosen such that the maximum fill-level of the node pool does not exceed 50 %.
 Otherwise, performance degrades.
 If the garbage collection manually set program points is not enough, then you may encounter a `uniquetable too small` error, i.e. there are no more nodes available to allocate.
@@ -320,7 +336,7 @@ With the compressed encoding it only takes 59,853,336 BDD nodes.
 
 ### 7 x 6 Solution
 
-Here are some statistics for the strong solution of the 7 x 6 board.
+Here are some statistics for the strong solution of the 7 x 6 board from the perspective of the first player. If ply is odd, then terminal positions are won otherwise lost for the first player.
 
 |   ply |    states (won) |   states (drawn) |   states (lost) |   states (total) |   states (terminal) |   nodes (won) |   nodes (drawn) |   nodes (lost) |   nodes (total) |   nodes (won+drawn+lost) |
 |------:|----------------:|-----------------:|----------------:|-----------------:|--------------------:|--------------:|----------------:|---------------:|----------------:|-------------------------:|
