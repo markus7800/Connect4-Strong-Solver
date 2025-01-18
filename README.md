@@ -88,29 +88,29 @@ Set only if you are intersted in the number of nodes required to encode all posi
 Some examples to demonstrate flags:
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=0 IN_OP_GC=0`
-    - `./build/count.out 29 7 6`: uses <32 GB RAM, fill-level: 28.50 %, finishes in 6290.382 seconds.
-    - `./build/count.out 28 7 6`: uses <16 GB RAM, fill-level: 56.99 %, finsihes in 6879.484 seconds.
+    - `./build/count.out 29 7 6`: uses <32 GB RAM, fill-level: 28.50 %, finishes in ~6300 seconds.
+    - `./build/count.out 28 7 6`: uses <16 GB RAM, fill-level: 56.99 %, finsihes in ~6900 seconds.
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=0 IN_OP_GC=1`
-    - `./build/count.out 27 7 6`: uses <8 GB RAM, triggers IN_OP_GC 3 times, finishes in 10816.522 seconds.
+    - `./build/count.out 27 7 6`: uses <8 GB RAM, triggers IN_OP_GC 3 times, finishes in ~10800 seconds.
 
 - `make count COMPRESSED_ENCODING=0 FULLBDD=0 IN_OP_GC=0`
-    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 44.43 %, finsihes in 10083.400 seconds.
-    - `./build/count.out 28 7 6` uses <16 GB RAM, fill-level: 88.86 %, finishes in 11715.221 seconds.
+    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 44.43 %, finsihes in ~10100 seconds.
+    - `./build/count.out 28 7 6` uses <16 GB RAM, fill-level: 88.86 %, finishes in ~11700 seconds.
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=1 IN_OP_GC=0`
-    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 48.21 %, finishes in 8021.748 seconds.
+    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 48.21 %, finishes in ~8000 seconds.
 
 - `make count COMPRESSED_ENCODING=0 FULLBDD=1 IN_OP_GC=0`
-    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 75.40 %, finishes in 12807.400 seconds.
+    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 75.40 %, finishes in ~12800 seconds.
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=1 IN_OP_GC=0 SUBTRACT_TERM=0`
-    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 0.17 %, finishes in 67.398 seconds.
+    - `./build/count.out 29 7 6` uses <32 GB RAM, fill-level: 0.17 %, finishes in ~70 seconds.
 
 If this takes too long on your computer you may try:
 
 - `make count COMPRESSED_ENCODING=1 FULLBDD=0 IN_OP_GC=0`
-    - `./build/count.out 26 6 6`: uses <4 GB RAM, fill-level: 60.02 %, finishes in in 978.566 seconds.
+    - `./build/count.out 26 6 6`: uses <4 GB RAM, fill-level: 60.02 %, finishes in in ~980 seconds.
 
 #### Solving Connect-4
 Compile with `make solve`.
@@ -133,14 +133,14 @@ For information on other options, see previous section.
 Some example runs:
 
 - `make solve COMPRESSED_ENCODING=1`
-    - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 51.79 %, finishes in 7659.027 seconds.
-    - `./build/solve.out 24 6 4`: uses <1 GB RAM, fill-level: 12.87 %, finishes in 32.617 seconds.
-    - `./build/solve.out 24 5 5`: uses <1 GB RAM, fill-level:  14.22 %, finishes in 40.008 seconds.
+    - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 51.79 %, finishes in ~7700 seconds.
+    - `./build/solve.out 24 6 4`: uses <1 GB RAM, fill-level: 12.87 %, finishes in ~35 seconds.
+    - `./build/solve.out 24 5 5`: uses <1 GB RAM, fill-level:  14.22 %, finishes in ~40 seconds.
 - `make solve COMPRESSED_ENCODING=0 IN_OP_GC=1 IN_OP_GC_THRES=0.9`
-    - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 90.00 %, finishes in 15383.985 seconds.
+    - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 90.00 %, finishes in ~15400 seconds.
 - `make solve COMPRESSED_ENCODING=1 IN_OP_GC=1 IN_OP_GC_THRES=0.9`
-    - `./build/solve.out 28 6 6`: uses <16 GB RAM, fill-level: 90.00 %, finishes in 8478.253 seconds.
-    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in 167967.311 seconds. (See results section for output and [Zenodo](https://zenodo.org/records/14582823))
+    - `./build/solve.out 28 6 6`: uses <16 GB RAM, fill-level: 90.00 %, finishes in ~8500 seconds.
+    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in ~168000 seconds. (See results section for output and [Zenodo](https://zenodo.org/records/14582823))
 
 #### Win-Draw-Loss Query
 
@@ -279,9 +279,9 @@ Run with `./build/full_ab_search_w{WIDTH}_h{HEIGHT}.out moveseq`.
 
 Examples:
 - `make full_ab_search WIDTH=7 HEIGHT=6 DTM=1`
-    - finds solution in 131.918 seconds and 946,511,712 nodes
+    - finds solution in ~130 seconds and 946,511,712 nodes
 - `make full_ab_search WIDTH=7 HEIGHT=6 DTM=0`
-    - finds solution in 114.841 seconds and 827,622,460 nodes
+    - finds solution in ~115 seconds and 827,622,460 nodes
 
 ## Scripts to Reproduce Paper
 
