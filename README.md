@@ -15,7 +15,7 @@ to count the number of unique positions and to produce a strong solution of a Co
 The number of positions for the conventional 7 x 6 board can be computed in ~3h with 16 GB RAM.
 
 The strong solution of the 7 x 6 instance takes ~47 hours and 128 GB RAM.
-It is published on [Zenodo](https://zenodo.org/uploads/14582823).
+It is published on [Zenodo](https://zenodo.org/records/14582823).
 
 ## Overview
 
@@ -124,7 +124,7 @@ Some example runs:
     - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 90.00 %, finishes in 15383.985 seconds.
 - `make solve COMPRESSED_ENCODING=1 IN_OP_GC=1 IN_OP_GC_THRES=0.9`
     - `./build/solve.out 28 6 6`: uses <16 GB RAM, fill-level: 90.00 %, finishes in 8478.253 seconds.
-    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in 167967.311 seconds. (See results section for output)
+    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in 167967.311 seconds. (See results section for output and [Zenodo](https://zenodo.org/records/14582823))
 
 #### Win-Draw-Loss Query
 
@@ -243,6 +243,9 @@ It may be beneficial to do multi-processing as well.
 For this execute `python3 probe/generate_openingbook_mp.py folder width height n_workers`.  
 It will spawn `n_workers / 4` processes.
 
+The openingbook is stored as .csv where the position key (see `position_key` function in `src/connect4/probe/board.c`) is mapped to game score: `100 - ply` for win in `ply` moves and `-100 + ply` for loss in `ply` moves.
+If a position is not contained in the opening book it is a draw.
+
 #### Full Alpha-Beta Search
 
 The bestmove search does alpha-beta pruning by leveraging the strong-solution found with `solve.out`.
@@ -266,37 +269,25 @@ Examples:
 
 ## Scripts to Reproduce Paper
 
-## Usage
+There is a paper in progress and we have added scripts to conveniently reproduce the results.
 
-Compile with `make` (see the `src/makefile` for compilation options):
-```
-cd src
-make
-```
+We ran all experiments on a AMD Ryzen 9 5950X 16-Core Processor with 128 GB RAM. 
 
-Run with
-```
-connect4.out log2tbsize width height
-```
-`log2tbsize` is the parameter that controls how much RAM is used and how many BDD nodes can be allocated (`1 << log2tbsize`).
-The maximum size is `log2tbsize=32` which requires a bit more than 200GB RAM.
-It is recommended to set `log2tbsize` as large as possible, because it reduces hash collisions.
-
-Garbage collection was tuned to work well with `connect4.out 29 7 6`.  
-Smaller board sizes spend more time in GC than necessary.
-
-
-### Writing your own program
-
-This project comes with its own [binary decision diagram](https://en.wikipedia.org/wiki/Binary_decision_diagram) library implementation.
-Its focus is on pre-allocation of all BDD nodes (constant memory usage), fine control over garbage collection, and to make Connect4 work.
-So it may not be the most user-friendly BDD library, however, it is very performant and may be re-used for your needs.
-We do not provide documentation, but comments in the source code and studying `queens.c` and `connect.c` should help.
+- `python3 scripts/count_positions.py RAM max_worker` counts the number of unique positions for several width-height combinations and several encodings. Results are stored in `results/count_positions_results`. The option `RAM` is the amount of memory you want to use, should be a multiple of 2. And `max_worker` is the maximum number of parallel searches. We ran the experiment with `RAM=128` and `max_worker=32`. This takes days to complete.
+- `python3 scripts/analyse_count_results.py` can be used to create summary tables of the count results.
+- `python3 python3 scripts/count_w_and_wo_subtract_term.py 7 6 29` was used to compare the BDD sizes when counting the number of unique positions for the 7 x 6 board with different encodings, once with the termination criteria and once without.
+- `python3 scripts/solve_position.py WIDTH HEIGHT LOG_TB_SIZE COMPRESSED_ENCODING ALLOW_ROW_ORDER` can be used to compile and run the `solve.out` program with the specified parameters. We ran `python3 scripts/solve_position.py 7 6 31 1 0` to solve the 7 x 6 board with 128 GB RAM in 47 hours.
+- `python3 scripts/generate_opening_book.py WIDTH HEIGHT COMPRESSED_ENCODING ALLOW_ROW_ORDER N_WORKERS` can be used to conveniently generate an opening book for the strong solution obtained with the previous script. For the 7 x 6 case it took a little more than 5 hours with 32 workers.
+- `python3 scripts/print_solve_table.py` can be used to inspect the statistics per ply of the strong solution.
+- `python3 scripts/compress_solution.py` was used to compress the strong solution with `7zip` for upload at [Zenodo](https://zenodo.org/records/14582823). Here we did not include the redundant `draw` BDDs to decrease the size.
+- `python3 scripts/zip_results.py results/` was used to zip the logs and data results from the experiments for upload at Zenodo.
 
 ## Results
+
+### Unique Position Counts
 We were able to independently verify the numbers computed by [John Tromp](https://tromp.github.io/c4/c4.html) and produce novel counts for boards up to size `width + height = 14`.
 
-The computation were run on a Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz with 238.4GB RAM.
+The computations were run on a AMD Ryzen 9 5950X 16-Core Processor with 128 GB RAM. 
 
 
 |   height\width |   1 |         2 |              3 |                  4 |                 5 |                  6 |                   7 |                   8 |                   9 |                 10 |                  11 |                     12 |                      13 |
@@ -315,7 +306,22 @@ The computation were run on a Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz with 
 |             12 |  13 |   980,684 | 10,300,852,227 |  3,928,940,117,357 |               N/A |                N/A |                 N/A |                 N/A |                 N/A |                N/A |                 N/A |                    N/A |                     N/A |
 |             13 |  14 | 2,888,780 | 61,028,884,959 | 29,499,214,177,403 |               N/A |                N/A |                 N/A |                 N/A |                 N/A |                N/A |                 N/A |                    N/A |                     N/A |
 
-### solution
+### Representing all 7 x 6 positions in one BDD
+
+With the compilation option `FULLBDD=1` we computed that 95,124,612 BDD nodes are enough to encode all 7 x 6 Connect4 positions with the standard encoding.
+
+This is a bit more than the 84,088,763 number of nodes which Edelkamp, S., & Kissmann, P. claimed in 
+```
+Edelkamp, S., & Kissmann, P. (2008). Symbolic classification of general two-player games.
+In KI 2008: Advances in Artificial Intelligence: 31st Annual German Conference on AI, KI 2008, Kaiserslautern, Germany, September 23-26, 2008. Proceedings 31 (pp. 185-192). Springer Berlin Heidelberg.
+```
+
+With the compressed encoding it only takes 59,853,336 BDD nodes.
+
+### 7 x 6 Solution
+
+Here are some statistics for the strong solution of the 7 x 6 board.
+
 |   ply |    states (won) |   states (drawn) |   states (lost) |   states (total) |   states (terminal) |   nodes (won) |   nodes (drawn) |   nodes (lost) |   nodes (total) |   nodes (won+drawn+lost) |
 |------:|----------------:|-----------------:|----------------:|-----------------:|--------------------:|--------------:|----------------:|---------------:|----------------:|-------------------------:|
 |     0 |               1 |                0 |               0 |                1 |                   0 |            52 |               1 |              1 |               1 |                       54 |
@@ -362,26 +368,9 @@ The computation were run on a Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz with 
 |    41 |   4,282,128,782 |    2,496,557,393 |   1,033,139,763 |    7,811,825,938 |       4,282,128,782 |     7,938,927 |       3,499,912 |      4,036,774 |       7,901,773 |               15,475,613 |
 |    42 |               0 |      713,298,878 |     746,034,021 |    1,459,332,899 |         746,034,021 |             1 |       1,783,048 |      2,731,785 |       2,777,005 |                4,514,834 |
 
+```
 states (won)      2,317,028,267,398
 states (drawn)      123,343,183,724
 states (lost)     2,091,613,767,970
 states (total)    4,531,985,219,092
-
-### Counts per ply
-
-By default, we only construct one BDD per ply (layer).
-We record the number of positions at a given ply and the number of nodes of the BDD encoding these positions.
-These numbers can be found in the results folder.
-
-In the 7 x 6 case, our approximately numbers match Edelkamp, S., & Kissmann, P.
-
-We also implemented the compilation option `FULLBDD=1` which computes the OR over the BDDs of each ply.
-This encodes all Connect4 positions.
-For the 7 x 6 position this BDD has 95124612 nodes in our implementation.
-
-This is a bit much more than the 84,088,763 number of nodes which Edelkamp, S., & Kissmann, P. claimed in 
 ```
-Edelkamp, S., & Kissmann, P. (2008). Symbolic classification of general two-player games.
-In KI 2008: Advances in Artificial Intelligence: 31st Annual German Conference on AI, KI 2008, Kaiserslautern, Germany, September 23-26, 2008. Proceedings 31 (pp. 185-192). Springer Berlin Heidelberg.
-```
-Of course this number depends on the variable ordering which Edelkamp, S., & Kissmann, P. did not publish.
