@@ -17,6 +17,8 @@ The number of positions for the conventional 7 x 6 board can be computed in ~3h 
 The strong solution of the 7 x 6 instance takes ~47 hours and 128 GB RAM.
 It is published on [Zenodo](https://zenodo.org/records/14582823).
 
+You can find a paper describing this work [here](paper.pdf).
+
 ## Overview
 
 ### Binary Decision Diagrams Library
