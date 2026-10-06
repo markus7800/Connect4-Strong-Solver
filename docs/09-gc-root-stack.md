@@ -73,3 +73,15 @@ the extra writes of the old protocol are cheap. (The last column was measured wi
 jobs running on the machine instead of three, which accounts for the 4–6 %.) The case
 this change is made for, a table much larger than the caches, is measured on 6x5 with
 2^26 nodes and added below.
+
+### Larger table
+
+6x5 solve with 2^26 nodes (no in-op GC triggers at this size, so this isolates the cost
+of the protocol):
+
+| configuration | time [s] | GC [s] |
+|---|---:|---:|
+| change 08, `IN_OP_GC=0` | 259.1 | 62.4 |
+| change 09, `IN_OP_GC=1` with the root stack | 262.6 | 62.5 |
+
+In-op GC is now available for 1.4 % of the run time, within noise of free.

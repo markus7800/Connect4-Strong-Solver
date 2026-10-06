@@ -30,6 +30,8 @@
 #include "default_encoding.c"
 #endif
 
+#include "moves.c"
+
 #ifndef SUBTRACT_TERM
 #define SUBTRACT_TERM 1
 #endif
@@ -73,11 +75,32 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     finished_variablesset(&vars_board0);
     finished_variablesset(&vars_board1);
 
+    // Positions are always encoded with the board0 variables,
+    // board1 variables are only used in the trans relations (see moves.c)
+    prepare_image_rename(&vars_board0);
+
     // Compute trans relation by performing OR over all possible moves
-    // One for the case when current ply is encoded by board0 and next ply by board1,
-    // and one for the case when the roles are switched
+    // One for the case when the position before the move is encoded by board0 and the one after by board1 (successors),
+    // and one for the case when the roles are switched (predecessors)
     nodeindex_t trans0 = get_trans(X, stm0, stm1, width, height, 0);
     nodeindex_t trans1 = get_trans(X, stm0, stm1, width, height, 1);
+    moves_t moves;
+    moves.width = width;
+    moves.vars_board0 = &vars_board0;
+    moves.trans0 = trans0;
+    moves.trans1 = trans1;
+    moves.trans0_col = NULL;
+    moves.trans1_col = NULL;
+#if PARTITIONED_IMAGE
+    moves.trans0_col = (nodeindex_t*) malloc(width * sizeof(nodeindex_t));
+    moves.trans1_col = (nodeindex_t*) malloc(width * sizeof(nodeindex_t));
+    for (uint8_t col = 0; col < width; col++) {
+        moves.trans0_col[col] = get_trans_col(X, stm0, stm1, width, height, 0, col);
+        keepalive_ix(moves.trans0_col[col]);
+        moves.trans1_col[col] = get_trans_col(X, stm0, stm1, width, height, 1, col);
+        keepalive_ix(moves.trans1_col[col]);
+    }
+#endif
     // We always want to keep the trans relations alive (prevent GC)
     keepalive_ix(trans0);
     keepalive_ix(trans1);
@@ -126,17 +149,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         gc_level = IN_OP_GC_EXCL ? 0 : (d >= 10) + (d >= 25);
         if (gc_level) printf("\n");
 
-        // first subtract all terminal positions and then perform image operatoin
+        // first subtract all terminal positions and then perform image operation
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
-        // roles of board0 and board1 switch
-        if ((d % 2) == 1) {
-            current = SUBTRACT_TERM ? connect4_subtract_term(current, 0, 1, X, width, height, gc_level) : current;
-            current = image(current, trans0, &vars_board0);
-
-        } else {
-            current = SUBTRACT_TERM ? connect4_subtract_term(current, 1, 0, X, width, height, gc_level) : current;
-            current = image(current, trans1, &vars_board1);
-        }
+        // in a terminal position the player who made the last move has four in a row:
+        // this is the second player (1) after an even number of moves > 0
+        current = SUBTRACT_TERM ? connect4_subtract_term(current, 0, (d % 2) == 1 ? 1 : 0, X, width, height, gc_level) : current;
+        current = successors(current, &moves);
 
         if (gc_level) {
             printf("  IMAGE GC: ");
@@ -147,21 +165,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if FULLBDD
         // update full bdd (enconding all positions) by performing OR with current
-        if ((d % 2) == 1) {
-                undo_keepalive_ix(full_bdd);
-                keepalive_ix(current);
-                // current is board1 encoding -> we have to do special OR
-                full_bdd = board0_board1_or(full_bdd, current);
-                undo_keepalive_ix(current);
-                keepalive_ix(full_bdd);
-        } else {
-                undo_keepalive_ix(full_bdd);
-                keepalive_ix(current);
-                // current is board0 encoding -> we can do normal OR
-                full_bdd = or(full_bdd, current);
-                undo_keepalive_ix(current);
-                keepalive_ix(full_bdd);
-        }
+        undo_keepalive_ix(full_bdd);
+        keepalive_ix(current);
+        full_bdd = or(full_bdd, current);
+        undo_keepalive_ix(current);
+        keepalive_ix(full_bdd);
 
         if (gc_level) {
             printf("  FULLBDD GC: ");

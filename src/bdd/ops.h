@@ -19,6 +19,7 @@
 #define DIFF_OP 5
 #define EXISTS_OP 6
 #define IMAGE_OP 7
+#define IMAGE_RENAME_OP 8
 // operation numbers 16 to 127 are free for user defined operations
 #define USER_OP 16
 // counting operations store a 64-bit number in the cache
@@ -33,6 +34,9 @@ typedef struct VariableSet {
     nodeindex_t index;
     bool* variables;
     uint32_t id; // unique number of the set (part of the cache key for image)
+    // only for image_rename (see prepare_image_rename), indexed by variable:
+    bool* primed;          // whether the variable is the primed partner (var - 1 is in the set)
+    nodeindex_t* identity; // for a variable of the set: the relation "x = x' for this and all later variables of the set"
 } variable_set_t;
 
 void init_variableset(variable_set_t* variable_set);
@@ -58,6 +62,21 @@ nodeindex_t not(nodeindex_t ix);
 nodeindex_t exists(nodeindex_t ix, variable_set_t* variable_set);
 // image is efficient implemenation of exists(and(ix1,ix2),variable_set)
 nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set);
+
+// Image with renaming: exists(and(ix1, ix2), variable_set) where afterwards each primed variable is renamed to its
+// unprimed partner. The result is over the same variables as ix1.
+//
+// Requirements:
+// - the primed partner x' of a variable x of the set is the next variable in the order (var(x') = var(x) + 1),
+//   and it is not part of the set
+// - ix1 (a set of states) does not depend on primed variables
+// - ix2 is a relation between unprimed (before) and primed (after) variables
+// - prepare_image_rename(variable_set) was called (after finished_variablesset)
+//
+// If the remaining part of the relation is the identity (x = x' for all later variables), the remaining part of
+// ix1 is returned as is, i.e. the result shares all nodes with ix1 that are not affected by the relation.
+void prepare_image_rename(variable_set_t* variable_set);
+nodeindex_t image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set);
 
 
 #endif

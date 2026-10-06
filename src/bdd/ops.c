@@ -35,6 +35,8 @@ void in_op_gc(uint8_t op, nodeindex_t result) {
             printf("(exists) "); break;
         case IMAGE_OP:
             printf("(image) "); break;
+        case IMAGE_RENAME_OP:
+            printf("(image_rename) "); break;
         }
         gc_stack_push(result);
         gc_in_op();
@@ -183,6 +185,8 @@ nodeindex_t not(nodeindex_t ix) {
 static uint32_t num_variable_sets = 0;
 void init_variableset(variable_set_t* variable_set) {
     variable_set->id = num_variable_sets++;
+    variable_set->primed = NULL;
+    variable_set->identity = NULL;
     variable_set->index = ONEINDEX;
     variable_set->variables = (bool*) malloc(memorypool.num_variables * sizeof(bool));
     for (size_t i = 0; i < memorypool.num_variables; i++) {
@@ -303,6 +307,106 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
 nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set) {
     keepalive(get_node(ix1)); keepalive(get_node(ix2));
     nodeindex_t res = apply_image(ix1, ix2, variable_set);
+    undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2));
+    return res;
+}
+
+
+void prepare_image_rename(variable_set_t* variable_set) {
+    size_t n = memorypool.num_variables;
+    variable_set->primed = (bool*) calloc(n + 2, sizeof(bool));
+    variable_set->identity = (nodeindex_t*) calloc(n + 2, sizeof(nodeindex_t));
+    BDD_CHECK(variable_set->primed != NULL && variable_set->identity != NULL, "Could not allocate :(");
+
+    // from the last variable of the set to the first
+    nodeindex_t identity = ONEINDEX;
+    keepalive_ix(identity);
+    for (size_t var = n; var >= 1; var--) {
+        if (!variable_set->variables[var - 1]) {
+            continue;
+        }
+        BDD_CHECK(var < n && !variable_set->variables[var], "image_rename needs the primed partner directly after each variable of the set :(");
+        variable_set->primed[var + 1] = true;
+        nodeindex_t x = make((variable_t) var, ZEROINDEX, ONEINDEX);
+        nodeindex_t xprimed = make((variable_t) (var + 1), ZEROINDEX, ONEINDEX);
+        reassign_and_keepalive(&identity, and(iff(x, xprimed), identity));
+        // stays alive forever
+        keepalive_ix(identity);
+        variable_set->identity[var] = identity;
+    }
+    undo_keepalive_ix(identity);
+}
+
+nodeindex_t apply_image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set) {
+    if (ix1 == ZEROINDEX || ix2 == ZEROINDEX) {
+        return ZEROINDEX;
+    }
+    if (ix1 == ONEINDEX && ix2 == ONEINDEX) {
+        return ONEINDEX;
+    }
+    bddnode_t* u1 = get_node(ix1);
+    bddnode_t* u2 = get_node(ix2);
+    variable_t level1 = level(u1);
+    variable_t level2 = level(u2);
+
+    // The rest of the relation is the identity and ix1 does not depend on a variable before it:
+    // the image is ix1 itself.
+    if (level2 <= level1 && !isconstant(u2) && variable_set->identity[u2->var] == ix2) {
+        return ix1;
+    }
+
+    // the variable set is part of the cache key
+    uint32_t tag = IMAGE_RENAME_OP | (variable_set->id << 8);
+    uint32_t cache_ix = opcache_index(tag, ix1, ix2);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix1 && cacheentry.b == ix2 && cacheentry.tag == tag) {
+        return cacheentry.result;
+    }
+
+    nodeindex_t l;
+    nodeindex_t h;
+    variable_t var;
+    if (level1 < level2) {
+        l = apply_image_rename(u1->low, ix2, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image_rename(u1->high, ix2, variable_set); IN_OP_GC_keepalive(h);
+        var = u1->var;
+    } else if (level1 > level2) {
+        l = apply_image_rename(ix1, u2->low, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image_rename(ix1, u2->high, variable_set); IN_OP_GC_keepalive(h);
+        var = u2->var;
+    } else {
+        l = apply_image_rename(u1->low, u2->low, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image_rename(u1->high, u2->high, variable_set); IN_OP_GC_keepalive(h);
+        var = u1->var;
+    }
+
+    nodeindex_t new_u;
+    if (variable_set->primed[var]) {
+        // primed variable: only the relation depends on it, it takes the place of its unprimed partner
+        assert(level1 > level2);
+        new_u = make(var - 1, l, h);
+    } else if (variable_set->variables[var - 1]) {
+        // unprimed variable: existential quantification
+        new_u = apply_binary(l, h, OR_OP);
+    } else {
+        new_u = make(var, l, h);
+    }
+
+#if IN_OP_GC
+    // l and h are reachable from new_u now
+    gc_stack_pop(2);
+    in_op_gc(IMAGE_RENAME_OP, new_u);
+#endif
+
+    opcache_store(cache_ix, tag, ix1, ix2, new_u);
+
+    return new_u;
+}
+
+nodeindex_t image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set) {
+    BDD_CHECK(variable_set->primed != NULL, "prepare_image_rename has to be called before image_rename :(");
+    keepalive(get_node(ix1)); keepalive(get_node(ix2));
+    nodeindex_t res = apply_image_rename(ix1, ix2, variable_set);
     undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2));
     return res;
 }

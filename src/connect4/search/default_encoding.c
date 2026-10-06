@@ -148,14 +148,22 @@ nodeindex_t trans_move(uint8_t col, uint8_t row, uint8_t player, uint8_t current
 }
 
 
+// transition relation for all moves in one column
+nodeindex_t get_trans_col(nodeindex_t (**X)[2][2], nodeindex_t stm0, nodeindex_t stm1, uint32_t width, uint32_t height, uint8_t board, uint8_t col) {
+    nodeindex_t trans = ZEROINDEX;
+    for (uint8_t row = 0; row < height; row++) { // it is enough to go to row < height
+        for (uint8_t player = 0; player < 2; player++) {
+            trans = or(trans, trans_move(col, row, player, board, stm0, stm1, X, width, height));
+        }
+    }
+    return trans;
+}
+
+// transition relation for all moves
 nodeindex_t get_trans(nodeindex_t (**X)[2][2], nodeindex_t stm0, nodeindex_t stm1, uint32_t width, uint32_t height, uint8_t board) {
     nodeindex_t trans = ZEROINDEX;
     for (uint8_t col = 0; col < width; col++) {
-        for (uint8_t row = 0; row < height; row++) {
-            for (uint8_t player = 0; player < 2; player++) {
-                trans = or(trans, trans_move(col, row, player, board, stm0, stm1, X, width, height));
-            }
-        }
+        trans = or(trans, get_trans_col(X, stm0, stm1, width, height, board, col));
     }
     return trans;
 }

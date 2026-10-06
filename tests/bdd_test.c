@@ -131,6 +131,110 @@ static void test_hash_range() {
     printf("ok hash range\n");
 }
 
+// ---- image_rename ----
+// unprimed variables are X[0], X[2], ..., primed variables X[1], X[3], ...
+static variable_set_t unprimed;
+
+// renames every (primed) variable of f to its unprimed partner, simple reference implementation
+#define MEMO_SIZE (1 << 16)
+static nodeindex_t memo_key[MEMO_SIZE], memo_val[MEMO_SIZE];
+static nodeindex_t rename_rec(nodeindex_t ix) {
+    if (ix <= ONEINDEX) return ix;
+    uint32_t slot = hash_3(0, ix, 0) & (MEMO_SIZE - 1);
+    if (memo_key[slot] == ix) return memo_val[slot];
+    bddnode_t* u = get_node(ix);
+    variable_t var = u->var;
+    nodeindex_t low = u->low, high = u->high;
+    CHECK(var % 2 == 0); // primed
+    nodeindex_t res = make(var - 1, rename_rec(low), rename_rec(high));
+    memo_key[slot] = ix;
+    memo_val[slot] = res;
+    return res;
+}
+static nodeindex_t reference_image_rename(nodeindex_t S, nodeindex_t T) {
+    // no gc can happen in here: IN_OP_GC only triggers when the table is full
+    memset(memo_key, 0, sizeof(memo_key));
+    return rename_rec(exists(and(S, T), &unprimed));
+}
+
+// random function that only depends on unprimed (offset 0) or primed (offset 1) variables of the first npairs pairs
+static nodeindex_t random_bdd_on(int npairs, int offset, int nops) {
+    nodeindex_t f = (rng() & 1) ? ONEINDEX : ZEROINDEX;
+    keepalive_ix(f);
+    for (int i = 0; i < nops; i++) {
+        nodeindex_t term = ONEINDEX;
+        keepalive_ix(term);
+        for (int j = 0; j < 3; j++) {
+            nodeindex_t lit = X[2 * (rng() % npairs) + offset];
+            if (rng() & 1) lit = not(lit);
+            reassign_and_keepalive(&term, and(term, lit));
+        }
+        if (rng() & 1) reassign_and_keepalive(&f, or(f, term));
+        else reassign_and_keepalive(&f, iff(f, term));
+        undo_keepalive_ix(term);
+    }
+    undo_keepalive_ix(f);
+    return f;
+}
+
+static void test_image_rename() {
+    int npairs = NVARS / 2;
+    init_variableset(&unprimed);
+    for (int i = 0; i < npairs; i++) add_variable(&unprimed, X[2 * i]);
+    finished_variablesset(&unprimed);
+    prepare_image_rename(&unprimed);
+
+    // identity relation: the image of S is S
+    nodeindex_t identity = unprimed.identity[1];
+    keepalive_ix(identity);
+    for (int round = 0; round < 20; round++) {
+        nodeindex_t S = random_bdd_on(npairs, 0, 30);
+        CHECK(image_rename(S, identity, &unprimed) == S);
+    }
+
+    for (int round = 0; round < 300; round++) {
+        nodeindex_t S = random_bdd_on(npairs, 0, 25); keepalive_ix(S);
+
+        // (a) relation like a transition relation: a few "moves", each changes one or two pairs
+        //     (precondition on x, effect on x') and leaves all other pairs unchanged (frame)
+        nodeindex_t T = ZEROINDEX; keepalive_ix(T);
+        int nmoves = 1 + rng() % 5;
+        for (int m = 0; m < nmoves; m++) {
+            int p1 = rng() % npairs, p2 = rng() % npairs;
+            nodeindex_t move = ONEINDEX; keepalive_ix(move);
+            for (int i = 0; i < npairs; i++) {
+                nodeindex_t c;
+                if (i == p1 || i == p2) {
+                    nodeindex_t pre = (rng() & 1) ? X[2 * i] : not(X[2 * i]);
+                    nodeindex_t eff = (rng() & 1) ? X[2 * i + 1] : not(X[2 * i + 1]);
+                    c = (rng() % 4 == 0) ? eff : and(pre, eff);
+                } else {
+                    c = iff(X[2 * i], X[2 * i + 1]);
+                }
+                reassign_and_keepalive(&move, and(move, c));
+            }
+            reassign_and_keepalive(&T, or(T, move));
+            undo_keepalive_ix(move);
+        }
+        nodeindex_t expected = reference_image_rename(S, T); keepalive_ix(expected);
+        CHECK(image_rename(S, T, &unprimed) == expected);
+        undo_keepalive_ix(expected); undo_keepalive_ix(T);
+
+        // (b) arbitrary relation over the first pairs (no frame structure)
+        nodeindex_t Tx = random_bdd_on(5, 0, 6); keepalive_ix(Tx);
+        nodeindex_t Ty = random_bdd_on(5, 1, 6); keepalive_ix(Ty);
+        T = (rng() & 1) ? and(Tx, Ty) : or(and(Tx, Ty), iff(Tx, Ty)); keepalive_ix(T);
+        expected = reference_image_rename(S, T); keepalive_ix(expected);
+        CHECK(image_rename(S, T, &unprimed) == expected);
+        undo_keepalive_ix(expected); undo_keepalive_ix(T); undo_keepalive_ix(Tx); undo_keepalive_ix(Ty);
+
+        undo_keepalive_ix(S);
+        if (round % 50 == 49) gc(true, true);
+    }
+    undo_keepalive_ix(identity);
+    printf("ok image_rename\n");
+}
+
 static void test_canonical_and_gc() {
     uint64_t before = uniquetable.count;
     nodeindex_t f = random_bdd(NVARS, 400); keepalive_ix(f);
@@ -201,6 +305,7 @@ int main() {
     test_ops_against_truthtables();
     test_canonical_and_gc();
     test_save_and_read();
+    test_image_rename();
     printf("all unit tests passed\n");
     free_all();
     return 0;

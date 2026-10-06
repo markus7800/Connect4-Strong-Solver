@@ -26,6 +26,8 @@
 #include "default_encoding.c"
 #endif
 
+#include "moves.c"
+
 #ifndef SAVE_BDD_TO_DISK
 #define SAVE_BDD_TO_DISK 1
 #endif
@@ -70,11 +72,32 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     finished_variablesset(&vars_board0);
     finished_variablesset(&vars_board1);
 
+    // Positions are always encoded with the board0 variables,
+    // board1 variables are only used in the trans relations (see moves.c)
+    prepare_image_rename(&vars_board0);
+
     // Compute trans relation by performing OR over all possible moves
-    // One for the case when current ply is encoded by board0 and next ply by board1,
-    // and one for the case when the roles are switched
+    // One for the case when the position before the move is encoded by board0 and the one after by board1 (successors),
+    // and one for the case when the roles are switched (predecessors)
     nodeindex_t trans0 = get_trans(X, stm0, stm1, width, height, 0);
     nodeindex_t trans1 = get_trans(X, stm0, stm1, width, height, 1);
+    moves_t moves;
+    moves.width = width;
+    moves.vars_board0 = &vars_board0;
+    moves.trans0 = trans0;
+    moves.trans1 = trans1;
+    moves.trans0_col = NULL;
+    moves.trans1_col = NULL;
+#if PARTITIONED_IMAGE
+    moves.trans0_col = (nodeindex_t*) malloc(width * sizeof(nodeindex_t));
+    moves.trans1_col = (nodeindex_t*) malloc(width * sizeof(nodeindex_t));
+    for (uint8_t col = 0; col < width; col++) {
+        moves.trans0_col[col] = get_trans_col(X, stm0, stm1, width, height, 0, col);
+        keepalive_ix(moves.trans0_col[col]);
+        moves.trans1_col[col] = get_trans_col(X, stm0, stm1, width, height, 1, col);
+        keepalive_ix(moves.trans1_col[col]);
+    }
+#endif
     // We always want to keep the trans relations alive (prevent GC)
     keepalive(get_node(trans0));
     keepalive(get_node(trans1));
@@ -124,22 +147,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
         if (gc_level) printf("\n");
 
-        // first subtract all terminal positions and then perform image operatoin
+        // first subtract all terminal positions and then perform image operation
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
-        // roles of board0 and board1 switch
-        if ((ply % 2) == 1) {
-            // current is board0
-            current = connect4_subtract_term(current, 0, 1, X, width, height, gc_level);
-            // trans0 is board0 -> board1
-            current = image(current, trans0, &vars_board0);
-            // current is now board1
-        } else {
-            // current is board1
-            current = connect4_subtract_term(current, 1, 0, X, width, height, gc_level);
-            // trans1 is board1 -> board0
-            current = image(current, trans1, &vars_board1);
-            // current is now board0
-        }
+        // in a terminal position the player who made the last move has four in a row:
+        // this is the second player (1) after an even number of moves > 0
+        current = connect4_subtract_term(current, 0, (ply % 2) == 1 ? 1 : 0, X, width, height, gc_level);
+        current = successors(current, &moves);
         keepalive_ix(current);
         bdd_per_ply[ply] = current;
 
@@ -191,8 +204,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t win_node_cnt, draw_node_cnt, lost_node_cnt;
 
     uint8_t board, player;
-    nodeindex_t trans, win_pre_img, draw_pre_image;
-    variable_set_t* vars_board;
+    nodeindex_t win_pre_img, draw_pre_image;
 
 #if WRITE_TO_FILE
     sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
@@ -201,8 +213,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #endif
 
 
-    // bdd_per_ply[ply % 2] is board0
-    // bdd_per_ply[ply % 2 + 1] is board1
     for (int ply = width*height; ply >= 0; ply--) {
         printf("Ply %d/%d:\n", ply, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
@@ -211,19 +221,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
 
-        if ((ply % 2) == 1) {
-            // current is board1
-            board = 1;
-            player = 0;
-            vars_board = &vars_board0;
-            trans = trans1;
-        } else {
-            // current is board0
-            board = 0;
-            player = 1;
-            vars_board = &vars_board1;
-            trans = trans0;
-        }
+        // all positions are encoded with board0
+        board = 0;
+        // the player who made the last move
+        player = (ply % 2) == 1 ? 0 : 1;
 
         keepalive_ix(next_draw); keepalive_ix(next_lost);
 
@@ -237,7 +238,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(current);
 
         // pre-image of lost positions of opponent are wins for player
-        win_pre_img = image(trans, next_lost, vars_board);
+        win_pre_img = predecessors(next_lost, &moves);
         keepalive_ix(win_pre_img);
         undo_keepalive_ix(next_lost);
 
@@ -278,7 +279,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             draw = current;
         } else {
             // pre-image of opponent draw is also draw for player
-            draw_pre_image = image(trans, next_draw, vars_board);
+            draw_pre_image = predecessors(next_draw, &moves);
             undo_keepalive_ix(next_draw);
 
             // get draws for ply

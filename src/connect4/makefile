@@ -24,6 +24,9 @@ ALLOW_ROW_ORDER = 0
 # use compressed Connect4 encoding?
 COMPRESSED_ENCODING = 1
 
+# apply the moves of each column separately instead of all moves at once?
+PARTITIONED_IMAGE = 0
+
 # for count
 
 # compute a BDD encoding all positions (OR over all BDDs for single plies)
@@ -71,6 +74,7 @@ SEARCHFLAGS = \
 -DWRITE_TO_FILE=$(WRITE_TO_FILE)
 
 ENCODING = \
+-DPARTITIONED_IMAGE=$(PARTITIONED_IMAGE) \
 -DALLOW_ROW_ORDER=$(ALLOW_ROW_ORDER) \
 -DCOMPRESSED_ENCODING=$(COMPRESSED_ENCODING)
 
