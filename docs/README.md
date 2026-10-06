@@ -21,6 +21,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [08](08-build-and-hot-path.md) | no node access on cache hits, release flags, overflow-checked counts | 3–4 % faster on small boards; counts can no longer wrap around silently |
 | [09](09-gc-root-stack.md) | GC root stack for intermediate results (`IN_OP_GC`) | no node writes per recursion step; prerequisite for making in-op GC the default |
 | [10](10-single-variable-set.md) | all sets in one variable set, `image_rename` with identity shortcut | 8–18 % faster, 13–31 % lower peak; column-partitioned image measured and rejected |
+| [11](11-terminal-predicate.md) | four-in-a-line BDD built once per player | 1.4–2.3x faster; the predicate has 185 K nodes for 7x6, under 1 M for 7x7 |
 
 ## Running totals
 
@@ -41,6 +42,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 07 hash | 20–24 | 17.4 | 13.4 | 26.9 |
 | 08 hot path, build flags | 20–24 | 16.7 | 13.0 | 25.7 |
 | 10 single variable set | 20–24 | 15.0 | 11.7 | 23.8 |
+| 11 terminal predicate | 20–24 | 10.0 | 8.4 | 10.4 |
 
 Larger boards (tables of 2^26 nodes):
 
@@ -48,4 +50,4 @@ Larger boards (tables of 2^26 nodes):
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | 00 baseline | 466.3 | 79.3 | 28.75 M | 3.31 GB | 859.1 | 82.1 | 40.28 M | 2.98 GB |
 | 03 unified cache | 444.0 | 69.8 | 28.75 M | 1.43 GB | 798.9 | 36.8 | 40.28 M | 1.48 GB |
-| 08 hot path, build flags | 259.1 | 62.4 | 28.75 M | 0.94 GB | | | | |
+| 08 hot path, build flags | 259.1 | 62.4 | 28.75 M | 0.94 GB | 369.3 | 33.5 | 40.28 M | 1.10 GB |

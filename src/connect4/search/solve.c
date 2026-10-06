@@ -27,6 +27,7 @@
 #endif
 
 #include "moves.c"
+#include "terminal.c"
 
 #ifndef SAVE_BDD_TO_DISK
 #define SAVE_BDD_TO_DISK 1
@@ -98,6 +99,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(moves.trans1_col[col]);
     }
 #endif
+    // The condition for terminal positions (four in a line) is computed once for each player
+    terminal_t terminal;
+    init_terminal(&terminal, X, width, height);
+
     // We always want to keep the trans relations alive (prevent GC)
     keepalive(get_node(trans0));
     keepalive(get_node(trans1));
@@ -151,7 +156,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // in a terminal position the player who made the last move has four in a row:
         // this is the second player (1) after an even number of moves > 0
-        current = connect4_subtract_term(current, 0, (ply % 2) == 1 ? 1 : 0, X, width, height, gc_level);
+        current = connect4_subtract_term(&terminal, current, (ply % 2) == 1 ? 1 : 0);
         current = successors(current, &moves);
         keepalive_ix(current);
         bdd_per_ply[ply] = current;
@@ -203,7 +208,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
     uint64_t win_node_cnt, draw_node_cnt, lost_node_cnt;
 
-    uint8_t board, player;
+    uint8_t player;
     nodeindex_t win_pre_img, draw_pre_image;
 
 #if WRITE_TO_FILE
@@ -221,20 +226,18 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         current = bdd_per_ply[ply];
         cnt = connect4_satcount(current);
 
-        // all positions are encoded with board0
-        board = 0;
         // the player who made the last move
         player = (ply % 2) == 1 ? 0 : 1;
 
         keepalive_ix(next_draw); keepalive_ix(next_lost);
 
         // compute terminal positions for ply
-        term = connect4_intersect_term(current, board, player, X, width, height, gc_level);
+        term = connect4_intersect_term(&terminal, current, player);
         term_cnt = connect4_satcount(term);
         keepalive_ix(term);
 
         // compute non-terminal positions for ply
-        current = connect4_subtract_term(current, board, player, X, width, height, gc_level);
+        current = connect4_subtract_term(&terminal, current, player);
         keepalive_ix(current);
 
         // pre-image of lost positions of opponent are wins for player

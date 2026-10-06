@@ -82,6 +82,12 @@ of the protocol):
 | configuration | time [s] | GC [s] |
 |---|---:|---:|
 | change 08, `IN_OP_GC=0` | 259.1 | 62.4 |
-| change 09, `IN_OP_GC=1` with the root stack | 262.6 | 62.5 |
+| change 08, `IN_OP_GC=1`, old protocol (counters in the nodes) | 249.6 | 58.2 |
+| change 09, `IN_OP_GC=1`, root stack | 262.6 | 62.5 |
 
-In-op GC is now available for 1.4 % of the run time, within noise of free.
+All three are within the run-to-run noise of this machine (about 5 % while other jobs
+are running). The expected saving does not show: the nodes whose counters the old
+protocol wrote were evidently still in the cache from being created or looked up a
+moment before. The root stack is therefore not a speed-up at this size. What the
+measurement does establish is the thing needed next: running with `IN_OP_GC=1` costs
+nothing compared to `IN_OP_GC=0`, so in-op GC can become the normal mode.

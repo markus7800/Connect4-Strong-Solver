@@ -54,6 +54,9 @@ COL, ROW, PLAYER, BOARD, var, level
 #define ALLOW_ROW_ORDER 0
 #endif
 
+// type of the array of cell variables: X[col][row][player][board]
+typedef nodeindex_t (**cellvars_t)[2][2];
+
 void initialise_variables(nodeindex_t (**X)[2][2], uint32_t width, uint32_t height) {
     // Second, cells: order column, row, player, board
     if (!ALLOW_ROW_ORDER || width >= height) {
@@ -183,135 +186,7 @@ nodeindex_t connect4_start(nodeindex_t stm0, nodeindex_t (**X)[2][2], uint32_t w
     return s;
 }
 
-// Subtracts all positions from current which are terminal, i.e. four in a row, column or diagonal
-// Subtraction is performed iteratively and also performs GC.
-nodeindex_t connect4_subtract_or_intersect_term(nodeindex_t current, uint8_t board, uint8_t player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level, bool subtract) {
-    nodeindex_t a;
-    nodeindex_t intersection = ZEROINDEX;
-
-    keepalive_ix(current); keepalive_ix(intersection);
-
-    // COLUMN
-    if (height >= 4) {
-        for (uint8_t col = 0; col < width; col++) {
-            for (uint8_t row = 0; row <= height - 4; row++) {
-                // encodes that there are four stones in a column for player starting at (col,row)
-                a = ONEINDEX;
-                for (uint8_t i = 0; i < 4; i++) {
-                    a = and(a, X[col][row + i][player][board]);
-                }
-                if (subtract) {
-                    // subtract from current
-                    reassign_and_keepalive(&current, diff(current, a));
-                } else {
-                    // add to intersection
-                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
-                }
-            }
-            if (gc_level == 2) {
-                printf("  COL %d GC: ", col);
-                keepalive_ix(current); keepalive_ix(intersection);
-                gc(true, true);
-                undo_keepalive_ix(current); undo_keepalive_ix(intersection);
-            }
-        }
-        if (gc_level == 1) {
-            // if we need to be even more aggressive with GC, we could move this in the loop
-            printf("  COL %"PRIu32" GC: ", width);
-            keepalive_ix(current); keepalive_ix(intersection);
-            gc(true, true);
-            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
-        }
-    }
-
-    // ROW
-    if (width >= 4) {
-        for (uint8_t row = 0; row < height; row++) {
-            for (uint8_t col = 0; col <= width - 4; col++) {
-                // encodes that there are four stones in a row for player starting at (col,row)
-                a = ONEINDEX;
-                for (uint8_t i = 0; i < 4; i++) {
-                    a = and(a, X[col + i][row][player][board]);
-                }
-                if (subtract) {
-                    // subtract from current
-                    reassign_and_keepalive(&current, diff(current, a));
-                } else {
-                    // add to intersection
-                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
-                }
-            }
-        }
-        if (gc_level) {
-            printf("  ROW %"PRIu32" GC: ", height);
-            keepalive_ix(current); keepalive_ix(intersection);
-            gc(true, true);
-            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
-        }
-    }
-
-    if (height >= 4 && width >= 4) {
-        // DIAG ascending
-        for (uint8_t col = 0; col <= width - 4; col++) {
-            for (uint8_t row = 0; row <= height - 4; row++) {
-                // encodes that there are four stones in a ascending diagonal for player starting at (col,row)
-                a = ONEINDEX;
-                for (uint8_t i = 0; i < 4; i++) {
-                    a = and(a, X[col + i][row + i][player][board]);
-                }
-                if (subtract) {
-                    // subtract from current
-                    reassign_and_keepalive(&current, diff(current, a));
-                } else {
-                    // add to intersection
-                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
-                }
-            }
-        }
-        if (gc_level) {
-            printf("  DIAG1 GC: ");
-            keepalive_ix(current); keepalive_ix(intersection);
-            gc(true, true);
-            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
-        }
-
-        // DIAG descending
-        for (uint8_t col = 3; col < width; col++) {
-            for (uint8_t row = 0; row <= height - 4; row++) {
-                // encodes that there are four stones in a descending diagonal for player starting at (col+3,row)
-                a = ONEINDEX;
-                for (uint8_t i = 0; i < 4; i++) {
-                    a = and(a, X[col - i][row + i][player][board]);
-                }
-                if (subtract) {
-                    // subtract from current
-                    reassign_and_keepalive(&current, diff(current, a));
-                } else {
-                    // add to intersection
-                    reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
-                }
-            }
-        }
-        if (gc_level) {
-            printf("  DIAG2 GC: ");
-            keepalive_ix(current); keepalive_ix(intersection);
-            gc(true, true);
-            undo_keepalive_ix(current); undo_keepalive_ix(intersection);
-        }
-    }
-
-    undo_keepalive_ix(current); undo_keepalive_ix(intersection);
-
-    if (subtract) {
-        return current;
-    } else {
-        return intersection;
-    }
-}
-
-inline nodeindex_t connect4_subtract_term(nodeindex_t current, uint8_t board, uint8_t player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
-    return connect4_subtract_or_intersect_term(current, board, player, X, width, height, gc_level, true);
-}
-inline nodeindex_t connect4_intersect_term(nodeindex_t current, uint8_t board, uint8_t player, nodeindex_t (**X)[2][2], uint32_t width, uint32_t height, int gc_level) {
-    return connect4_subtract_or_intersect_term(current, board, player, X, width, height, gc_level, false);
+// BDD that is true if there is a stone of player at the cell
+nodeindex_t cell_of_player(nodeindex_t (**X)[2][2], uint32_t height, uint8_t col, uint8_t row, uint8_t board, uint8_t player) {
+    return X[col][row][player][board];
 }

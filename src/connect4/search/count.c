@@ -31,6 +31,7 @@
 #endif
 
 #include "moves.c"
+#include "terminal.c"
 
 #ifndef SUBTRACT_TERM
 #define SUBTRACT_TERM 1
@@ -101,6 +102,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(moves.trans1_col[col]);
     }
 #endif
+    // The condition for terminal positions (four in a line) is computed once for each player
+    terminal_t terminal;
+    init_terminal(&terminal, X, width, height);
+
     // We always want to keep the trans relations alive (prevent GC)
     keepalive_ix(trans0);
     keepalive_ix(trans1);
@@ -153,7 +158,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // in a terminal position the player who made the last move has four in a row:
         // this is the second player (1) after an even number of moves > 0
-        current = SUBTRACT_TERM ? connect4_subtract_term(current, 0, (d % 2) == 1 ? 1 : 0, X, width, height, gc_level) : current;
+        current = SUBTRACT_TERM ? connect4_subtract_term(&terminal, current, (d % 2) == 1 ? 1 : 0) : current;
         current = successors(current, &moves);
 
         if (gc_level) {
