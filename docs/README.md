@@ -22,6 +22,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [09](09-gc-root-stack.md) | GC root stack for intermediate results (`IN_OP_GC`) | no node writes per recursion step; prerequisite for making in-op GC the default |
 | [10](10-single-variable-set.md) | all sets in one variable set, `image_rename` with identity shortcut | 8–18 % faster, 13–31 % lower peak; column-partitioned image measured and rejected |
 | [11](11-terminal-predicate.md) | four-in-a-line BDD built once per player | 1.4–2.3x faster; the predicate has 185 K nodes for 7x6, under 1 M for 7x7 |
+| [12](12-reach-on-disk.md) | reachable sets are stored on disk between the two passes | 10–20 % fewer live nodes, ~10 % faster |
 
 ## Running totals
 
@@ -43,6 +44,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 08 hot path, build flags | 20–24 | 16.7 | 13.0 | 25.7 |
 | 10 single variable set | 20–24 | 15.0 | 11.7 | 23.8 |
 | 11 terminal predicate | 20–24 | 10.0 | 8.4 | 10.4 |
+| 12 reach on disk | 20–24 | 8.9 | 7.1 | 10.4 |
 
 Larger boards (tables of 2^26 nodes):
 

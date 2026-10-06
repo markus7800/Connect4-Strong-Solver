@@ -98,6 +98,10 @@ extern double GC_TIME;
 extern double GC_MAX_FILL_LEVEL;
 // Keeps track of the maximum number of allocated nodes
 extern uint64_t GC_MAX_NODES_ALLOC;
+// Keeps track of the maximum number of nodes that were alive after a garbage collection.
+// This is (a sample of) the number of nodes the computation really needs,
+// whereas the number of allocated nodes includes garbage that was not collected yet.
+extern uint64_t GC_MAX_NODES_ALIVE;
 
 // checks if properties of BDD hold
 void verify_uniquetable();

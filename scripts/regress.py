@@ -148,6 +148,9 @@ def parse_stdout(stdout):
     m = re.search(r"GC max number of allocated nodes: (\d+)", stdout)
     if m:
         out["peak_nodes"] = int(m.group(1))
+    m = re.search(r"GC max number of nodes alive after gc: (\d+)", stdout)
+    if m:
+        out["peak_alive"] = int(m.group(1))
     m = re.search(r"GC max fill-level: ([0-9.]+) %", stdout)
     if m:
         out["peak_fill_pct"] = float(m.group(1))
@@ -322,7 +325,7 @@ def main():
         results.append(m)
         status = "ok  " if m["ok"] else "FAIL"
         print(f"{status} {m['case']:<24} time {fmt(m.get('time_s'), 's'):>9} s  gc {fmt(m.get('gc_time_s'), 's'):>8} s  "
-              f"peak nodes {fmt(m.get('peak_nodes'), 'M'):>9} M  rss {fmt(m.get('peak_rss_bytes'), 'GB'):>6} GB  "
+              f"peak nodes {fmt(m.get('peak_nodes'), 'M'):>9} M  alive {fmt(m.get('peak_alive'), 'M'):>9} M  rss {fmt(m.get('peak_rss_bytes'), 'GB'):>6} GB  "
               f"{'; '.join(m['notes'])}", flush=True)
 
     if args.json:

@@ -22,6 +22,7 @@ void init_uniquetable(uint64_t log2size) {
     GC_TIME = 0;
     GC_MAX_FILL_LEVEL = 0;
     GC_MAX_NODES_ALLOC = 0;
+    GC_MAX_NODES_ALIVE = 0;
 
     assert(log2size <= 32);
     uint64_t size = ((uint64_t) 1) << log2size;
@@ -130,6 +131,7 @@ static void mark_rec(nodeindex_t ix) {
 double GC_TIME;
 double GC_MAX_FILL_LEVEL;
 uint64_t GC_MAX_NODES_ALLOC;
+uint64_t GC_MAX_NODES_ALIVE;
 #ifdef HASH_STATS
 // quality of the hash function: distribution of bucket sizes compared to the ideal (Poisson) distribution
 static void print_hash_stats() {
@@ -224,6 +226,7 @@ static void gc_run(bool force, bool in_op) {
     double perc_before = (double) uniquetable.count / memorypool.capacity * 100;
     double perc_after = (double) num_alive / memorypool.capacity * 100;
     printf("decreased number of nodes from %"PRIu64" (%.2f%%) to %"PRIu64" (%.2f%%)\n", uniquetable.count, perc_before, num_alive, perc_after);
+    if (num_alive > GC_MAX_NODES_ALIVE) GC_MAX_NODES_ALIVE = num_alive;
     uniquetable.count = num_alive;
     memorypool.num_nodes = num_alive;
     memorypool.next = free_list;

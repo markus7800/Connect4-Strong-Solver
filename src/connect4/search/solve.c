@@ -6,6 +6,7 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h> // rmdir
 
 #include "../../bdd/bdd.h"
 
@@ -31,6 +32,11 @@
 
 #ifndef SAVE_BDD_TO_DISK
 #define SAVE_BDD_TO_DISK 1
+#endif
+
+// keep the BDDs of the reachable positions per ply on disk after the computation?
+#ifndef KEEP_REACH
+#define KEEP_REACH 0
 #endif
 
 #ifndef IN_OP_GC_EXCL
@@ -80,8 +86,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Compute trans relation by performing OR over all possible moves
     // One for the case when the position before the move is encoded by board0 and the one after by board1 (successors),
     // and one for the case when the roles are switched (predecessors)
+    // We always want to keep the trans relations alive (prevent GC)
     nodeindex_t trans0 = get_trans(X, stm0, stm1, width, height, 0);
+    keepalive_ix(trans0);
     nodeindex_t trans1 = get_trans(X, stm0, stm1, width, height, 1);
+    keepalive_ix(trans1);
     moves_t moves;
     moves.width = width;
     moves.vars_board0 = &vars_board0;
@@ -103,10 +112,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     terminal_t terminal;
     init_terminal(&terminal, X, width, height);
 
-    // We always want to keep the trans relations alive (prevent GC)
-    keepalive(get_node(trans0));
-    keepalive(get_node(trans1));
-
     // Phiu, first GC run.
     printf("  INIT GC: ");
     gc(true, true);
@@ -120,31 +125,43 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     mkdir(folder, 0777);
     printf("Made directory %s.\n\n", folder);
 
-    printf("\n\nReachable states computation:\n\n");
-    
-    // PLY 0:
-    nodeindex_t current = connect4_start(stm0, X, width, height);
-    uint64_t cnt = connect4_satcount(current);
-    bdd_nodecount = nodecount(current);
-    printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
-    total += cnt;
+    // The BDDs of the reachable positions of each ply are needed again in the retrograde analysis.
+    // They are stored on disk in the meantime, only the BDD of the current ply is kept in memory.
+    char reach_folder[50];
+    sprintf(reach_folder, "reach_w%"PRIu32"_h%"PRIu32"", width, height);
+    mkdir(reach_folder, 0777);
 
+    // used for saving BDDs. board0 and board1 are mapped to same variables
+    variable_t board_varmap[MAX_VARIABLES + 1];
+    board_varmap[0] = 0; board_varmap[1] = 1;
+    for (size_t v = 2; v <= MAX_VARIABLES; v++) {
+        board_varmap[v] = (v + 1) / 2;
+    }
+    // used for reading BDDs: the variables in the file are mapped to board0 variables
+    variable_t file_varmap[256];
+    file_varmap[0] = 0;
+    for (size_t v = 1; v <= 255; v++) {
+        file_varmap[v] = 2 * v - 1;
+    }
+
+    printf("\n\nReachable states computation:\n\n");
 
     struct timespec t0, t1;
     double t;
     double total_t = 0;
     char filename[100];
 
-    nodeindex_t* bdd_per_ply = (nodeindex_t*) malloc((width*height+1)*sizeof(nodeindex_t));
-    BDD_CHECK(bdd_per_ply != NULL, "Could not allocate :(");
-    keepalive_ix(current);
-    bdd_per_ply[0] = current;
-
     uint64_t* bddnodecount_per_ply = (uint64_t*) malloc((width*height+1)*sizeof(uint64_t));
-    bddnodecount_per_ply[0] = 1;
+    uint64_t* count_per_ply = (uint64_t*) malloc((width*height+1)*sizeof(uint64_t));
+    BDD_CHECK(bddnodecount_per_ply != NULL && count_per_ply != NULL, "Could not allocate :(");
+
+    // PLY 0:
+    nodeindex_t current = connect4_start(stm0, X, width, height);
+    keepalive_ix(current);
+    uint64_t cnt;
 
     int gc_level;
-    for (int ply = 1; ply <= width*height; ply++) {
+    for (int ply = 0; ply <= width*height; ply++) {
         printf("Ply %d/%d:", ply, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -152,27 +169,28 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
         if (gc_level) printf("\n");
 
-        // first subtract all terminal positions and then perform image operation
-        // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
-        // in a terminal position the player who made the last move has four in a row:
-        // this is the second player (1) after an even number of moves > 0
-        current = connect4_subtract_term(&terminal, current, (ply % 2) == 1 ? 1 : 0);
-        current = successors(current, &moves);
-        keepalive_ix(current);
-        bdd_per_ply[ply] = current;
+        if (ply > 0) {
+            // first subtract all terminal positions and then perform image operation
+            // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
+            // in a terminal position the player who made the last move has four in a row:
+            // this is the second player (1) after an even number of moves > 0
+            nodeindex_t nonterminal = connect4_subtract_term(&terminal, current, (ply % 2) == 1 ? 1 : 0);
+            reassign_and_keepalive(&current, successors(nonterminal, &moves));
 
-        if (gc_level) {
-            printf("  IMAGE GC: ");
-            gc(true, true);
+            if (gc_level) {
+                printf("  IMAGE GC: ");
+                gc(true, true);
+            }
         }
 
         // count the number of positions at ply
         cnt = connect4_satcount(current);
         total = add_count(total, cnt);
-        
+        count_per_ply[ply] = cnt;
 
-        // count number of nodes in current BDD
-        bdd_nodecount = nodecount(current);
+        // count number of nodes in current BDD and store it on disk
+        sprintf(filename, "%s/reach_w%"PRIu32"_h%"PRIu32"_%d.bin", reach_folder, width, height, ply);
+        bdd_nodecount = _safe_to_file_with_varmap(current, filename, board_varmap);
         bddnodecount_per_ply[ply] = bdd_nodecount;
 
         clock_gettime(CLOCK_REALTIME, &t1);
@@ -181,9 +199,8 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // print info
         printf(" PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
-
-           
-    } 
+    }
+    undo_keepalive_ix(current);
 
     printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
 
@@ -191,15 +208,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     printf("\n\nRetrograde analysis:\n\n");
 
-
-#if SAVE_BDD_TO_DISK
-    // used for saving BDDs. board0 and board1 are mapped to same variables
-    variable_t board_varmap[MAX_VARIABLES + 1];
-    board_varmap[0] = 0; board_varmap[1] = 1;
-    for (size_t v = 2; v <= MAX_VARIABLES; v++) {
-        board_varmap[v] = (v + 1) / 2;
-    }
-#endif
 
     nodeindex_t win, draw, lost, term;
 
@@ -223,8 +231,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         clock_gettime(CLOCK_REALTIME, &t0);
         gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
 
-        current = bdd_per_ply[ply];
-        cnt = connect4_satcount(current);
+        // load the reachable positions of this ply
+        sprintf(filename, "%s/reach_w%"PRIu32"_h%"PRIu32"_%d.bin", reach_folder, width, height, ply);
+        nodeindex_t reachable = _read_from_file_with_varmap(filename, file_varmap);
+        keepalive_ix(reachable);
+        current = reachable;
+        cnt = count_per_ply[ply];
+        BDD_CHECK(nodecount(current) == bddnodecount_per_ply[ply], "BDD read from disk differs from the one that was written :(");
+#if !KEEP_REACH
+        remove(filename);
+#endif
 
         // the player who made the last move
         player = (ply % 2) == 1 ? 0 : 1;
@@ -319,7 +335,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         next_draw = draw;
         next_lost = lost;
 
-        undo_keepalive_ix(bdd_per_ply[ply]);
+        undo_keepalive_ix(reachable);
 
         if (gc_level) {
             keepalive_ix(next_draw); keepalive_ix(next_lost);
@@ -363,7 +379,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     }
     free(X);
 
-    free(bdd_per_ply);
+#if !KEEP_REACH
+    rmdir(reach_folder);
+#endif
+    free(count_per_ply);
     free(bddnodecount_per_ply);
 
     return total;
@@ -450,6 +469,7 @@ int main(int argc, char const *argv[]) {
     if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
     printf("GC max fill-level: %.2f %%\n", GC_MAX_FILL_LEVEL*100);
     printf("GC max number of allocated nodes: %"PRIu64"\n", GC_MAX_NODES_ALLOC);
+    printf("GC max number of nodes alive after gc: %"PRIu64"\n", GC_MAX_NODES_ALIVE);
 
     free_all();
 

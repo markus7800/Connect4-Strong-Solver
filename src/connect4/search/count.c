@@ -349,6 +349,7 @@ int main(int argc, char const *argv[]) {
     if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
     printf("GC max fill-level: %.2f %%\n", GC_MAX_FILL_LEVEL*100);
     printf("GC max number of allocated nodes: %"PRIu64"\n", GC_MAX_NODES_ALLOC);
+    printf("GC max number of nodes alive after gc: %"PRIu64"\n", GC_MAX_NODES_ALIVE);
 
     free_all();
 
