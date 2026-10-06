@@ -97,11 +97,17 @@ WIDTH_HEIGHT = \
 
 # the op cache has 2^(log2_tablesize - CACHE_SHIFT) entries of 16 bytes
 CACHE_SHIFT = 2
+# the unique table has 2^(log2_tablesize - BUCKET_SHIFT) buckets of 4 bytes
+BUCKET_SHIFT = 0
+# if > 0: also run GC during ops when more than IN_OP_GC_GROWTH times the nodes alive after the last GC are allocated
+IN_OP_GC_GROWTH = 0
 # keep cache entries of surviving nodes when garbage collecting? 0 = never, 1 = for GC during ops, 2 = always
 GC_KEEPS_CACHE = 1
 
 GCFLAGS = \
 -DOPCACHE_LOG2_REDUCTION=$(CACHE_SHIFT) \
+-DUNIQUETABLE_LOG2_REDUCTION=$(BUCKET_SHIFT) \
+-DIN_OP_GC_GROWTH=$(IN_OP_GC_GROWTH) \
 -DGC_KEEPS_CACHE=$(GC_KEEPS_CACHE) \
 -DFORCE_GC=$(FORCE_GC) \
 -DGC_GROWTH=$(GC_GROWTH) \

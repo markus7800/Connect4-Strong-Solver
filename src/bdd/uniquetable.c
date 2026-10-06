@@ -13,11 +13,28 @@ uint32_t gc_stack_top = 0;
 uint64_t GC_IN_OP_TRIGGER = 0;
 double GC_IN_OP_THRES = 0;
 
+// If IN_OP_GC_GROWTH > 0, gc during operations is also triggered when more than IN_OP_GC_GROWTH times the
+// nodes that were alive after the last gc are allocated, and not only when the node pool is nearly full.
+// This keeps the memory that is in use proportional to the nodes that are alive, at the price of more
+// garbage collections. 0 turns it off.
+#ifndef IN_OP_GC_GROWTH
+#define IN_OP_GC_GROWTH 0
+#endif
+
 static void update_in_op_trigger() {
     uint64_t regular = (uint64_t) (GC_IN_OP_THRES * (double) memorypool.capacity);
     uint64_t alive = memorypool.num_nodes;
+    if (IN_OP_GC_GROWTH > 0) {
+        // not before a 64th of the pool is allocated
+        double growth = IN_OP_GC_GROWTH * (double) alive + (double) (memorypool.capacity / 64);
+        if (growth < (double) regular) {
+            regular = (uint64_t) growth;
+        }
+    }
     uint64_t halfway = alive + (memorypool.capacity - alive) / 2;
-    GC_IN_OP_TRIGGER = halfway > regular ? halfway : regular;
+    uint64_t limit = (uint64_t) (GC_IN_OP_THRES * (double) memorypool.capacity);
+    // above the regular threshold the rest of the pool is used step by step
+    GC_IN_OP_TRIGGER = alive >= limit || (regular == limit && halfway > regular) ? halfway : regular;
 }
 
 void gc_set_in_op_threshold(double thres) {

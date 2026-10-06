@@ -27,6 +27,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [14](14-dont-care-minimisation.md) | don't-care minimisation of the result BDDs (experiment) | not adopted: 11–14 % at the memory peak; one BDD for all plies would make a published solution 2.5x smaller |
 | [15](15-variable-order.md) | column / row order options (experiment) | default order stays for 7+ columns; centre-out is 36–41 % smaller for 5 columns but 26 % larger for 7 |
 | [16](16-sizing-ladder.md) | forward pass keeps two instead of three large BDDs; sizing measurements | count needs 1.5x the largest reachable-set BDD (was 2.2x); 7x6 count 626 s, 8x6 count 2920 s; outlook for 7x7 / 8x6 / 9x7 |
+| [17](17-7x6-on-32gb.md) | 7x6 on the 32 GB Mac; `BUCKET_SHIFT`, `IN_OP_GC_GROWTH` options | needs 24–28 GiB; first 8 plies verified, then stopped: the machine had ~21 GB to give next to the desktop session |
 
 ## Running totals
 
