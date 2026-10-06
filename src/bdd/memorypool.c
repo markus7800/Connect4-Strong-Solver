@@ -21,7 +21,7 @@ void free_zeroed(void* ptr, uint64_t bytes) {
 
 void init_memorypool(uint64_t capacity) {
     // (nodeindex_t) -1 == MAX(uint32_t) is a special value (disabled nodes), it must never be allocated
-    assert(capacity <= (((uint64_t) 1) << 32) - 1);
+    BDD_CHECK(capacity <= (((uint64_t) 1) << 32) - 1, "Too many nodes requested :(");
 
     memorypool.num_nodes = 0;
     memorypool.num_variables = 0;

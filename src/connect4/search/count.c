@@ -177,7 +177,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // count the number of positions at ply
         cnt = connect4_satcount(current);
-        total += cnt;
+        total = add_count(total, cnt);
         
 
         // count number of nodes in current BDD
@@ -295,7 +295,7 @@ int main(int argc, char const *argv[]) {
     }
     if (IN_OP_GC_EXCL) {
         printf("Performs GC during ops exclusively.\n");
-        assert(IN_OP_GC);
+        BDD_CHECK(IN_OP_GC, "IN_OP_GC_EXCL needs IN_OP_GC :(");
     }
 
     if (!ALLOW_ROW_ORDER || width >= height) {

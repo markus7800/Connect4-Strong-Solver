@@ -48,6 +48,22 @@ DTM = 1                 # compute distance to win/loss? or win/draw/loss score i
 
 CFLAGS = -O3 -flto -Wall -O3
 
+# for solve and count: disable asserts and optimise for the CPU of this machine
+# (make solve DEBUG=1 keeps the asserts)
+DEBUG = 0
+ifeq ($(shell uname -m),arm64)
+NATIVE = -mcpu=native
+else ifeq ($(shell uname -m),aarch64)
+NATIVE = -mcpu=native
+else
+NATIVE = -march=native
+endif
+ifeq ($(DEBUG),1)
+SEARCHCFLAGS = $(CFLAGS) $(NATIVE)
+else
+SEARCHCFLAGS = $(CFLAGS) $(NATIVE) -DNDEBUG
+endif
+
 BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../bdd/ops.c ../bdd/uniquetable.c ../bdd/save.c
 
 SEARCHFLAGS = \
@@ -75,10 +91,10 @@ GCFLAGS = \
 -DIN_OP_GC_THRES=$(IN_OP_GC_THRES)
 
 count:
-	$(CC) search/count.c $(BDDFILES) $(CFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -o build/count.out
+	$(CC) search/count.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -o build/count.out
 
 solve:
-	$(CC) search/solve.c $(BDDFILES) $(CFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -o build/solve.out
+	$(CC) search/solve.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -o build/solve.out
 
 bestmove:
 	$(CC) probe/bestmove.c $(CFLAGS) $(ENCODING) $(WIDTH_HEIGHT) -o build/bestmove_w$(WIDTH)_h$(HEIGHT).out

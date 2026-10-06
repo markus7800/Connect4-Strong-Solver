@@ -7,10 +7,15 @@
 #define IN_OP_GC_keepalive(ix) ;
 #endif
 
+// number of allocated nodes above which gc is triggered during operations (IN_OP_GC_THRES * capacity)
+static uint64_t in_op_gc_threshold = 0;
+
 void in_op_gc(uint8_t op) {
+    if (in_op_gc_threshold == 0) {
+        in_op_gc_threshold = (uint64_t) (IN_OP_GC_THRES * (double) memorypool.capacity);
+    }
     uint64_t prev_num_nodes = memorypool.num_nodes;
-    double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
-    if (fill_level > IN_OP_GC_THRES) {
+    if (prev_num_nodes > in_op_gc_threshold) {
         printf("!!IN_OP GC: ");
         switch (op) {
         case AND_OP:
@@ -65,7 +70,7 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
         if (ix2 == ZEROINDEX) return ix1;
         break;
     default:
-        assert(false);
+        BDD_CHECK(false, "Unknown binary operation :(");
     }
     // at most one of the operands is a constant from here on (0 for iff, 1 as first operand of diff)
     bddnode_t* u1 = get_node(ix1);
@@ -74,9 +79,7 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
     uint32_t cache_ix = opcache_index(op, ix1, ix2);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
     if (cacheentry.a == ix1 && cacheentry.b == ix2 && cacheentry.tag == op) {
-        if (!isdisabled(get_node(cacheentry.result))) {
-            return cacheentry.result;
-        }
+        return cacheentry.result;
     }
     
     nodeindex_t l;
@@ -119,9 +122,7 @@ nodeindex_t apply_not(nodeindex_t ix) {
     uint32_t cache_ix = opcache_index(NOT_OP, ix, 0);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
     if (cacheentry.a == ix && cacheentry.b == 0 && cacheentry.tag == NOT_OP) {
-        if (!isdisabled(get_node(cacheentry.result))) {
-            return cacheentry.result;
-        }
+        return cacheentry.result;
     }
     
     nodeindex_t l = apply_not(u->low); IN_OP_GC_keepalive(l);
@@ -212,9 +213,7 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
     uint32_t cache_ix = opcache_index(EXISTS_OP, ix, ix2);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
     if (cacheentry.a == ix && cacheentry.b == ix2 && cacheentry.tag == EXISTS_OP) {
-        if (!isdisabled(get_node(cacheentry.result))) {
-            return cacheentry.result;
-        }
+        return cacheentry.result;
     }
     
     nodeindex_t l = apply_exists(u->low, variable_set); IN_OP_GC_keepalive(l);
@@ -261,9 +260,7 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     uint32_t cache_ix = opcache_index(tag, ix1, ix2);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
     if (cacheentry.a == ix1 && cacheentry.b == ix2 && cacheentry.tag == tag) {
-        if (!isdisabled(get_node(cacheentry.result))) {
-            return cacheentry.result;
-        }
+        return cacheentry.result;
     }
     
     nodeindex_t l;

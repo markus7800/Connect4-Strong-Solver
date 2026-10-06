@@ -18,6 +18,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [05](05-memory-budget.md) | table size as RAM budget (`28G`), any pool capacity, huge pages on Linux | 20–24 bytes per node; 28 GiB hold 1.34 G nodes, 2^32 nodes fit in 103 GB |
 | [06](06-terminal-rules-and-diff.md) | terminal rules in `apply`, `diff` operation | 1.5x faster `solve`, 1.8x faster `count` |
 | [07](07-hash.md) | multiply-mix hash with full 32-bit range | tables with 2^32 buckets are used fully; 3–5 % faster; old hash was already well distributed |
+| [08](08-build-and-hot-path.md) | no node access on cache hits, release flags, overflow-checked counts | 3–4 % faster on small boards; counts can no longer wrap around silently |
 
 ## Running totals
 
@@ -36,6 +37,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 05 memory budget | 20–24 | 26.2 | 21.0 | 51.4 |
 | 06 terminal rules, `diff` | 20–24 | 18.1 | 14.0 | 27.9 |
 | 07 hash | 20–24 | 17.4 | 13.4 | 26.9 |
+| 08 hot path, build flags | 20–24 | 16.7 | 13.0 | 25.7 |
 
 Larger boards (tables of 2^26 nodes):
 

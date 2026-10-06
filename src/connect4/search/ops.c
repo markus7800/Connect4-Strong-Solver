@@ -22,7 +22,7 @@ uint64_t _connect4_satcount(nodeindex_t ix) {
     variable_t low_level = (level(get_node(u->low)) + 1) / 2;
     variable_t high_level = (level(get_node(u->high)) + 1) / 2;
     variable_t var_level = (level(u) + 1) / 2;
-    uint64_t res = (1 << (low_level - var_level - 1)) * l + (1 << (high_level - var_level - 1)) * h;
+    uint64_t res = add_count(shift_count(l, low_level - var_level - 1), shift_count(h, high_level - var_level - 1));
 
     opcache_store_count(cache_ix, CONNECT4_SAT_OP, ix, res);
 
@@ -33,7 +33,7 @@ uint64_t connect4_satcount(nodeindex_t ix) {
     bddnode_t* u = get_node(ix);
     uint64_t res = _connect4_satcount(ix);
     variable_t var_level = (level(u) + 1) / 2;
-    return (1 << (var_level - 1)) * res;
+    return shift_count(res, var_level - 1);
 }
 
 /*
@@ -54,9 +54,7 @@ nodeindex_t apply_board0_board1_or(nodeindex_t ix1, nodeindex_t ix2) {
     uint32_t cache_ix = opcache_index(CONNECT4_OR, ix1, ix2);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
     if (cacheentry.a == ix1 && cacheentry.b == ix2 && cacheentry.tag == CONNECT4_OR) {
-        if (!isdisabled(get_node(cacheentry.result))) {
-            return cacheentry.result;
-        }
+        return cacheentry.result;
     }
     
     nodeindex_t l;

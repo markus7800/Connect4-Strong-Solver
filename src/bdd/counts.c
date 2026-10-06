@@ -16,7 +16,7 @@ uint64_t _satcount(nodeindex_t ix) {
     uint64_t l = _satcount(u->low);
     uint64_t h = _satcount(u->high);
 
-    uint64_t res = (1 << (level(get_node(u->low)) - level(u) - 1)) * l + (1 << (level(get_node(u->high)) - level(u) - 1)) * h;
+    uint64_t res = add_count(shift_count(l, level(get_node(u->low)) - level(u) - 1), shift_count(h, level(get_node(u->high)) - level(u) - 1));
 
     opcache_store_count(cache_ix, SAT_OP, ix, res);
 
@@ -26,7 +26,7 @@ uint64_t _satcount(nodeindex_t ix) {
 uint64_t satcount(nodeindex_t ix) {
     bddnode_t* u = get_node(ix);
     uint64_t res = _satcount(ix);
-    return (1 << (level(u) - 1)) * res;
+    return shift_count(res, level(u) - 1);
 }
 
 // counts and flags all non-constant nodes below ix that are not flagged yet

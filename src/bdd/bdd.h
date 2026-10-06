@@ -59,7 +59,7 @@ tablesizes_t tablesizes_for_capacity(uint64_t capacity) {
 }
 
 tablesizes_t tablesizes_for_log2(uint64_t log2size) {
-    assert(log2size <= 32);
+    BDD_CHECK(log2size <= 32, "log2size has to be at most 32 :(");
     return tablesizes_for_capacity(((uint64_t) 1) << log2size);
 }
 

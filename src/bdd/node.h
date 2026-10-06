@@ -8,6 +8,10 @@
 #include <stdint.h>
 
 
+// Check that is also performed in release builds (asserts are disabled with -DNDEBUG).
+// Only used for cheap checks of conditions that would otherwise silently give wrong results.
+#define BDD_CHECK(cond, msg) do { if (!(cond)) { fprintf(stderr, "%s (%s:%d)\n", msg, __FILE__, __LINE__); exit(EXIT_FAILURE); } } while (0)
+
 // node index is the index into pre-allocated array of the memorypool
 typedef uint32_t nodeindex_t;
 // the special nodes 0 and 1 will always be stored at index 0 and 1 respectively

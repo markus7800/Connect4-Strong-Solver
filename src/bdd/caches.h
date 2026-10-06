@@ -15,8 +15,9 @@
 // For counting operations (OP_COUNT_FLAG set in the operation) the key is (tag, a)
 // and the fields b and result hold a 64-bit number instead of node indices.
 //
-// The cache is cleaned by gc: entries that refer to a deallocated node are removed,
-// all other entries stay valid.
+// The cache is cleaned by gc: entries that refer to a deallocated node are removed (or the whole cache is cleared).
+// Nodes are only deallocated by gc, so an entry that is found never refers to a deallocated node
+// and the result can be returned without looking at the node.
 
 // Probing pseudo code:
 // uint32_t cache_ix = opcache_index(OP, ix1, ix2);

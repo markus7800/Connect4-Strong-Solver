@@ -84,7 +84,7 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
 
 // increment external reference count to keep alive
 inline void keepalive(bddnode_t* node) {
-    assert(node->extref < (1 << 20) - 1);
+    BDD_CHECK(node->extref < (1 << 20) - 1, "Too many external references to a node :(");
     node->extref++;
 }
 inline void undo_keepalive(bddnode_t* node) {

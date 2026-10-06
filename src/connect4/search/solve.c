@@ -108,7 +108,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     char filename[100];
 
     nodeindex_t* bdd_per_ply = (nodeindex_t*) malloc((width*height+1)*sizeof(nodeindex_t));
-    assert(bdd_per_ply != NULL);
+    BDD_CHECK(bdd_per_ply != NULL, "Could not allocate :(");
     keepalive_ix(current);
     bdd_per_ply[0] = current;
 
@@ -150,7 +150,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // count the number of positions at ply
         cnt = connect4_satcount(current);
-        total += cnt;
+        total = add_count(total, cnt);
         
 
         // count number of nodes in current BDD
@@ -328,7 +328,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         total_t += t;
 
         printf("  win=%"PRIu64" draw=%"PRIu64" loss=%"PRIu64" term=%"PRIu64" / total=%"PRIu64" in %.3f seconds\n", win_cnt, draw_cnt, lost_cnt, term_cnt, cnt, t);
-        assert((win_cnt + draw_cnt + lost_cnt) == cnt);
+        BDD_CHECK((win_cnt + draw_cnt + lost_cnt) == cnt, "win + draw + loss does not match the number of positions :(");
 
 #if WRITE_TO_FILE
 
@@ -406,7 +406,7 @@ int main(int argc, char const *argv[]) {
     }
     if (IN_OP_GC_EXCL) {
         printf("Performs GC during ops exclusively. (thres=%.4f)\n", IN_OP_GC_THRES);
-        assert(IN_OP_GC);
+        BDD_CHECK(IN_OP_GC, "IN_OP_GC_EXCL needs IN_OP_GC :(");
     }
 
     if (!ALLOW_ROW_ORDER || width >= height) {
