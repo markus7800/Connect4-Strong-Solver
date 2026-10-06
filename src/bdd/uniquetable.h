@@ -60,6 +60,21 @@ extern  void keepalive_ix(nodeindex_t ix);
 extern void undo_keepalive_ix(nodeindex_t ix);
 extern void reassign_and_keepalive(nodeindex_t* target, nodeindex_t value);
 
+// The gc stack is a second way to keep nodes alive: all nodes on the stack are roots for garbage collection.
+// It is meant for the intermediate results of a running operation: pushing and popping only touches
+// the (small, cache-resident) stack and not the nodes themselves, unlike keepalive.
+#define GC_STACK_SIZE (8 * (MAX_VARIABLES + 2))
+extern nodeindex_t gc_stack[GC_STACK_SIZE];
+extern uint32_t gc_stack_top;
+static inline void gc_stack_push(nodeindex_t ix) {
+    assert(gc_stack_top < GC_STACK_SIZE);
+    gc_stack[gc_stack_top++] = ix;
+}
+static inline void gc_stack_pop(uint32_t n) {
+    assert(gc_stack_top >= n);
+    gc_stack_top -= n;
+}
+
 // Perform garbage collection.
 // By default gc is only performed if the unique table is filled more than 50%.
 // This behaviour can be overwritten by setting force = true.

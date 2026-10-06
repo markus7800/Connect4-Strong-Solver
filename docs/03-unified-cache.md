@@ -93,3 +93,18 @@ times that):
 
 A single cache with N/4 entries is enough: the time outside GC went down slightly, not
 up, although the three caches together had three times as many entries.
+
+### Keeping entries when GC interrupts an operation
+
+6x5 solve with 2^25 nodes and `IN_OP_GC=1` at a threshold of 0.7 (a threshold of 0.5,
+and a 2^24 table at 0.9, are below what this board needs alive and abort):
+
+| policy | time [s] | GC [s] | in-op GCs |
+|---|---:|---:|---:|
+| 1: keep valid entries on in-op GC | 519.7 | 67.4 | 4 |
+| 0: always clear | 496.3 | 63.6 | 4 |
+
+With only four in-op GCs in the whole run this says nothing about the policy; the 4 %
+difference is within the noise of a machine running other jobs. The solver's schedule
+of forced GCs between steps leaves little for the in-op GC to do. The question is
+taken up again when that schedule is replaced by fill-triggered GC.

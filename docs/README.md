@@ -19,6 +19,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [06](06-terminal-rules-and-diff.md) | terminal rules in `apply`, `diff` operation | 1.5x faster `solve`, 1.8x faster `count` |
 | [07](07-hash.md) | multiply-mix hash with full 32-bit range | tables with 2^32 buckets are used fully; 3–5 % faster; old hash was already well distributed |
 | [08](08-build-and-hot-path.md) | no node access on cache hits, release flags, overflow-checked counts | 3–4 % faster on small boards; counts can no longer wrap around silently |
+| [09](09-gc-root-stack.md) | GC root stack for intermediate results (`IN_OP_GC`) | no node writes per recursion step; prerequisite for making in-op GC the default |
 
 ## Running totals
 

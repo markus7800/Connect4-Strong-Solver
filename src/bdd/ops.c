@@ -1,8 +1,10 @@
 
 #include "ops.h"
 
+// If garbage collection can be triggered during an operation (IN_OP_GC), the intermediate results that are
+// held by the recursion have to survive it. They are pushed on the gc stack (see uniquetable.h).
 #if IN_OP_GC
-#define IN_OP_GC_keepalive(ix) keepalive(get_node(ix)) 
+#define IN_OP_GC_keepalive(ix) gc_stack_push(ix)
 #else
 #define IN_OP_GC_keepalive(ix) ;
 #endif
@@ -10,7 +12,8 @@
 // number of allocated nodes above which gc is triggered during operations (IN_OP_GC_THRES * capacity)
 static uint64_t in_op_gc_threshold = 0;
 
-void in_op_gc(uint8_t op) {
+// Triggers gc if too many nodes are allocated. `result` is the node that was just created, it is kept alive.
+void in_op_gc(uint8_t op, nodeindex_t result) {
     if (in_op_gc_threshold == 0) {
         in_op_gc_threshold = (uint64_t) (IN_OP_GC_THRES * (double) memorypool.capacity);
     }
@@ -33,7 +36,9 @@ void in_op_gc(uint8_t op) {
         case IMAGE_OP:
             printf("(image) "); break;
         }
+        gc_stack_push(result);
         gc_in_op();
+        gc_stack_pop(1);
         if (memorypool.num_nodes == prev_num_nodes) {
             perror("Could not decrease number of nodes in op GC :(\n.");
             exit(EXIT_FAILURE);
@@ -102,10 +107,9 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
     nodeindex_t u = make(var, l, h);
 
 #if IN_OP_GC
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-    keepalive(get_node(u));
-    in_op_gc(op);
-    undo_keepalive(get_node(u));
+    // l and h are reachable from u now
+    gc_stack_pop(2);
+    in_op_gc(op, u);
 #endif
 
     opcache_store(cache_ix, op, ix1, ix2, u);
@@ -131,10 +135,9 @@ nodeindex_t apply_not(nodeindex_t ix) {
     nodeindex_t new_u = make(u->var, l, h);
 
 #if IN_OP_GC
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-    keepalive(get_node(new_u));
-    in_op_gc(NOT_OP);
-    undo_keepalive(get_node(new_u));
+    // l and h are reachable from new_u now
+    gc_stack_pop(2);
+    in_op_gc(NOT_OP, new_u);
 #endif
 
     opcache_store(cache_ix, NOT_OP, ix, 0, new_u);
@@ -227,10 +230,9 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
     }
 
 #if IN_OP_GC
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-    keepalive(get_node(new_u));
-    in_op_gc(EXISTS_OP);
-    undo_keepalive(get_node(new_u));
+    // l and h are reachable from new_u now
+    gc_stack_pop(2);
+    in_op_gc(EXISTS_OP, new_u);
 #endif
 
     opcache_store(cache_ix, EXISTS_OP, ix, ix2, new_u);
@@ -288,10 +290,9 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     }
 
 #if IN_OP_GC
-    undo_keepalive(get_node(l)); undo_keepalive(get_node(h));
-    keepalive(get_node(new_u));
-    in_op_gc(IMAGE_OP);
-    undo_keepalive(get_node(new_u));
+    // l and h are reachable from new_u now
+    gc_stack_pop(2);
+    in_op_gc(IMAGE_OP, new_u);
 #endif
 
     opcache_store(cache_ix, tag, ix1, ix2, new_u);

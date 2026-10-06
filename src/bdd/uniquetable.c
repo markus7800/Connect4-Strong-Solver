@@ -7,6 +7,9 @@
 
 nodetable_t uniquetable;
 
+nodeindex_t gc_stack[GC_STACK_SIZE];
+uint32_t gc_stack_top = 0;
+
 // Which cache entries survive gc?
 // 0 ... none, the cache is always cleared
 // 1 ... if gc was triggered inside of an operation, entries that only refer to nodes which are alive survive (default)
@@ -177,7 +180,10 @@ static void gc_run(bool force, bool in_op) {
             n_roots += 1;
         }
     }
-    printf("%"PRIu64" roots ... ", n_roots);
+    for (uint32_t i = 0; i < gc_stack_top; i++) {
+        mark_rec(gc_stack[i]);
+    }
+    printf("%"PRIu64" roots ... ", n_roots + gc_stack_top);
 
     // Remove cache entries that refer to nodes which will be deallocated
     if (GC_KEEPS_CACHE == 2 || (GC_KEEPS_CACHE == 1 && in_op)) {
