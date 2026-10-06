@@ -10,12 +10,16 @@ ENTER_TO_CONTINUE = 0
 
 # for solve and count
 
-# should GC be performed during ops?
-IN_OP_GC = 0
+# should GC be performed during ops (when the node pool is nearly full)?
+IN_OP_GC = 1
 # fill-level at which IN_OP_GC is triggered
-IN_OP_GC_THRES = 0.9999
-# exclusively perform IN_OP_GC?
+IN_OP_GC_THRES = 0.9
+# (no effect anymore: between the steps GC only runs if the node pool is more than half full)
 IN_OP_GC_EXCL = 0
+# run GC after every step of the computation? (for measuring the number of nodes that are needed)
+FORCE_GC = 0
+# between the steps, GC runs if more than GC_GROWTH times the nodes that survived the last GC are allocated
+GC_GROWTH = 2.0
 
 # for solve, count, bestmove, wdl, openingbook 
 
@@ -38,6 +42,8 @@ SUBTRACT_TERM = 1
 
 # save BDDs (strong solution) to disk?
 SAVE_BDD_TO_DISK = 1
+# keep the BDDs of the reachable positions per ply (folder reach_w{WIDTH}_h{HEIGHT}) after the computation?
+KEEP_REACH = 0
 
 # for bestmove, full_ab_search, wdl, openingbook, perft
 
@@ -90,6 +96,8 @@ GC_KEEPS_CACHE = 1
 GCFLAGS = \
 -DOPCACHE_LOG2_REDUCTION=$(CACHE_SHIFT) \
 -DGC_KEEPS_CACHE=$(GC_KEEPS_CACHE) \
+-DFORCE_GC=$(FORCE_GC) \
+-DGC_GROWTH=$(GC_GROWTH) \
 -DIN_OP_GC=$(IN_OP_GC) \
 -DIN_OP_GC_EXCL=$(IN_OP_GC_EXCL) \
 -DIN_OP_GC_THRES=$(IN_OP_GC_THRES)
@@ -98,7 +106,7 @@ count:
 	$(CC) search/count.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -o build/count.out
 
 solve:
-	$(CC) search/solve.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -o build/solve.out
+	$(CC) search/solve.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -DKEEP_REACH=$(KEEP_REACH) -o build/solve.out
 
 bestmove:
 	$(CC) probe/bestmove.c $(CFLAGS) $(ENCODING) $(WIDTH_HEIGHT) -o build/bestmove_w$(WIDTH)_h$(HEIGHT).out

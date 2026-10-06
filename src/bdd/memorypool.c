@@ -52,7 +52,7 @@ nodeindex_t pop_index() {
         index = (nodeindex_t) memorypool.hwm;
         memorypool.hwm++;
     } else {
-        perror("Ran out of nodes :(\n");
+        fprintf(stderr, "Ran out of nodes :( The table is too small for the nodes that are alive.\n");
         exit(EXIT_FAILURE);
     }
     memorypool.num_nodes++;

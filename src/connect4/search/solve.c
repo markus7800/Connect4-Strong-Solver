@@ -160,14 +160,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     keepalive_ix(current);
     uint64_t cnt;
 
-    int gc_level;
     for (int ply = 0; ply <= width*height; ply++) {
-        printf("Ply %d/%d:", ply, width*height);
+        printf("Ply %d/%d:\n", ply, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
-
-        // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
-        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
-        if (gc_level) printf("\n");
 
         if (ply > 0) {
             // first subtract all terminal positions and then perform image operation
@@ -176,11 +171,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             // this is the second player (1) after an even number of moves > 0
             nodeindex_t nonterminal = connect4_subtract_term(&terminal, current, (ply % 2) == 1 ? 1 : 0);
             reassign_and_keepalive(&current, successors(nonterminal, &moves));
-
-            if (gc_level) {
-                printf("  IMAGE GC: ");
-                gc(true, true);
-            }
+            checkpoint("IMAGE");
         }
 
         // count the number of positions at ply
@@ -198,7 +189,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         total_t += t;
 
         // print info
-        printf(" PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
+        printf("  PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
     }
     undo_keepalive_ix(current);
 
@@ -209,15 +200,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     printf("\n\nRetrograde analysis:\n\n");
 
 
-    nodeindex_t win, draw, lost, term;
-
+    // Positions of the next ply (one more stone) that are drawn / lost for the player to move there.
+    // They are kept alive between the plies.
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
+    keepalive_ix(next_draw); keepalive_ix(next_lost);
 
     uint64_t term_cnt, win_cnt, draw_cnt, lost_cnt;
     uint64_t win_node_cnt, draw_node_cnt, lost_node_cnt;
-
-    uint8_t player;
-    nodeindex_t win_pre_img, draw_pre_image;
 
 #if WRITE_TO_FILE
     sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
@@ -225,51 +214,41 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     fprintf(f, "width,height,ply,win_count,draw_count,loss_count,term_count,total_count,win_nodecount,draw_nodecount,loss_nodecount,total_nodecount,time\n");
 #endif
 
-
     for (int ply = width*height; ply >= 0; ply--) {
         printf("Ply %d/%d:\n", ply, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
-        gc_level = IN_OP_GC_EXCL ? 0 : (ply >= 10);
 
         // load the reachable positions of this ply
         sprintf(filename, "%s/reach_w%"PRIu32"_h%"PRIu32"_%d.bin", reach_folder, width, height, ply);
         nodeindex_t reachable = _read_from_file_with_varmap(filename, file_varmap);
         keepalive_ix(reachable);
-        current = reachable;
         cnt = count_per_ply[ply];
-        BDD_CHECK(nodecount(current) == bddnodecount_per_ply[ply], "BDD read from disk differs from the one that was written :(");
+        BDD_CHECK(nodecount(reachable) == bddnodecount_per_ply[ply], "BDD read from disk differs from the one that was written :(");
 #if !KEEP_REACH
         remove(filename);
 #endif
 
-        // the player who made the last move
-        player = (ply % 2) == 1 ? 0 : 1;
-
-        keepalive_ix(next_draw); keepalive_ix(next_lost);
-
-        // compute terminal positions for ply
-        term = connect4_intersect_term(&terminal, current, player);
-        term_cnt = connect4_satcount(term);
-        keepalive_ix(term);
-
-        // compute non-terminal positions for ply
-        current = connect4_subtract_term(&terminal, current, player);
-        keepalive_ix(current);
-
-        // pre-image of lost positions of opponent are wins for player
-        win_pre_img = predecessors(next_lost, &moves);
-        keepalive_ix(win_pre_img);
-        undo_keepalive_ix(next_lost);
-
-        if (gc_level) {
-            printf("  WIN 1 GC: "); gc(true, true);
+        // Terminal positions: the player who made the last move has four in a row.
+        // They are lost for the player to move.
+        nodeindex_t nonterminal = connect4_subtract_term(&terminal, reachable, (ply % 2) == 1 ? 0 : 1);
+        keepalive_ix(nonterminal);
+        term_cnt = cnt - connect4_satcount(nonterminal);
+        if (ply < width*height) {
+            // only needed for the full board
+            undo_keepalive_ix(nonterminal);
         }
-    
-        // get wins for ply
-        win = and(current, win_pre_img);
-        win_cnt = connect4_satcount(win);
-        undo_keepalive_ix(win_pre_img);
+
+        // Note: a terminal position has no move to a reachable position (the game is over),
+        // and the won / drawn / lost positions of the next ply are reachable.
+        // So the predecessors below are restricted to reachable positions only,
+        // the terminal positions drop out by themselves.
+
+        // WIN: positions with a move to a position that is lost for the opponent
+        // i.e. the predecessors of the lost positions of the next ply, restricted to the reachable positions
+        nodeindex_t win = predecessors_within(next_lost, reachable, &moves);
         keepalive_ix(win);
+        undo_keepalive_ix(next_lost);
+        win_cnt = connect4_satcount(win);
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_win.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
@@ -277,35 +256,27 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #else
         win_node_cnt = nodecount(win);
 #endif
+        checkpoint("WIN");
 
-        if (gc_level) {
-            printf("  WIN 2 GC: "); gc(true, true);
-        }
+        // all reachable positions that are not won (drawn or lost)
+        nodeindex_t notwon = diff(reachable, win);
+        keepalive_ix(notwon);
+        undo_keepalive_ix(win); undo_keepalive_ix(reachable);
+        checkpoint("NOT WON");
 
-        // subtract wins from all non-terminal positions at ply
-        reassign_and_keepalive(&current, diff(current, win));
-        undo_keepalive_ix(win);
-
-        if (gc_level) {
-            printf("  WIN 3 GC: "); gc(true, true);
-        }
-
-        // if we cannot win next best result is a draw
-
+        // DRAW: if we cannot win the next best result is a draw,
+        // i.e. the predecessors of the drawn positions of the next ply, restricted to the positions that are not won
+        nodeindex_t draw;
         if (ply == width*height) {
-            // if ply == width*height then board is full
-            // and there are no moves oven when no post-condition is placed (next_draw=ONE_INDEX)
-            draw = current;
+            // the board is full: there are no moves and all non-terminal positions are drawn
+            draw = nonterminal;
+            undo_keepalive_ix(nonterminal);
         } else {
-            // pre-image of opponent draw is also draw for player
-            draw_pre_image = predecessors(next_draw, &moves);
-            undo_keepalive_ix(next_draw);
-
-            // get draws for ply
-            draw = and(current, draw_pre_image);
+            draw = predecessors_within(next_draw, notwon, &moves);
         }
-        draw_cnt = connect4_satcount(draw);
         keepalive_ix(draw);
+        undo_keepalive_ix(next_draw);
+        draw_cnt = connect4_satcount(draw);
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
@@ -313,16 +284,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #else
         draw_node_cnt = nodecount(draw);
 #endif
+        checkpoint("DRAW");
 
-        if (gc_level) {
-            printf("  DRAW GC: "); gc(true, true);
-        }
-
-        // also subtract draws from current = all non-terminal positions at ply - wins - draws
-        // terminals are alays lost so add to result to get lost positions for ply
-        lost = or(diff(current, draw), term);
+        // LOSS: everything else, this includes the terminal positions
+        nodeindex_t lost = diff(notwon, draw);
+        keepalive_ix(lost);
+        undo_keepalive_ix(notwon);
         lost_cnt = connect4_satcount(lost);
-        undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_loss.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
@@ -331,18 +299,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         lost_node_cnt = nodecount(lost);
 #endif
 
-        // store the results of current ply for next ply
+        // the results of this ply are the input for the next one (both are kept alive)
         next_draw = draw;
         next_lost = lost;
+        checkpoint("PLY");
 
-        undo_keepalive_ix(reachable);
-
-        if (gc_level) {
-            keepalive_ix(next_draw); keepalive_ix(next_lost);
-            printf("  PLY GC: "); gc(true, true);
-            undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
-        }
-        
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
         total_t += t;
@@ -364,6 +325,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #endif
     }
 
+    undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
     printf("DEINIT GC: ");
     gc(true, true);
     uint64_t num_nodes_post_comp = uniquetable.count;

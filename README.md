@@ -74,20 +74,25 @@ Options:
 - `ENTER_TO_CONTINUE`: whether to require to press enter to start computation (default: `0`)
 - `WRITE_TO_FILE`: whether to write results to `.csv` file (default: `1`)
 - `IN_OP_GC`: whether to allow automatic garbage collection during BDD operations (default: `1`)
-- `IN_OP_GC_THRES`: fill-level of node pool above which garbage collection is triggerd if `IN_OP_GC=1` (default: `0.9999`)
-- `IN_OP_GC_EXCL`: whether to exclusively perform automatic garbage collection instead of at manually set points (default: `0`)
+- `IN_OP_GC_THRES`: fill-level of node pool above which garbage collection is triggerd if `IN_OP_GC=1` (default: `0.9`)
+- `GC_GROWTH`: between the steps of the computation, garbage collection runs if more than `GC_GROWTH` times the nodes that survived the previous collection are allocated (default: `2.0`)
+- `FORCE_GC`: whether to run garbage collection after every step, for measuring how many nodes are really needed (default: `0`)
+- `GC_KEEPS_CACHE`: whether cache entries of surviving nodes are kept by garbage collection: `0` never, `1` if it runs during an operation, `2` always (default: `1`)
+- `CACHE_SHIFT`: the operation cache has `2^(log2_tablesize - CACHE_SHIFT)` entries (default: `2`)
+- `PARTITIONED_IMAGE`: whether to apply the moves of each column separately instead of all at once (default: `0`, slower)
+- `DEBUG`: whether to keep asserts (default: `0`)
 
 Run with `./build/counts.out log2_tablesize width height`.
 
-Generally, if you have enough memory available, `log2_tablesize` should be chosen such that the maximum fill-level of the node pool does not exceed 50 %.
-Otherwise, performance degrades.
-If the garbage collection manually set program points is not enough, then you may encounter a `uniquetable too small` error, i.e. there are no more nodes available to allocate.
-In this case you may try to set `IN_OP_GC=1`.
-Then, if the fill level exceeds `IN_OP_GC_THRES` during a BDD operation, garbage collection will be triggered.
-This wrecks performance, because all caches are also cleared, which are heavily used during operations.
-For `IN_OP_GC=1` (and gariage collection in general) to work, the program has to be written in a way such that all BDD nodes that are used later on will be kept alive with reference counting, i.e. `keep_alive(node)`.
-Lastly, setting `FULLBDD=1` increases computation and memory usage slighlty, because a union over all the BDD encoding the position at each ply is iteratively performed and kept alive.
+`log2_tablesize` can also be a RAM budget like `12G`.
+
+If the node pool fills up during a BDD operation, garbage collection is triggered there (`IN_OP_GC=1`).
+For this to work, the program has to be written in a way such that all BDD nodes that are used later on are kept alive, i.e. `keepalive(node)`.
+If the nodes that are alive do not fit, the program stops with `Could not decrease number of nodes in op GC`; then you need a larger table.
+Setting `FULLBDD=1` increases computation and memory usage slighlty, because a union over all the BDD encoding the position at each ply is iteratively performed and kept alive.
 Set only if you are intersted in the number of nodes required to encode all positions, not just the position counts.
+
+The timings and RAM numbers in the examples below were measured before the optimisations described in [docs](docs/README.md) and are out of date (everything is several times faster and needs less than half the memory now).
 
 Some examples to demonstrate flags:
 
@@ -123,10 +128,9 @@ Options:
 - `ALLOW_ROW_ORDER`
 - `ENTER_TO_CONTINUE`
 - `WRITE_TO_FILE`
-- `IN_OP_GC`
-- `IN_OP_GC_THRES`
-- `IN_OP_GC_EXCL`
+- `IN_OP_GC`, `IN_OP_GC_THRES`, `GC_GROWTH`, `FORCE_GC`, `GC_KEEPS_CACHE`, `CACHE_SHIFT`, `PARTITIONED_IMAGE`, `DEBUG`
 - `SAVE_BDD_TO_DISK`: whether to save the strong solution as BDD to disk (default: `1`)
+- `KEEP_REACH`: whether to keep the BDDs of the reachable positions per ply, which are stored in the `reach_w{WIDTH}_h{HEIGHT}` folder during the computation (default: `0`)
 
 Run with `./build/solve.out log2_tablesize width height`.
 

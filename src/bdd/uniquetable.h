@@ -84,6 +84,14 @@ static inline void gc_stack_pop(uint32_t n) {
 // If this index is still in the cache we would get wrong results.)
 void gc(bool disable_rec, bool force);
 
+// Garbage collection during operations is triggered when more than GC_IN_OP_TRIGGER nodes are allocated.
+// Normally this is GC_IN_OP_THRES * capacity. If more nodes than that are alive after a gc, the trigger is moved
+// to the middle between the number of nodes alive and the capacity, so that the rest of the pool can still
+// be used without running gc for every new node. The program stops when the pool is really full.
+extern uint64_t GC_IN_OP_TRIGGER;
+extern double GC_IN_OP_THRES;
+void gc_set_in_op_threshold(double thres);
+
 // Garbage collection that is triggered while an operation is running.
 // The partial results of the running operation are valuable, so (by default) the cache is not cleared,
 // only entries that refer to a deallocated node are removed.
@@ -102,6 +110,8 @@ extern uint64_t GC_MAX_NODES_ALLOC;
 // This is (a sample of) the number of nodes the computation really needs,
 // whereas the number of allocated nodes includes garbage that was not collected yet.
 extern uint64_t GC_MAX_NODES_ALIVE;
+// Number of nodes that were alive after the last garbage collection.
+extern uint64_t GC_LAST_NODES_ALIVE;
 
 // checks if properties of BDD hold
 void verify_uniquetable();

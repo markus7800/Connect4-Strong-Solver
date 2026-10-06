@@ -83,8 +83,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // Compute trans relation by performing OR over all possible moves
     // One for the case when the position before the move is encoded by board0 and the one after by board1 (successors),
     // and one for the case when the roles are switched (predecessors)
+    // We always want to keep the trans relations alive (prevent GC)
     nodeindex_t trans0 = get_trans(X, stm0, stm1, width, height, 0);
+    keepalive_ix(trans0);
     nodeindex_t trans1 = get_trans(X, stm0, stm1, width, height, 1);
+    keepalive_ix(trans1);
     moves_t moves;
     moves.width = width;
     moves.vars_board0 = &vars_board0;
@@ -106,9 +109,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     terminal_t terminal;
     init_terminal(&terminal, X, width, height);
 
-    // We always want to keep the trans relations alive (prevent GC)
-    keepalive_ix(trans0);
-    keepalive_ix(trans1);
 
     // Phiu, first GC run.
     printf("  INIT GC: ");
@@ -145,43 +145,23 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     double t;
     double total_t = 0;
 
-    int gc_level;
+    keepalive_ix(current);
     for (int d = 1; d <= width*height+1; d++) {
-        printf("Ply %d/%d:", d, width*height);
+        printf("Ply %d/%d:\n", d, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
-
-        // GC is tuned for 7 x 6 board (it is overkill for smaller boards)
-        gc_level = IN_OP_GC_EXCL ? 0 : (d >= 10) + (d >= 25);
-        if (gc_level) printf("\n");
 
         // first subtract all terminal positions and then perform image operation
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // in a terminal position the player who made the last move has four in a row:
         // this is the second player (1) after an even number of moves > 0
-        current = SUBTRACT_TERM ? connect4_subtract_term(&terminal, current, (d % 2) == 1 ? 1 : 0) : current;
-        current = successors(current, &moves);
-
-        if (gc_level) {
-            printf("  IMAGE GC: ");
-            keepalive_ix(current);
-            gc(true, true);
-            undo_keepalive_ix(current);
-        }
+        nodeindex_t nonterminal = SUBTRACT_TERM ? connect4_subtract_term(&terminal, current, (d % 2) == 1 ? 1 : 0) : current;
+        reassign_and_keepalive(&current, successors(nonterminal, &moves));
+        checkpoint("IMAGE");
 
 #if FULLBDD
         // update full bdd (enconding all positions) by performing OR with current
-        undo_keepalive_ix(full_bdd);
-        keepalive_ix(current);
-        full_bdd = or(full_bdd, current);
-        undo_keepalive_ix(current);
-        keepalive_ix(full_bdd);
-
-        if (gc_level) {
-            printf("  FULLBDD GC: ");
-            keepalive_ix(current);
-            gc(true, true);
-            undo_keepalive_ix(current);
-        }
+        reassign_and_keepalive(&full_bdd, or(full_bdd, current));
+        checkpoint("FULLBDD");
 
         // count number of nodes in current full BDD
         bdd_nodecount = nodecount(full_bdd);
@@ -201,7 +181,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         total_t += t;
 
         // print info
-        printf(" PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
+        printf("  PlyBDD(%"PRIu64") with satcount = %"PRIu64" in %.3f seconds\n", bdd_nodecount, cnt, t);
 
 
 #if WRITE_TO_FILE
@@ -235,6 +215,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     printf("\nTotal number of positions for width=%"PRIu32" x height=%"PRIu32" board: %"PRIu64"\n", width, height, total);
     printf("\nFinished in %.3f seconds.\n", total_t);
 
+    undo_keepalive_ix(current);
     printf("DEINIT GC: ");
     gc(true, true);
     uint64_t num_nodes_post_comp = uniquetable.count;

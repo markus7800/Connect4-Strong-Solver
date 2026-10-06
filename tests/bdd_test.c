@@ -218,6 +218,13 @@ static void test_image_rename() {
         }
         nodeindex_t expected = reference_image_rename(S, T); keepalive_ix(expected);
         CHECK(image_rename(S, T, &unprimed) == expected);
+        // restricted image
+        nodeindex_t C = random_bdd_on(npairs, 0, 1 + rng() % 25); keepalive_ix(C);
+        CHECK(image_rename_and(S, T, C, &unprimed) == and(expected, C));
+        CHECK(image_rename_and(S, T, ONEINDEX, &unprimed) == expected);
+        CHECK(image_rename_and(S, T, ZEROINDEX, &unprimed) == ZEROINDEX);
+        CHECK(image_rename_and(S, T, expected, &unprimed) == expected);
+        undo_keepalive_ix(C);
         undo_keepalive_ix(expected); undo_keepalive_ix(T);
 
         // (b) arbitrary relation over the first pairs (no frame structure)
@@ -226,13 +233,16 @@ static void test_image_rename() {
         T = (rng() & 1) ? and(Tx, Ty) : or(and(Tx, Ty), iff(Tx, Ty)); keepalive_ix(T);
         expected = reference_image_rename(S, T); keepalive_ix(expected);
         CHECK(image_rename(S, T, &unprimed) == expected);
+        C = random_bdd_on(npairs, 0, 1 + rng() % 25); keepalive_ix(C);
+        CHECK(image_rename_and(S, T, C, &unprimed) == and(expected, C));
+        undo_keepalive_ix(C);
         undo_keepalive_ix(expected); undo_keepalive_ix(T); undo_keepalive_ix(Tx); undo_keepalive_ix(Ty);
 
         undo_keepalive_ix(S);
         if (round % 50 == 49) gc(true, true);
     }
     undo_keepalive_ix(identity);
-    printf("ok image_rename\n");
+    printf("ok image_rename and image_rename_and\n");
 }
 
 static void test_canonical_and_gc() {

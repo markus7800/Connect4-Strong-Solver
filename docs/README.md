@@ -23,6 +23,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [10](10-single-variable-set.md) | all sets in one variable set, `image_rename` with identity shortcut | 8–18 % faster, 13–31 % lower peak; column-partitioned image measured and rejected |
 | [11](11-terminal-predicate.md) | four-in-a-line BDD built once per player | 1.4–2.3x faster; the predicate has 185 K nodes for 7x6, under 1 M for 7x7 |
 | [12](12-reach-on-disk.md) | reachable sets are stored on disk between the two passes | 10–20 % fewer live nodes, ~10 % faster |
+| [13](13-retrograde-pass.md) | restricted pre-images, one fewer large BDD alive, GC by growth, in-op GC uses the whole pool | 6x5 needs 11.6 M nodes (1.03x the largest W+D+L) and completes in 0.24 GiB |
 
 ## Running totals
 
@@ -45,6 +46,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 10 single variable set | 20–24 | 15.0 | 11.7 | 23.8 |
 | 11 terminal predicate | 20–24 | 10.0 | 8.4 | 10.4 |
 | 12 reach on disk | 20–24 | 8.9 | 7.1 | 10.4 |
+| 13 retrograde pass, GC schedule | 20–24 | 7.7 | 7.0 | 9.8 |
 
 Larger boards (tables of 2^26 nodes):
 
@@ -53,3 +55,9 @@ Larger boards (tables of 2^26 nodes):
 | 00 baseline | 466.3 | 79.3 | 28.75 M | 3.31 GB | 859.1 | 82.1 | 40.28 M | 2.98 GB |
 | 03 unified cache | 444.0 | 69.8 | 28.75 M | 1.43 GB | 798.9 | 36.8 | 40.28 M | 1.48 GB |
 | 08 hot path, build flags | 259.1 | 62.4 | 28.75 M | 0.94 GB | 369.3 | 33.5 | 40.28 M | 1.10 GB |
+| 12 reach on disk | 137.3 | 13.9 | 21.29 M | 0.85 GB | | | | |
+| 13 retrograde pass, GC schedule | 146.1 | 6.5 | 24.99 M | 0.91 GB | 130.5 | 4.4 | 38.48 M | 1.07 GB |
+
+"Peak nodes" is the largest number of allocated nodes seen at a GC, garbage included, so
+it depends on the GC schedule. From change 13 on GC runs less often; the number of nodes
+that are actually needed is the "max alive" figure in [13](13-retrograde-pass.md).

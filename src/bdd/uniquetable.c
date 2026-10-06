@@ -10,6 +10,21 @@ nodetable_t uniquetable;
 nodeindex_t gc_stack[GC_STACK_SIZE];
 uint32_t gc_stack_top = 0;
 
+uint64_t GC_IN_OP_TRIGGER = 0;
+double GC_IN_OP_THRES = 0;
+
+static void update_in_op_trigger() {
+    uint64_t regular = (uint64_t) (GC_IN_OP_THRES * (double) memorypool.capacity);
+    uint64_t alive = memorypool.num_nodes;
+    uint64_t halfway = alive + (memorypool.capacity - alive) / 2;
+    GC_IN_OP_TRIGGER = halfway > regular ? halfway : regular;
+}
+
+void gc_set_in_op_threshold(double thres) {
+    GC_IN_OP_THRES = thres;
+    update_in_op_trigger();
+}
+
 // Which cache entries survive gc?
 // 0 ... none, the cache is always cleared
 // 1 ... if gc was triggered inside of an operation, entries that only refer to nodes which are alive survive (default)
@@ -23,6 +38,7 @@ void init_uniquetable(uint64_t log2size) {
     GC_MAX_FILL_LEVEL = 0;
     GC_MAX_NODES_ALLOC = 0;
     GC_MAX_NODES_ALIVE = 0;
+    GC_LAST_NODES_ALIVE = 0;
 
     assert(log2size <= 32);
     uint64_t size = ((uint64_t) 1) << log2size;
@@ -132,6 +148,7 @@ double GC_TIME;
 double GC_MAX_FILL_LEVEL;
 uint64_t GC_MAX_NODES_ALLOC;
 uint64_t GC_MAX_NODES_ALIVE;
+uint64_t GC_LAST_NODES_ALIVE;
 #ifdef HASH_STATS
 // quality of the hash function: distribution of bucket sizes compared to the ideal (Poisson) distribution
 static void print_hash_stats() {
@@ -227,9 +244,14 @@ static void gc_run(bool force, bool in_op) {
     double perc_after = (double) num_alive / memorypool.capacity * 100;
     printf("decreased number of nodes from %"PRIu64" (%.2f%%) to %"PRIu64" (%.2f%%)\n", uniquetable.count, perc_before, num_alive, perc_after);
     if (num_alive > GC_MAX_NODES_ALIVE) GC_MAX_NODES_ALIVE = num_alive;
+    GC_LAST_NODES_ALIVE = num_alive;
     uniquetable.count = num_alive;
     memorypool.num_nodes = num_alive;
     memorypool.next = free_list;
+
+    if (GC_IN_OP_THRES > 0) {
+        update_in_op_trigger();
+    }
 
     clock_gettime(CLOCK_REALTIME, &t1);
     GC_TIME += get_elapsed_time(t0, t1);

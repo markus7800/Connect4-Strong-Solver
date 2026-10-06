@@ -9,16 +9,17 @@
 #define IN_OP_GC_keepalive(ix) ;
 #endif
 
-// number of allocated nodes above which gc is triggered during operations (IN_OP_GC_THRES * capacity)
-static uint64_t in_op_gc_threshold = 0;
-
 // Triggers gc if too many nodes are allocated. `result` is the node that was just created, it is kept alive.
+// The number of allocated nodes above which gc is triggered is GC_IN_OP_TRIGGER (see uniquetable.h).
 void in_op_gc(uint8_t op, nodeindex_t result) {
-    if (in_op_gc_threshold == 0) {
-        in_op_gc_threshold = (uint64_t) (IN_OP_GC_THRES * (double) memorypool.capacity);
-    }
-    uint64_t prev_num_nodes = memorypool.num_nodes;
-    if (prev_num_nodes > in_op_gc_threshold) {
+    if (memorypool.num_nodes > GC_IN_OP_TRIGGER) {
+        if (GC_IN_OP_THRES == 0) {
+            // first call: the regular trigger is IN_OP_GC_THRES * capacity
+            gc_set_in_op_threshold(IN_OP_GC_THRES);
+            if (memorypool.num_nodes <= GC_IN_OP_TRIGGER) {
+                return;
+            }
+        }
         printf("!!IN_OP GC: ");
         switch (op) {
         case AND_OP:
@@ -37,14 +38,12 @@ void in_op_gc(uint8_t op, nodeindex_t result) {
             printf("(image) "); break;
         case IMAGE_RENAME_OP:
             printf("(image_rename) "); break;
+        case IMAGE_RENAME_AND_OP:
+            printf("(image_rename_and) "); break;
         }
         gc_stack_push(result);
         gc_in_op();
         gc_stack_pop(1);
-        if (memorypool.num_nodes == prev_num_nodes) {
-            perror("Could not decrease number of nodes in op GC :(\n.");
-            exit(EXIT_FAILURE);
-        }
     }
 }
 
@@ -408,5 +407,145 @@ nodeindex_t image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* varia
     keepalive(get_node(ix1)); keepalive(get_node(ix2));
     nodeindex_t res = apply_image_rename(ix1, ix2, variable_set);
     undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2));
+    return res;
+}
+
+
+nodeindex_t apply_image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, variable_set_t* variable_set) {
+    if (ix1 == ZEROINDEX || ix2 == ZEROINDEX || ix3 == ZEROINDEX) {
+        return ZEROINDEX;
+    }
+    if (ix3 == ONEINDEX) {
+        // no restriction left
+        return apply_image_rename(ix1, ix2, variable_set);
+    }
+    bddnode_t* u1 = get_node(ix1);
+    bddnode_t* u2 = get_node(ix2);
+    bddnode_t* u3 = get_node(ix3);
+    variable_t level1 = level(u1);
+    variable_t level2 = level(u2);
+    // ix3 is a function of the result variables, which are the primed variables before renaming:
+    // in the order of the recursion its top variable sits at the position of the primed partner
+    variable_t level3 = u3->var + 1;
+
+    // The rest of the relation is the identity: the image is ix1 itself, restricted to ix3.
+    if (level2 <= level1 && !isconstant(u2) && variable_set->identity[u2->var] == ix2) {
+        return apply_binary(ix1, ix3, AND_OP);
+    }
+    if (ix1 == ONEINDEX && ix2 == ONEINDEX) {
+        return ix3;
+    }
+
+    // the node of the relation is part of the cache key (24 bits, checked in image_rename_and)
+    uint32_t tag = IMAGE_RENAME_AND_OP | (ix2 << 8);
+    uint32_t cache_ix = opcache_index(tag, ix1, ix3) ^ (hash_2(0, ix2) & opcache.mask);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix1 && cacheentry.b == ix3 && cacheentry.tag == tag) {
+        return cacheentry.result;
+    }
+
+    variable_t top = level1 < level2 ? level1 : level2;
+    if (level3 < top) top = level3;
+
+    nodeindex_t l;
+    nodeindex_t h;
+    nodeindex_t new_u;
+    if (variable_set->primed[top]) {
+        // primed variable: the relation and the restriction can depend on it, it is renamed to its unprimed partner
+        assert(level1 != top);
+        nodeindex_t t0 = level2 == top ? u2->low : ix2;
+        nodeindex_t t1 = level2 == top ? u2->high : ix2;
+        nodeindex_t c0 = level3 == top ? u3->low : ix3;
+        nodeindex_t c1 = level3 == top ? u3->high : ix3;
+        l = apply_image_rename_and(ix1, t0, c0, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image_rename_and(ix1, t1, c1, variable_set); IN_OP_GC_keepalive(h);
+        new_u = make(top - 1, l, h);
+    } else {
+        // unprimed variable of the set: existential quantification, the restriction does not depend on it
+        BDD_CHECK(variable_set->variables[top - 1], "image_rename_and: variable is neither in the set nor primed :(");
+        nodeindex_t s0 = level1 == top ? u1->low : ix1;
+        nodeindex_t s1 = level1 == top ? u1->high : ix1;
+        nodeindex_t t0 = level2 == top ? u2->low : ix2;
+        nodeindex_t t1 = level2 == top ? u2->high : ix2;
+        l = apply_image_rename_and(s0, t0, ix3, variable_set); IN_OP_GC_keepalive(l);
+        h = apply_image_rename_and(s1, t1, ix3, variable_set); IN_OP_GC_keepalive(h);
+        new_u = apply_binary(l, h, OR_OP);
+    }
+
+#if IN_OP_GC
+    // l and h are reachable from new_u now
+    gc_stack_pop(2);
+    in_op_gc(IMAGE_RENAME_AND_OP, new_u);
+#endif
+
+    opcache_store(cache_ix, tag, ix1, ix3, new_u);
+
+    return new_u;
+}
+
+// largest node index below ix (inclusive)
+static nodeindex_t max_index_rec(nodeindex_t ix) {
+    nodeindex_t res = ix;
+    while (ix > ONEINDEX) {
+        bddnode_t* u = get_node(ix);
+        if (u->visit) {
+            break;
+        }
+        u->visit = 1;
+        if (ix > res) res = ix;
+        nodeindex_t m = max_index_rec(u->low);
+        if (m > res) res = m;
+        ix = u->high;
+    }
+    return res;
+}
+static void unvisit_rec(nodeindex_t ix) {
+    while (ix > ONEINDEX) {
+        bddnode_t* u = get_node(ix);
+        if (!u->visit) {
+            break;
+        }
+        u->visit = 0;
+        unvisit_rec(u->low);
+        ix = u->high;
+    }
+}
+
+nodeindex_t image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, variable_set_t* variable_set) {
+    BDD_CHECK(variable_set->primed != NULL, "prepare_image_rename has to be called before image_rename_and :(");
+    // only one variable set is supported (it is not part of the cache key)
+    static variable_set_t* used_variable_set = NULL;
+    if (used_variable_set == NULL) used_variable_set = variable_set;
+    BDD_CHECK(used_variable_set == variable_set, "image_rename_and only supports one variable set :(");
+
+    keepalive(get_node(ix1)); keepalive(get_node(ix2)); keepalive(get_node(ix3));
+    nodeindex_t res;
+    // all nodes of the relation have to fit into the 24 bits of the cache key
+    static nodeindex_t checked_relation[4] = {0, 0, 0, 0};
+    static bool checked_fits[4];
+    int slot = -1;
+    for (int i = 0; i < 4; i++) {
+        if (checked_relation[i] == ix2) slot = i;
+    }
+    if (slot < 0) {
+        // remember the result of the check for the last relations (they are kept alive by the caller)
+        static int next_slot = 0;
+        slot = next_slot;
+        next_slot = (next_slot + 1) % 4;
+        checked_relation[slot] = ix2;
+        checked_fits[slot] = max_index_rec(ix2) < (1 << 24);
+        unvisit_rec(ix2);
+    }
+    if (checked_fits[slot]) {
+        res = apply_image_rename_and(ix1, ix2, ix3, variable_set);
+    } else {
+        nodeindex_t image = apply_image_rename(ix1, ix2, variable_set);
+        IN_OP_GC_keepalive(image);
+        res = apply_binary(image, ix3, AND_OP);
+#if IN_OP_GC
+        gc_stack_pop(1);
+#endif
+    }
+    undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2)); undo_keepalive(get_node(ix3));
     return res;
 }

@@ -20,6 +20,7 @@
 #define EXISTS_OP 6
 #define IMAGE_OP 7
 #define IMAGE_RENAME_OP 8
+#define IMAGE_RENAME_AND_OP 9
 // operation numbers 16 to 127 are free for user defined operations
 #define USER_OP 16
 // counting operations store a 64-bit number in the cache
@@ -77,6 +78,14 @@ nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set
 // ix1 is returned as is, i.e. the result shares all nodes with ix1 that are not affected by the relation.
 void prepare_image_rename(variable_set_t* variable_set);
 nodeindex_t image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set);
+
+// and(image_rename(ix1, ix2, variable_set), ix3) in a single recursion: the image restricted to the set ix3.
+// ix3 only depends on variables of the set (it is a set of states like ix1).
+// The recursion stops wherever ix3 is 0, so the (possibly much larger) unrestricted image is never built.
+//
+// The nodes of the relation ix2 are part of the cache key with 24 bits: the relation has to be built
+// before the node pool has more than 2^24 nodes (otherwise the unrestricted image is computed first).
+nodeindex_t image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, variable_set_t* variable_set);
 
 
 #endif
