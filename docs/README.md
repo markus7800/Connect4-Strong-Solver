@@ -16,6 +16,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [03](03-unified-cache.md) | one 16-byte operation cache, entries can survive GC | 41 -> 32 bytes per node, no slowdown on small boards |
 | [04](04-no-scratch-map.md) | node count and save without hash maps | 32 -> 24 bytes per node; saving a BDD needs no extra memory |
 | [05](05-memory-budget.md) | table size as RAM budget (`28G`), any pool capacity, huge pages on Linux | 20–24 bytes per node; 28 GiB hold 1.34 G nodes, 2^32 nodes fit in 103 GB |
+| [06](06-terminal-rules-and-diff.md) | terminal rules in `apply`, `diff` operation | 1.5x faster `solve`, 1.8x faster `count` |
 
 ## Running totals
 
@@ -32,6 +33,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 03 unified cache | 32 | 27.4 | 21.2 | 52.9 |
 | 04 no scratch maps | 24 | 26.6 | 21.1 | 51.9 |
 | 05 memory budget | 20–24 | 26.2 | 21.0 | 51.4 |
+| 06 terminal rules, `diff` | 20–24 | 18.1 | 14.0 | 27.9 |
 
 Larger boards (tables of 2^26 nodes):
 

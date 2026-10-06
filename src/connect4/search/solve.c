@@ -263,7 +263,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
 
         // subtract wins from all non-terminal positions at ply
-        reassign_and_keepalive(&current, and(current, not(win)));
+        reassign_and_keepalive(&current, diff(current, win));
         undo_keepalive_ix(win);
 
         if (gc_level) {
@@ -300,7 +300,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
         // also subtract draws from current = all non-terminal positions at ply - wins - draws
         // terminals are alays lost so add to result to get lost positions for ply
-        lost = or(and(current, not(draw)), term);
+        lost = or(diff(current, draw), term);
         lost_cnt = connect4_satcount(lost);
         undo_keepalive_ix(term); undo_keepalive_ix(current); undo_keepalive_ix(draw);
 

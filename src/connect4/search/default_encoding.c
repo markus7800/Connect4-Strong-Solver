@@ -194,7 +194,7 @@ nodeindex_t connect4_subtract_or_intersect_term(nodeindex_t current, uint8_t boa
                 }
                 if (subtract) {
                     // subtract from current
-                    reassign_and_keepalive(&current, and(current, not(a)));
+                    reassign_and_keepalive(&current, diff(current, a));
                 } else {
                     // add to intersection
                     reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
@@ -227,7 +227,7 @@ nodeindex_t connect4_subtract_or_intersect_term(nodeindex_t current, uint8_t boa
                 }
                 if (subtract) {
                     // subtract from current
-                    reassign_and_keepalive(&current, and(current, not(a)));
+                    reassign_and_keepalive(&current, diff(current, a));
                 } else {
                     // add to intersection
                     reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
@@ -253,7 +253,7 @@ nodeindex_t connect4_subtract_or_intersect_term(nodeindex_t current, uint8_t boa
                 }
                 if (subtract) {
                     // subtract from current
-                    reassign_and_keepalive(&current, and(current, not(a)));
+                    reassign_and_keepalive(&current, diff(current, a));
                 } else {
                     // add to intersection
                     reassign_and_keepalive(&intersection, or(intersection, and(current, a)));
@@ -277,7 +277,7 @@ nodeindex_t connect4_subtract_or_intersect_term(nodeindex_t current, uint8_t boa
                 }
                 if (subtract) {
                     // subtract from current
-                    reassign_and_keepalive(&current, and(current, not(a)));
+                    reassign_and_keepalive(&current, diff(current, a));
                 } else {
                     // add to intersection
                     reassign_and_keepalive(&intersection, or(intersection, and(current, a)));

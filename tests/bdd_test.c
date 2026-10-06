@@ -90,12 +90,21 @@ static void test_ops_against_truthtables() {
         tt_t tor = truthtable(or(f, g));
         tt_t tiff = truthtable(iff(f, g));
         tt_t tnot = truthtable(not(f));
+        tt_t tdiff = truthtable(diff(f, g));
+        CHECK(diff(f, g) == and(f, not(g)));
+        CHECK(and(f, g) == and(g, f));
+        CHECK(or(f, g) == or(g, f));
+        CHECK(and(f, f) == f && or(f, f) == f && diff(f, f) == ZEROINDEX && iff(f, f) == ONEINDEX);
+        CHECK(and(f, ONEINDEX) == f && and(ZEROINDEX, f) == ZEROINDEX && or(f, ZEROINDEX) == f && or(ONEINDEX, f) == ONEINDEX);
+        CHECK(diff(f, ZEROINDEX) == f && diff(ZEROINDEX, f) == ZEROINDEX && diff(f, ONEINDEX) == ZEROINDEX && diff(ONEINDEX, f) == not(f));
+        CHECK(iff(f, ONEINDEX) == f && iff(ZEROINDEX, f) == not(f));
         uint64_t cnt = 0;
         for (size_t i = 0; i < (1 << NTT) / 64; i++) {
             CHECK(tand.bits[i] == (tf.bits[i] & tg.bits[i]));
             CHECK(tor.bits[i] == (tf.bits[i] | tg.bits[i]));
             CHECK(tiff.bits[i] == ~(tf.bits[i] ^ tg.bits[i]));
             CHECK(tnot.bits[i] == ~tf.bits[i]);
+            CHECK(tdiff.bits[i] == (tf.bits[i] & ~tg.bits[i]));
             cnt += __builtin_popcountll(tf.bits[i]);
         }
         // satcount is over all NVARS variables

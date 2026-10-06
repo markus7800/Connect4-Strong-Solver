@@ -19,6 +19,8 @@ void in_op_gc(uint8_t op) {
             printf("(or) "); break;
         case IFF_OP:
             printf("(iff) "); break;
+        case DIFF_OP:
+            printf("(diff) "); break;
         case NOT_OP:
             printf("(not) "); break;
         case EXISTS_OP:
@@ -35,20 +37,39 @@ void in_op_gc(uint8_t op) {
 }
 
 nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
+    // Terminal cases: the result is a constant or one of the operands.
+    // For the commutative operations the operands are ordered, such that op(f, g) and op(g, f) share a cache entry.
+    nodeindex_t tmp;
+    switch (op) {
+    case AND_OP:
+        if (ix1 == ZEROINDEX || ix2 == ZEROINDEX) return ZEROINDEX;
+        if (ix1 == ONEINDEX) return ix2;
+        if (ix2 == ONEINDEX || ix1 == ix2) return ix1;
+        if (ix1 > ix2) { tmp = ix1; ix1 = ix2; ix2 = tmp; }
+        break;
+    case OR_OP:
+        if (ix1 == ONEINDEX || ix2 == ONEINDEX) return ONEINDEX;
+        if (ix1 == ZEROINDEX) return ix2;
+        if (ix2 == ZEROINDEX || ix1 == ix2) return ix1;
+        if (ix1 > ix2) { tmp = ix1; ix1 = ix2; ix2 = tmp; }
+        break;
+    case IFF_OP:
+        if (ix1 == ix2) return ONEINDEX;
+        if (ix1 == ONEINDEX) return ix2;
+        if (ix2 == ONEINDEX) return ix1;
+        if (ix1 > ix2) { tmp = ix1; ix1 = ix2; ix2 = tmp; }
+        break;
+    case DIFF_OP:
+        // ix1 and not ix2
+        if (ix1 == ZEROINDEX || ix2 == ONEINDEX || ix1 == ix2) return ZEROINDEX;
+        if (ix2 == ZEROINDEX) return ix1;
+        break;
+    default:
+        assert(false);
+    }
+    // at most one of the operands is a constant from here on (0 for iff, 1 as first operand of diff)
     bddnode_t* u1 = get_node(ix1);
     bddnode_t* u2 = get_node(ix2);
-    if (isconstant(u1) && isconstant(u2)) {
-        switch (op) {
-        case AND_OP:
-            return constant(u1) & constant(u2);
-        case OR_OP:
-            return constant(u1) | constant(u2);
-        case IFF_OP:
-            return constant(u1) == constant(u2);
-        default:
-            assert(false);
-        }
-    }
 
     uint32_t cache_ix = opcache_index(op, ix1, ix2);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
@@ -139,6 +160,13 @@ nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2) {
     return res;
 }
 
+nodeindex_t diff(nodeindex_t ix1, nodeindex_t ix2) {
+    keepalive(get_node(ix1)); keepalive(get_node(ix2));
+    nodeindex_t res = apply_binary(ix1, ix2, DIFF_OP);
+    undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2));
+    return res;
+}
+
 nodeindex_t not(nodeindex_t ix) {
     keepalive(get_node(ix));
     nodeindex_t res = apply_not(ix);
@@ -219,6 +247,9 @@ nodeindex_t exists(nodeindex_t ix, variable_set_t* variable_set) {
 }
 
 nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set) {
+    if (ix1 == ZEROINDEX || ix2 == ZEROINDEX) {
+        return ZEROINDEX;
+    }
     bddnode_t* u1 = get_node(ix1);
     bddnode_t* u2 = get_node(ix2);
     if (isconstant(u1) && isconstant(u2)) {
