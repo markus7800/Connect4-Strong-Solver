@@ -7,49 +7,41 @@ void init_memorypool(uint64_t log2size) {
     assert(log2size <= 32);
     uint64_t capacity = ((uint64_t) 1) << log2size;
 
-    memorypool.capacity = capacity;
     memorypool.num_nodes = 0;
     memorypool.num_variables = 0;
-    memorypool.nodes = (bddnode_t*) malloc(capacity * sizeof(bddnode_t));
-    if (memorypool.nodes != NULL) {
-        // printf("allocated!\n");
-    } else {
+    // zero-initialised and never touched before a node is allocated,
+    // the OS only backs the part of the pool that is actually used
+    memorypool.nodes = (bddnode_t*) calloc(capacity, sizeof(bddnode_t));
+    if (memorypool.nodes == NULL) {
         perror("Could not allocate memorypool :(\n");
-        assert(false);
+        exit(EXIT_FAILURE);
     }
-    for (uint64_t i = 0; i < capacity; i++) {
-        memorypool.nodes[i].var = 0;
-        memorypool.nodes[i].parentcount = 0;
-        disable(&memorypool.nodes[i]);
-        memorypool.nodes[i].next = i + 1;
-    }
+    // (nodeindex_t) -1 == MAX(uint32_t) is a special value (disabled nodes), it must never be allocated
+    memorypool.capacity = (log2size == 32) ? capacity - 1 : capacity;
+    memorypool.hwm = 0;
     memorypool.next = 0;
 }
 
 
 /*
 Returns the node index for the next unused BDDNode.
-Updates the `next` field to point to a new unused BDDNode.
+Nodes that were freed by the garbage collection are reused first (in ascending order),
+otherwise the next never-used node is taken.
 */
 nodeindex_t pop_index() {
-    if (memorypool.next >= memorypool.capacity) {
+    nodeindex_t index;
+    if (memorypool.next != 0) {
+        index = memorypool.next;
+        memorypool.next = memorypool.nodes[index].next;
+    } else if (memorypool.hwm < memorypool.capacity) {
+        index = (nodeindex_t) memorypool.hwm;
+        memorypool.hwm++;
+    } else {
         perror("Ran out of nodes :(\n");
         exit(EXIT_FAILURE);
-    } else {
-        nodeindex_t index = memorypool.next;
-        memorypool.next = memorypool.nodes[index].next;
-        memorypool.num_nodes++;
-        return index;
     }
-}
-
-/*
-Frees node index by marking it as next unused BDDNode
-*/
-void push_index(nodeindex_t index) {
-    memorypool.nodes[index].next = memorypool.next;
-    memorypool.next = index;
-    memorypool.num_nodes--;
+    memorypool.num_nodes++;
+    return index;
 }
 
 inline bddnode_t* get_node(nodeindex_t index) {
@@ -58,17 +50,24 @@ inline bddnode_t* get_node(nodeindex_t index) {
 }
 
 
+// the constants are stored at index 0 and 1, they are not part of the unique table buckets
+static void create_constant(nodeindex_t value) {
+    nodeindex_t index = pop_index();
+    assert(index == value);
+    bddnode_t* node = get_node(index);
+    node->var = 0;
+    node->low = value;
+    node->high = value;
+    node->next = 0;
+    node->parentcount = 0;
+    uniquetable.count++;
+    assert(isconstant(node));
+    assert(constant(node) == value);
+}
+
 void create_zero_one() {
-    nodeindex_t zero = allocate(0, 0, 0, false);
-    bddnode_t* zeronode = get_node(zero);
-    assert(zero == ZEROINDEX);
-    assert(isconstant(zeronode));
-    assert(constant(zeronode) == 0);
-    nodeindex_t one = allocate(0, 1, 1, false);
-    bddnode_t* onenode = get_node(one);
-    assert(one == ONEINDEX);
-    assert(isconstant(onenode));
-    assert(constant(onenode) == 1);
+    create_constant(ZEROINDEX);
+    create_constant(ONEINDEX);
 }
 
 nodeindex_t create_variable() {

@@ -1,7 +1,8 @@
 
 #include "uniquetable.h"
+#include <string.h> // memset
 
-uniquetable_t uniquetable;
+nodetable_t uniquetable;
 
 void init_set(uniquetable_t* set, uint64_t log2size) {
     assert(log2size <= 32);
@@ -31,7 +32,18 @@ void init_uniquetable(uint64_t log2size) {
     GC_TIME = 0;
     GC_MAX_FILL_LEVEL = 0;
     GC_MAX_NODES_ALLOC = 0;
-    init_set(&uniquetable, log2size);
+
+    assert(log2size <= 32);
+    uint64_t size = ((uint64_t) 1) << log2size;
+    uniquetable.mask = (uint32_t) (size - 1);
+    uniquetable.size = size;
+    uniquetable.count = 0;
+    // all buckets are empty (0)
+    uniquetable.buckets = (nodeindex_t*) calloc(size, sizeof(nodeindex_t));
+    if (uniquetable.buckets == NULL) {
+        perror("Could not allocate unique table :(\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void reset_set(uniquetable_t* set) {
@@ -43,44 +55,25 @@ void reset_set(uniquetable_t* set) {
     set->count = 0;
 }
 
-nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix, bool inc_parentcount) {
-    uint64_t i = uniquetable.count;
-    uniquetable.count++;
-    if (uniquetable.count == uniquetable.size) {
-        perror("Unique table is too small :(\n");
-        exit(EXIT_FAILURE);
-    }
-
+nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix) {
     // consume node from memorypool
     nodeindex_t index = pop_index();
     bddnode_t* node = get_node(index);
+    uniquetable.count++;
 
     // initialise node with var, low, high
     node->var = var;
     node->low = low;
     node->high = high;
-    node->next = 0;
-    // increment the parent cound of low and high nodes if wanted
-    if (inc_parentcount) {
-        get_node(low)->parentcount++;
-        get_node(high)->parentcount++;
-    }
-    
-    // store new node at the end of entries
-    uniquetable.entries[i].value = index;
-    // if a node was already stored at target_bucket_ix, we keep track of it with a singly linked list
-    uniquetable.entries[i].next = uniquetable.buckets[target_bucket_ix];
-    // in the buckets array, the last added node is stored
-    // is guaranteed to be differnent from (bucket_t) -1, because the maximum number of elements is MAX(uint_32)-1
-    // note that target_bucket_ix may be MAX(uint_32). Then uniquetable.buckets[MAX(uint_32)] is a valid bucket, but less than MAX(uint_32)
-    uniquetable.buckets[target_bucket_ix] = i;
+    // increment the parent count of low and high nodes
+    get_node(low)->parentcount++;
+    get_node(high)->parentcount++;
+
+    // the new node becomes the first node of its bucket
+    node->next = uniquetable.buckets[target_bucket_ix];
+    uniquetable.buckets[target_bucket_ix] = index;
 
     return index;
-}
-
-nodeindex_t allocate(variable_t var, nodeindex_t low, nodeindex_t high, bool inc_parentcount) {
-    uint32_t target_bucket_ix = hash_varlowhigh(var, low, high) & uniquetable.mask;
-    return add(var, low, high, target_bucket_ix, inc_parentcount);
 }
 
 nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
@@ -92,27 +85,22 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
     assert(level_for_var(var) < level(get_node(high)));
 
     uint32_t target_bucket_ix = hash_varlowhigh(var, low, high) & uniquetable.mask;
-    bucket_t b = uniquetable.buckets[target_bucket_ix];
-
-    uniquetable_entry_t entry;
-    nodeindex_t index;
+    nodeindex_t index = uniquetable.buckets[target_bucket_ix];
     bddnode_t* node;
 
     // try to find existing node
-    // we traverse singly linked list until we find node
-    // the end of the list is marked by b == -1
-    while (b != (bucket_t) -1) {
-        entry = uniquetable.entries[b];
-        index = entry.value;
+    // we traverse the bucket (singly linked list through node->next) until we find the node
+    // the end of the list is marked by index == 0
+    while (index != 0) {
         node = get_node(index);
         if (node->var == var && node->low == low && node->high == high) {
-            return entry.value;
+            return index;
         }
-        b = entry.next;
+        index = node->next;
     }
 
     // allocate new node
-    return add(var, low, high, target_bucket_ix, true);
+    return add(var, low, high, target_bucket_ix);
 }
 
 
@@ -212,20 +200,16 @@ void gc(bool disable_rec, bool force) {
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
 
-
-    uniquetable_entry_t entry;
-    uint32_t target_bucket_ix;
     bddnode_t* node;
-    nodeindex_t index;
+    bddnode_t* nodes = memorypool.nodes;
 
-    // Iterate overall nodes an disable if possible
+    // Iterate over all nodes and disable if possible
+    // Free nodes are always disabled, constants (index 0 and 1) are never disabled
     if (disable_rec) {
         uint64_t n_disabled = 0;
-        for (uint64_t i = 0; i < uniquetable.count; i++) {
-            entry = uniquetable.entries[i];
-            index = entry.value;
-            node = get_node(index);
-            if (!isconstant(node) && !isdisabled(node) && node->parentcount == 0) {
+        for (uint64_t i = 2; i < memorypool.hwm; i++) {
+            node = &nodes[i];
+            if (!isdisabled(node) && node->parentcount == 0) {
                 disable_node_rec(node);
                 n_disabled += 1;
             }
@@ -234,34 +218,40 @@ void gc(bool disable_rec, bool force) {
     }
 
     // Reset all buckets
-    for (uint64_t i = 0; i < uniquetable.size; i++) {
-        uniquetable.buckets[i] = (bucket_t) -1;
+    memset(uniquetable.buckets, 0, uniquetable.size * sizeof(nodeindex_t));
+
+    // Unused nodes at the end of the pool are treated as never allocated again
+    while (memorypool.hwm > 2 && nodes[memorypool.hwm - 1].parentcount == 0) {
+        memorypool.hwm--;
     }
 
-    // Remove all disable nodes from unique table
-    uint64_t j = 0;
-    for (uint64_t i = 0; i < uniquetable.count; i++) {
-        entry = uniquetable.entries[i];
-        index = entry.value;
-        node = get_node(index);
-        if (isconstant(node) || node->parentcount > 0) {
+    // Rebuild the buckets from all nodes that are alive and the list of free nodes from all others.
+    // Going from high to low index gives lists that are sorted by ascending index.
+    uint64_t num_alive = 2;
+    nodeindex_t free_list = 0;
+    uint32_t target_bucket_ix;
+    for (uint64_t i = memorypool.hwm; i-- > 2; ) {
+        node = &nodes[i];
+        if (node->parentcount > 0) {
             // Re-insert node
             assert(!isdisabled(node));
             target_bucket_ix = hash_bddnode(node) & uniquetable.mask;
-            uniquetable.entries[j].value = index;
-            uniquetable.entries[j].next = uniquetable.buckets[target_bucket_ix];
-            uniquetable.buckets[target_bucket_ix] = j;
-            j++;
+            node->next = uniquetable.buckets[target_bucket_ix];
+            uniquetable.buckets[target_bucket_ix] = (nodeindex_t) i;
+            num_alive++;
         } else {
             // Disable node and give back to memorypool
             disable(node);
-            push_index(index);
+            node->next = free_list;
+            free_list = (nodeindex_t) i;
         }
     }
-    double perc_before = (double) uniquetable.count / uniquetable.size * 100;
-    double perc_after = (double) j / uniquetable.size * 100;
-    printf("decreased number of nodes from %"PRIu64" (%.2f%%) to %"PRIu64" (%.2f%%)\n", uniquetable.count, perc_before, j, perc_after);
-    uniquetable.count = (uint64_t) j;
+    double perc_before = (double) uniquetable.count / memorypool.capacity * 100;
+    double perc_after = (double) num_alive / memorypool.capacity * 100;
+    printf("decreased number of nodes from %"PRIu64" (%.2f%%) to %"PRIu64" (%.2f%%)\n", uniquetable.count, perc_before, num_alive, perc_after);
+    uniquetable.count = num_alive;
+    memorypool.num_nodes = num_alive;
+    memorypool.next = free_list;
 
     // clear caches
     clear_unaryopcache();
@@ -275,14 +265,15 @@ void gc(bool disable_rec, bool force) {
 
 
 void verify_uniquetable() {
-    uniquetable_entry_t entry;
     bddnode_t* node;
     nodeindex_t index;
-    for (uint64_t i = 0; i < uniquetable.count; i++) {
-        entry = uniquetable.entries[i];
-        node = get_node(entry.value);
+    for (uint64_t i = 2; i < memorypool.hwm; i++) {
+        node = get_node((nodeindex_t) i);
+        if (isdisabled(node)) {
+            continue; // free node
+        }
         index = make(node->var, node->low, node->high);
-        if (index != entry.value) {
+        if (index != i) {
             printf("Looking for node ");
             print_bddnode(node);
             printf(" returns different node ");
@@ -290,14 +281,8 @@ void verify_uniquetable() {
             printf("\n");
             assert(false);
         }
-        if (!isconstant(node) && node->low == node->high) {
+        if (node->low == node->high) {
             printf("Low and high are the same for ");
-            print_bddnode(node);
-            printf("\n");
-            assert(false);
-        }
-        if (isdisabled(node)) {
-            printf("Alive node is disabled ");
             print_bddnode(node);
             printf("\n");
             assert(false);
@@ -312,36 +297,33 @@ void print_nodes(bool statsonly) {
     printf("Uniquetable(count=%"PRIu64", size=%"PRIu64")\n", uniquetable.count, uniquetable.size);
     if (statsonly) return;
 
-    uniquetable_entry_t entry;
-    bucket_t targetbucket;
     bddnode_t* node;
-    for (uint64_t i = 0; i < uniquetable.count; i++) {
-        if (i == 20) {
+    uint64_t printed = 0;
+    for (uint64_t i = 0; i < memorypool.hwm; i++) {
+        node = get_node((nodeindex_t) i);
+        if (i >= 2 && isdisabled(node)) {
+            continue; // free node
+        }
+        if (printed == 20) {
             printf("Hiding %"PRIu64" nodes\n", uniquetable.count-20);
             break;
         }
-        entry = uniquetable.entries[i];
-        node = get_node(entry.value);
-        targetbucket = uniquetable.buckets[hash_bddnode(node) & uniquetable.mask];
-        printf("%"PRIu64". Index(%d) -> ", i, entry.value);
+        printf("Index(%"PRIu64") -> ", i);
         print_bddnode(node);
-        printf(" ... targetbucket=%d, next=%d\n", targetbucket, entry.next);
+        printf(" ... next=%d\n", node->next);
+        printed++;
     }
 }
 
 void print_dot() {
     printf("digraph {\n");
-    uniquetable_entry_t entry;
-    nodeindex_t index;
     bddnode_t* node;
-    for (uint64_t i = 0; i < uniquetable.count; i++) {
-        entry = uniquetable.entries[i];
-        index = entry.value;
-        node = get_node(index);
-        if (!isconstant(node)) {
-            printf("%d [label=\"x%d (%d)\"]\n", index, node->var, index);
-            printf("%d -> %d [style=dashed]\n", index, node->low);
-            printf("%d -> %d\n", index, node->high);
+    for (uint64_t i = 2; i < memorypool.hwm; i++) {
+        node = get_node((nodeindex_t) i);
+        if (!isdisabled(node)) {
+            printf("%"PRIu64" [label=\"x%d (%"PRIu64")\"]\n", i, node->var, i);
+            printf("%"PRIu64" -> %d [style=dashed]\n", i, node->low);
+            printf("%"PRIu64" -> %d\n", i, node->high);
         }
     }
     printf("0 [label=\"0\"]\n");

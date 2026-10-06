@@ -30,8 +30,18 @@ typedef struct UniqueTable {
     uint64_t count;               // number of entries currently stored
 } uniquetable_t;
 
-// Global unique table storing all allocated BDD nodes
-extern uniquetable_t uniquetable;
+// The global unique table storing all allocated BDD nodes.
+// It only consists of the bucket array: buckets[hash(node) & mask] is the index of the first node in the bucket,
+// the remaining nodes of the bucket are linked through the `next` field of the nodes themselves.
+// 0 marks the end of a bucket (the constant nodes 0 and 1 are never stored in a bucket).
+typedef struct NodeTable {
+    uint32_t mask;                // mask for indexing into buckets
+    nodeindex_t* buckets;         // array of bucket heads
+    uint64_t size;                // number of buckets
+    uint64_t count;               // number of nodes currently allocated (including the constants)
+} nodetable_t;
+
+extern nodetable_t uniquetable;
 
 // initialises a hash map with a maximum of 2^log2size elements
 void init_set(uniquetable_t* set, uint64_t log2size);
@@ -41,14 +51,10 @@ void init_uniquetable(uint64_t log2size);
 void reset_set(uniquetable_t* set);
 
 // Consumes a node from the memorypool and writes var, low, and high to it
-// Stores the node at target_bucket_ix (= hash(node) & mask)
+// Stores the node at the front of bucket target_bucket_ix (= hash(node) & mask)
 // Does not check whether such a node already exists
-// If inc_parentcount is true, then the parent counts of low and high are incremented
-nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix, bool inc_parentcount);
-
-// This is a helper for that computes the target_bucket_ix for the node (var, low, high)
-// and adds it to the global unique table with above method
-nodeindex_t allocate(variable_t var, nodeindex_t low, nodeindex_t high, bool inc_parentcount);
+// Increments the parent counts of low and high
+nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix);
 
 // This is the BDD make function.
 // It checks if a node with (var, low, high) exists and in this case returns its node index.
@@ -83,8 +89,9 @@ extern void reassign_and_keepalive(nodeindex_t* target, nodeindex_t value);
 // Perform garbage collection.
 // By default gc is only performed if the unique table is filled more than 50%.
 // This behaviour can be overwritten by setting force = true.
-// If disable_rec = false, then only nodes that are already disabled are deallocated.
-// If disable_rec = true, then gc will iterate over all nodes and disable them if possible.
+// If disable_rec = false, then only nodes without parents are deallocated (not recursively).
+// If disable_rec = true, then gc will iterate over all nodes and disable them recursively if possible.
+// The bucket lists and the list of free nodes are rebuilt from scratch.
 // Also clears all caches. (Deallocating nodes means giving back the index to the memorypool.
 // If this index is still in some cache we can get segfault)
 void gc(bool disable_rec, bool force);

@@ -21,8 +21,9 @@ typedef struct BBDNode {
     uint32_t parentcount; // number of parents (metric for GC)
     nodeindex_t low;      // index to low node
     nodeindex_t high;     // index to high node
-    nodeindex_t next;     // If node is in memorypool, then next points to next unallocated node.
-                          // If the node is allocated, next is set to 0
+    nodeindex_t next;     // If the node is allocated, next is the next node in the same bucket of the unique table.
+                          // If the node is free, next is the next free node.
+                          // In both cases 0 marks the end of the list (the constant 0 is never part of a list).
 } bddnode_t;
 
 // hashing utilities
