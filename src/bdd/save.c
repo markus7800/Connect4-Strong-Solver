@@ -18,7 +18,7 @@ uint64_t _collect_nodes_into_map(nodeindex_t ix, nodeindexmap_t* map) {
     }
 }
 
-uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t* map, variable_t varmap[256]) {
+uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexmap_t* map, variable_t varmap[MAX_VARIABLES + 1]) {
     FILE* f = fopen(filename, "wb"); // write binary file
     if (f == NULL) {
         exit(EXIT_FAILURE);
@@ -36,18 +36,25 @@ uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexma
     bddnode_t* node;
     nodeindex_t low, high;
     variable_t var;
+    uint8_t filevar;
     unsigned char buffer[9];
     for (uint64_t i = 0; i < map->count; i++) {
         entry = map->entries[i];
         node = get_node(entry.key); // get for key
         assert(entry.value == i);
         var = varmap[node->var];
+        if (var > 255) {
+            // the file format stores variables with one byte
+            perror("Variable does not fit into file format :(\n");
+            exit(EXIT_FAILURE);
+        }
+        filevar = (uint8_t) var;
         low = get_value_for_key(map, node->low);
         high = get_value_for_key(map, node->high);
         // we mapped nodeindex such that it correspond to the position in entries
         // thus the nodes are in order of their index and we do not need to store the nodeindex anymore
         // memcpy(&buffer[0], &entry.value, 4);
-        memcpy(&buffer[0], &var, 1);
+        memcpy(&buffer[0], &filevar, 1);
         memcpy(&buffer[1], &low, 4);
         memcpy(&buffer[5], &high, 4);
         fwrite(buffer, sizeof(buffer), 1, f);
@@ -58,8 +65,8 @@ uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, nodeindexma
     return map->count;
 }
 uint64_t _safe_to_file(nodeindex_t root, char* filename, nodeindexmap_t* map) {
-    variable_t varmap[256];
-    for (size_t v = 0; v <= 255; v++) {
+    variable_t varmap[MAX_VARIABLES + 1];
+    for (size_t v = 0; v <= MAX_VARIABLES; v++) {
         varmap[v] = v;
     }
     return _safe_to_file_with_varmap(root, filename, map, varmap);
@@ -80,7 +87,7 @@ nodeindex_t _read_from_file(char* filename, nodeindexmap_t* map) {
     nodeindex_t src_ix, dst_ix;
 
     nodeindex_t low, high;
-    variable_t var;
+    uint8_t var;
 
     // nodes are in order of their index
     src_ix = 0;

@@ -61,8 +61,8 @@ inline variable_t level(bddnode_t* node) {
 
 void print_bddnode(bddnode_t* node) {
     if (isconstant(node)) {
-        printf("BDDNode(%d, #parents=%d)", constant(node), node->parentcount);
+        printf("BDDNode(%d, #extref=%d)", constant(node), node->extref);
     } else {
-        printf("BDDNode(var=%d, low=%d, high=%d, #parents=%d)", node->var, node->low, node->high, node->parentcount);
+        printf("BDDNode(var=%d, low=%d, high=%d, #extref=%d)", node->var, node->low, node->high, node->extref);
     }
 }

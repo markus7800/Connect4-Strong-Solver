@@ -65,9 +65,9 @@ nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t targ
     node->var = var;
     node->low = low;
     node->high = high;
-    // increment the parent count of low and high nodes
-    get_node(low)->parentcount++;
-    get_node(high)->parentcount++;
+    node->mark = 0;
+    node->visit = 0;
+    node->extref = 0;
 
     // the new node becomes the first node of its bucket
     node->next = uniquetable.buckets[target_bucket_ix];
@@ -139,28 +139,14 @@ bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index) {
 }
 
 
-// if node has not parent remove edges to low and high
-// recursively disable low and high
-void disable_node_rec(bddnode_t* node) {
-    if (isconstant(node)) {
-        return;
-    }
-    if (node->parentcount == 0 && !isdisabled(node)) {
-        bddnode_t* l = get_node(node->low);
-        bddnode_t* h = get_node(node->high);
-        l->parentcount--;
-        h->parentcount--;
-        disable_node_rec(l);
-        disable_node_rec(h);
-        disable(node);
-    }
-}
-// increment parent count which does not come from real parent to keep alive
+// increment external reference count to keep alive
 inline void keepalive(bddnode_t* node) {
-    node->parentcount++;
+    assert(node->extref < (1 << 20) - 1);
+    node->extref++;
 }
 inline void undo_keepalive(bddnode_t* node) {
-    node->parentcount--;
+    assert(node->extref > 0);
+    node->extref--;
 }
 inline void keepalive_ix(nodeindex_t ix) {
     keepalive(get_node(ix));
@@ -180,6 +166,20 @@ double get_elapsed_time(struct timespec t0, struct timespec t1) {
     return (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
 }
 
+
+// marks all nodes that are reachable from ix
+// the recursion depth is bounded by the number of variables
+static void mark_rec(nodeindex_t ix) {
+    while (ix > ONEINDEX) {
+        bddnode_t* node = &memorypool.nodes[ix];
+        if (node->mark) {
+            return;
+        }
+        node->mark = 1;
+        mark_rec(node->low);
+        ix = node->high;
+    }
+}
 
 double GC_TIME;
 double GC_MAX_FILL_LEVEL;
@@ -203,38 +203,35 @@ void gc(bool disable_rec, bool force) {
     bddnode_t* node;
     bddnode_t* nodes = memorypool.nodes;
 
-    // Iterate over all nodes and disable if possible
-    // Free nodes are always disabled, constants (index 0 and 1) are never disabled
-    if (disable_rec) {
-        uint64_t n_disabled = 0;
-        for (uint64_t i = 2; i < memorypool.hwm; i++) {
-            node = &nodes[i];
-            if (!isdisabled(node) && node->parentcount == 0) {
-                disable_node_rec(node);
-                n_disabled += 1;
-            }
+    // Mark: every node that is reachable from a kept-alive node is alive.
+    // Free nodes are always disabled and have no external references.
+    uint64_t n_roots = 0;
+    for (uint64_t i = 2; i < memorypool.hwm; i++) {
+        if (nodes[i].extref > 0) {
+            mark_rec((nodeindex_t) i);
+            n_roots += 1;
         }
-        printf("%"PRIu64" disabled ... ", n_disabled);
     }
+    printf("%"PRIu64" roots ... ", n_roots);
 
     // Reset all buckets
     memset(uniquetable.buckets, 0, uniquetable.size * sizeof(nodeindex_t));
 
     // Unused nodes at the end of the pool are treated as never allocated again
-    while (memorypool.hwm > 2 && nodes[memorypool.hwm - 1].parentcount == 0) {
+    while (memorypool.hwm > 2 && !nodes[memorypool.hwm - 1].mark) {
         memorypool.hwm--;
     }
 
-    // Rebuild the buckets from all nodes that are alive and the list of free nodes from all others.
+    // Sweep: rebuild the buckets from all nodes that are alive and the list of free nodes from all others.
     // Going from high to low index gives lists that are sorted by ascending index.
     uint64_t num_alive = 2;
     nodeindex_t free_list = 0;
     uint32_t target_bucket_ix;
     for (uint64_t i = memorypool.hwm; i-- > 2; ) {
         node = &nodes[i];
-        if (node->parentcount > 0) {
+        if (node->mark) {
             // Re-insert node
-            assert(!isdisabled(node));
+            node->mark = 0;
             target_bucket_ix = hash_bddnode(node) & uniquetable.mask;
             node->next = uniquetable.buckets[target_bucket_ix];
             uniquetable.buckets[target_bucket_ix] = (nodeindex_t) i;

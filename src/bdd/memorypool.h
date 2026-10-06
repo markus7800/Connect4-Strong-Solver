@@ -19,7 +19,7 @@ typedef struct MemoryPool {
     uint64_t capacity;        // number of alloctable nodes = 2^log2size (2^32 - 1 for log2size = 32)
     uint64_t hwm;             // high-water mark: nodes with index >= hwm were never allocated
     nodeindex_t next;         // first node of the free list (singly linked list through node.next, 0 = empty)
-    variable_t num_variables; // number of variables already created (max = 255)
+    variable_t num_variables; // number of variables already created (max = MAX_VARIABLES)
     uint64_t num_nodes;       // number of nodes already allocated
 } memorypool_t;
 

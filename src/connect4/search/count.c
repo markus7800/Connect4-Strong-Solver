@@ -263,7 +263,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 /*
 Run with connect4.out log2(tablesize) width height
 Where width x height is the board size.
-Note that 2*(2*width*height + 1) has to be less than 256
+Note that 2*(2*width*height + 1) has to be at most MAX_VARIABLES
 log2(tablesize) is the log2 of the number of nodes that can be allocated.
 i.e. we have 2 << log2(tablesize) allocatable nodes
 */

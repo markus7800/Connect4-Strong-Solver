@@ -59,7 +59,6 @@ static void create_constant(nodeindex_t value) {
     node->low = value;
     node->high = value;
     node->next = 0;
-    node->parentcount = 0;
     uniquetable.count++;
     assert(isconstant(node));
     assert(constant(node) == value);
@@ -71,7 +70,10 @@ void create_zero_one() {
 }
 
 nodeindex_t create_variable() {
-    assert(memorypool.num_variables < (variable_t) -2);
+    if (memorypool.num_variables >= MAX_VARIABLES) {
+        perror("Too many variables :(\n");
+        exit(EXIT_FAILURE);
+    }
     variable_t var = ++memorypool.num_variables;
     nodeindex_t index = make(var, ZEROINDEX, ONEINDEX);
     keepalive(get_node(index));

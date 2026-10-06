@@ -12,6 +12,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 |---|---|---|
 | [00](00-baseline.md) | baseline and regression harness | 53 bytes per node; binary apply 38 %, `make` 20 %, GC 22 % of the time on 5x5 |
 | [01](01-intrusive-unique-table.md) | unique table chains through the nodes | 53 -> 45 bytes per node, GC 12–30 % faster, RSS follows actual usage |
+| [02](02-mark-sweep-gc.md) | mark-and-sweep GC, 16-byte node, 10-bit variables | 45 -> 41 bytes per node; GC on `solve` ~25 % slower until the GC schedule changes |
 
 ## Running totals
 
@@ -22,3 +23,4 @@ allocatable node for `solve` (nodes, unique table, caches, scratch maps).
 |---|---:|---:|---:|---:|
 | 00 baseline | 53 | 27.0 | 21.6 | 52.0 |
 | 01 intrusive unique table | 45 | 27.2 | 21.8 | 47.9 |
+| 02 mark-and-sweep GC | 41 | 28.2 | 22.3 | 48.0 |

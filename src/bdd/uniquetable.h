@@ -53,7 +53,6 @@ void reset_set(uniquetable_t* set);
 // Consumes a node from the memorypool and writes var, low, and high to it
 // Stores the node at the front of bucket target_bucket_ix (= hash(node) & mask)
 // Does not check whether such a node already exists
-// Increments the parent counts of low and high
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix);
 
 // This is the BDD make function.
@@ -67,19 +66,14 @@ void add_nodeindex(uniquetable_t* set, nodeindex_t index);
 bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index);
 
 
-// Garbage collection:
-// We keep track of the number of parents for each BDD node.
-// If a node has no parents and is not root node of any BDD that is still of interest, we can deallocate it.
+// Garbage collection (mark and sweep):
+// A node is alive if it is kept alive explicitly or if it can be reached from such a node via low / high edges.
+// All other nodes are deallocated by gc.
 // Thus, to avoid having root nodes of interest garbage collected,
-// we have to keep them alive by artificially incrementing their parent count.
+// we have to keep them alive by incrementing their external reference count.
 
-// If a node has no parents and is not already disabled,
-// disables node, decrements the parent count of low and high,
-// and recursively calls disable_node_rec on them.
-void disable_node_rec(bddnode_t* node);
-
-// artificially increments the parent count of the node
-// to prevent it from getting deallocated when calling gc
+// increments the external reference count of the node
+// to prevent it (and all nodes below it) from getting deallocated when calling gc
 extern void keepalive(bddnode_t* node);
 extern void undo_keepalive(bddnode_t* node);
 extern  void keepalive_ix(nodeindex_t ix);
@@ -89,8 +83,7 @@ extern void reassign_and_keepalive(nodeindex_t* target, nodeindex_t value);
 // Perform garbage collection.
 // By default gc is only performed if the unique table is filled more than 50%.
 // This behaviour can be overwritten by setting force = true.
-// If disable_rec = false, then only nodes without parents are deallocated (not recursively).
-// If disable_rec = true, then gc will iterate over all nodes and disable them recursively if possible.
+// disable_rec is ignored (kept for compatibility), gc always collects everything that is not alive.
 // The bucket lists and the list of free nodes are rebuilt from scratch.
 // Also clears all caches. (Deallocating nodes means giving back the index to the memorypool.
 // If this index is still in some cache we can get segfault)

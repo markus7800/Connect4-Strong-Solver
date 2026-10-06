@@ -14,16 +14,22 @@ typedef uint32_t nodeindex_t;
 #define ZEROINDEX 0
 #define ONEINDEX 1
 
-typedef uint8_t variable_t;
+// variables are numbered 1 to MAX_VARIABLES, 0 is reserved for the constant nodes
+typedef uint16_t variable_t;
+#define VAR_BITS 10
+#define MAX_VARIABLES ((1 << VAR_BITS) - 2) // level of the constants is num_variables + 1 and has to fit too
 
+// A node takes 16 bytes.
 typedef struct BBDNode {
-    variable_t var;       // variable 1 to 255
-    uint32_t parentcount; // number of parents (metric for GC)
     nodeindex_t low;      // index to low node
     nodeindex_t high;     // index to high node
     nodeindex_t next;     // If the node is allocated, next is the next node in the same bucket of the unique table.
                           // If the node is free, next is the next free node.
                           // In both cases 0 marks the end of the list (the constant 0 is never part of a list).
+    uint32_t var : VAR_BITS; // variable 1 to MAX_VARIABLES, 0 for the constants
+    uint32_t mark : 1;    // set during garbage collection for nodes that are reachable from a kept-alive node
+    uint32_t visit : 1;   // scratch bit for traversals
+    uint32_t extref : 20; // number of external references (keepalive), such a node is a root for garbage collection
 } bddnode_t;
 
 // hashing utilities
