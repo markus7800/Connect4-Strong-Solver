@@ -21,6 +21,7 @@
 #define IMAGE_OP 7
 #define IMAGE_RENAME_OP 8
 #define IMAGE_RENAME_AND_OP 9
+#define MINIMISE_OP 10
 // operation numbers 16 to 127 are free for user defined operations
 #define USER_OP 16
 // counting operations store a 64-bit number in the cache
@@ -61,6 +62,13 @@ nodeindex_t iff(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t diff(nodeindex_t ix1, nodeindex_t ix2);
 nodeindex_t not(nodeindex_t ix);
 nodeindex_t exists(nodeindex_t ix, variable_set_t* variable_set);
+// Don't-care minimisation (the "restrict" operator of Coudert and Madre).
+// Returns a BDD g that agrees with f wherever care is true: and(g, care) == and(f, care).
+// Where care is false g can be anything, which is used to make g small:
+// if care is false for one value of a variable, the test of this variable is dropped.
+// g is usually, but not necessarily, smaller than f.
+nodeindex_t minimise(nodeindex_t f, nodeindex_t care);
+
 // image is efficient implemenation of exists(and(ix1,ix2),variable_set)
 nodeindex_t image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variable_set);
 

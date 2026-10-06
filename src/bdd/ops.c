@@ -40,6 +40,8 @@ void in_op_gc(uint8_t op, nodeindex_t result) {
             printf("(image_rename) "); break;
         case IMAGE_RENAME_AND_OP:
             printf("(image_rename_and) "); break;
+        case MINIMISE_OP:
+            printf("(minimise) "); break;
         }
         gc_stack_push(result);
         gc_in_op();
@@ -547,5 +549,69 @@ nodeindex_t image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, 
 #endif
     }
     undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2)); undo_keepalive(get_node(ix3));
+    return res;
+}
+
+
+nodeindex_t apply_minimise(nodeindex_t ix, nodeindex_t care) {
+    if (care == ONEINDEX || ix <= ONEINDEX) {
+        return ix;
+    }
+    if (care == ZEROINDEX) {
+        // nothing to care about (only reached if the top-level care set is empty)
+        return ZEROINDEX;
+    }
+    if (ix == care) {
+        // f is true wherever we care
+        return ONEINDEX;
+    }
+
+    uint32_t cache_ix = opcache_index(MINIMISE_OP, ix, care);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix && cacheentry.b == care && cacheentry.tag == MINIMISE_OP) {
+        return cacheentry.result;
+    }
+
+    bddnode_t* u = get_node(ix);
+    bddnode_t* c = get_node(care);
+    nodeindex_t res;
+    if (level(c) < level(u)) {
+        // f does not depend on the top variable of care: we care if we care for one of its values
+        nodeindex_t c_any = apply_binary(c->low, c->high, OR_OP); IN_OP_GC_keepalive(c_any);
+        res = apply_minimise(ix, c_any);
+#if IN_OP_GC
+        gc_stack_pop(1);
+        in_op_gc(MINIMISE_OP, res);
+#endif
+    } else {
+        nodeindex_t c0 = level(c) == level(u) ? c->low : care;
+        nodeindex_t c1 = level(c) == level(u) ? c->high : care;
+        variable_t var = u->var;
+        nodeindex_t low = u->low;
+        nodeindex_t high = u->high;
+        if (c0 == ZEROINDEX) {
+            // we do not care about the low branch: drop the test of the variable
+            res = apply_minimise(high, c1);
+        } else if (c1 == ZEROINDEX) {
+            res = apply_minimise(low, c0);
+        } else {
+            nodeindex_t l = apply_minimise(low, c0); IN_OP_GC_keepalive(l);
+            nodeindex_t h = apply_minimise(high, c1); IN_OP_GC_keepalive(h);
+            res = make(var, l, h);
+#if IN_OP_GC
+            gc_stack_pop(2);
+            in_op_gc(MINIMISE_OP, res);
+#endif
+        }
+    }
+
+    opcache_store(cache_ix, MINIMISE_OP, ix, care, res);
+    return res;
+}
+
+nodeindex_t minimise(nodeindex_t ix, nodeindex_t care) {
+    keepalive(get_node(ix)); keepalive(get_node(care));
+    nodeindex_t res = apply_minimise(ix, care);
+    undo_keepalive(get_node(ix)); undo_keepalive(get_node(care));
     return res;
 }

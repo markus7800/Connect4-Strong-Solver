@@ -24,6 +24,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [11](11-terminal-predicate.md) | four-in-a-line BDD built once per player | 1.4–2.3x faster; the predicate has 185 K nodes for 7x6, under 1 M for 7x7 |
 | [12](12-reach-on-disk.md) | reachable sets are stored on disk between the two passes | 10–20 % fewer live nodes, ~10 % faster |
 | [13](13-retrograde-pass.md) | restricted pre-images, one fewer large BDD alive, GC by growth, in-op GC uses the whole pool | 6x5 needs 11.6 M nodes (1.03x the largest W+D+L) and completes in 0.24 GiB |
+| [14](14-dont-care-minimisation.md) | don't-care minimisation of the result BDDs (experiment) | not adopted: 11–14 % at the memory peak; one BDD for all plies would make a published solution 2.5x smaller |
 
 ## Running totals
 

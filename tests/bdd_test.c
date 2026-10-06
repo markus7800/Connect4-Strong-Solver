@@ -245,6 +245,26 @@ static void test_image_rename() {
     printf("ok image_rename and image_rename_and\n");
 }
 
+static void test_minimise() {
+    uint64_t smaller = 0, larger = 0;
+    for (int round = 0; round < 300; round++) {
+        nodeindex_t f = random_bdd(NVARS, 1 + rng() % 40); keepalive_ix(f);
+        // care sets of different density
+        nodeindex_t c = random_bdd(NVARS, 1 + rng() % 10); keepalive_ix(c);
+        if (rng() & 1) reassign_and_keepalive(&c, and(c, random_bdd(NVARS, 1 + rng() % 10)));
+        nodeindex_t g = minimise(f, c); keepalive_ix(g);
+        // g agrees with f on the care set
+        CHECK(and(g, c) == and(f, c));
+        CHECK(minimise(f, ONEINDEX) == f);
+        CHECK(minimise(and(f, c), c) == minimise(f, c) || and(minimise(and(f, c), c), c) == and(f, c));
+        if (nodecount(g) < nodecount(f)) smaller++;
+        if (nodecount(g) > nodecount(f)) larger++;
+        undo_keepalive_ix(f); undo_keepalive_ix(c); undo_keepalive_ix(g);
+        if (round % 50 == 49) gc(true, true);
+    }
+    printf("ok minimise (smaller in %"PRIu64", larger in %"PRIu64" of 300 cases)\n", smaller, larger);
+}
+
 static void test_canonical_and_gc() {
     uint64_t before = uniquetable.count;
     nodeindex_t f = random_bdd(NVARS, 400); keepalive_ix(f);
@@ -316,6 +336,7 @@ int main() {
     test_canonical_and_gc();
     test_save_and_read();
     test_image_rename();
+    test_minimise();
     printf("all unit tests passed\n");
     free_all();
     return 0;

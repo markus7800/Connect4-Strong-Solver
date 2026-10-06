@@ -96,8 +96,8 @@ Letting garbage pile up is 20–50 % slower than collecting eagerly; anything be
 
 | budget | nodes | result | in-op GCs | time [s] | max alive |
 |---|---:|---|---:|---:|---:|
-| baseline, 2^24 at 0.9 (0.83 GiB) | 16.78 M | fails | | | |
-| baseline, 2^25 at 0.7 (1.66 GiB) | 33.55 M | ok | 4 | 496 | |
+| old retrograde pass (change 03), 2^24 at 0.9 | 16.78 M | fails | | | |
+| old retrograde pass (change 04), 2^25 at 0.7 | 33.55 M | ok | 4 | 496 | |
 | `300M` | 15.47 M | ok | 22 | 213 | 11.95 M |
 | `260M` | 12.85 M | ok | 61 | 217 | 11.65 M |
 | `250M` | 12.19 M | ok | 91 | 198 | 11.58 M |
@@ -106,8 +106,10 @@ Letting garbage pile up is 20–50 % slower than collecting eagerly; anything be
 * The run needs 11.6 M nodes alive at its worst moment, 1.03 times the largest
   `W + D + L`, and it completes in a pool that is 95 % full at that point. With the
   abort-at-90 % rule the same code needed the `280M` budget.
-* In RAM: 0.24 GiB instead of more than 0.83 GiB for the baseline, and at that size it
-  is still 2.5x faster than the baseline with all the memory it wants.
+* In RAM: 0.24 GiB. The original code could not have run in 2^24 nodes either (same
+  liveness as change 03), which at 53 bytes per node is 0.83 GiB; so at least 3.5x less
+  memory, and at that size the run is still 2.3x faster than the baseline with a
+  comfortable table (466 s).
 * For comparison, the same run with a comfortable 2^26 table takes 135–146 s; under
   maximum pressure it takes about 1.5x as long.
 

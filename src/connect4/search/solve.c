@@ -34,6 +34,12 @@
 #define SAVE_BDD_TO_DISK 1
 #endif
 
+// Experiment: report how much smaller the won / drawn / lost BDDs get if they only have to be correct
+// on a care set (don't-care minimisation), see docs/14-dont-care-minimisation.md. Does not change the results.
+#ifndef MINIMISE_STATS
+#define MINIMISE_STATS 0
+#endif
+
 // keep the BDDs of the reachable positions per ply on disk after the computation?
 #ifndef KEEP_REACH
 #define KEEP_REACH 0
@@ -200,6 +206,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     printf("\n\nRetrograde analysis:\n\n");
 
 
+#if MINIMISE_STATS
+    // union over all plies processed so far
+    nodeindex_t win_all = ZEROINDEX, draw_all = ZEROINDEX, lost_all = ZEROINDEX, reach_all = ZEROINDEX;
+    keepalive_ix(win_all); keepalive_ix(draw_all); keepalive_ix(lost_all); keepalive_ix(reach_all);
+#endif
+
     // Positions of the next ply (one more stone) that are drawn / lost for the player to move there.
     // They are kept alive between the plies.
     nodeindex_t next_draw = ZEROINDEX, next_lost = ZEROINDEX;
@@ -233,6 +245,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         nodeindex_t nonterminal = connect4_subtract_term(&terminal, reachable, (ply % 2) == 1 ? 0 : 1);
         keepalive_ix(nonterminal);
         term_cnt = cnt - connect4_satcount(nonterminal);
+#if MINIMISE_STATS
+        // the care sets are needed until the end of the ply
+        keepalive_ix(reachable); keepalive_ix(nonterminal);
+        uint64_t win_min_reach, win_min_nonterm, draw_min_reach, draw_min_notwon, lost_min_reach, lost_min_notwon;
+#endif
         if (ply < width*height) {
             // only needed for the full board
             undo_keepalive_ix(nonterminal);
@@ -255,6 +272,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         win_node_cnt = _safe_to_file_with_varmap(win, filename, board_varmap);
 #else
         win_node_cnt = nodecount(win);
+#endif
+#if MINIMISE_STATS
+        win_min_reach = nodecount(minimise(win, reachable));
+        win_min_nonterm = nodecount(minimise(win, nonterminal));
+        reassign_and_keepalive(&win_all, or(win_all, win));
+        reassign_and_keepalive(&reach_all, or(reach_all, reachable));
 #endif
         checkpoint("WIN");
 
@@ -284,11 +307,24 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #else
         draw_node_cnt = nodecount(draw);
 #endif
+#if MINIMISE_STATS
+        draw_min_reach = nodecount(minimise(draw, reachable));
+        draw_min_notwon = nodecount(minimise(draw, notwon));
+        reassign_and_keepalive(&draw_all, or(draw_all, draw));
+#endif
         checkpoint("DRAW");
 
         // LOSS: everything else, this includes the terminal positions
         nodeindex_t lost = diff(notwon, draw);
         keepalive_ix(lost);
+#if MINIMISE_STATS
+        lost_min_reach = nodecount(minimise(lost, reachable));
+        lost_min_notwon = nodecount(minimise(lost, notwon));
+        reassign_and_keepalive(&lost_all, or(lost_all, lost));
+        printf("UNION_STATS,%d,%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64"\n", ply, nodecount(reach_all), nodecount(win_all), nodecount(draw_all), nodecount(lost_all),
+            nodecount(minimise(win_all, reach_all)), nodecount(minimise(lost_all, reach_all)));
+        undo_keepalive_ix(reachable); undo_keepalive_ix(nonterminal);
+#endif
         undo_keepalive_ix(notwon);
         lost_cnt = connect4_satcount(lost);
 
@@ -297,6 +333,12 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         lost_node_cnt = _safe_to_file_with_varmap(lost, filename, board_varmap);
 #else
         lost_node_cnt = nodecount(lost);
+#endif
+
+#if MINIMISE_STATS
+        printf("MINIMISE_STATS,%d,%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64"\n", ply,
+            bddnodecount_per_ply[ply], win_node_cnt, win_min_reach, win_min_nonterm,
+            draw_node_cnt, draw_min_reach, draw_min_notwon, lost_node_cnt, lost_min_reach, lost_min_notwon);
 #endif
 
         // the results of this ply are the input for the next one (both are kept alive)
@@ -325,6 +367,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #endif
     }
 
+#if MINIMISE_STATS
+    undo_keepalive_ix(win_all); undo_keepalive_ix(draw_all); undo_keepalive_ix(lost_all); undo_keepalive_ix(reach_all);
+#endif
     undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
     printf("DEINIT GC: ");
     gc(true, true);
