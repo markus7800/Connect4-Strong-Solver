@@ -87,17 +87,13 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     gc(true, true);
     uint64_t num_nodes_pre_comp = uniquetable.count;
 
-    // We reuse the set to count the number of nodes in a BDD
-    uniquetable_t nodecount_set;
-    init_set(&nodecount_set, log2size-1);
-
     uint64_t total = 0;
     uint64_t bdd_nodecount;
 
     // PLY 0:
     nodeindex_t current = connect4_start(stm0, X, width, height);
     uint64_t cnt = connect4_satcount(current);
-    bdd_nodecount = _nodecount(current, &nodecount_set);
+    bdd_nodecount = nodecount(current);
     printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
     total += cnt;
 
@@ -175,8 +171,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         }
 
         // count number of nodes in current full BDD
-        reset_set(&nodecount_set);
-        bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
+        bdd_nodecount = nodecount(full_bdd);
         printf(" FullBDD(%"PRIu64"),", bdd_nodecount);
 #endif
 
@@ -186,8 +181,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         
 
         // count number of nodes in current BDD
-        reset_set(&nodecount_set);
-        bdd_nodecount = _nodecount(current, &nodecount_set);
+        bdd_nodecount = nodecount(current);
 
         clock_gettime(CLOCK_REALTIME, &t1);
         t = get_elapsed_time(t0, t1);
@@ -211,8 +205,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if FULLBDD
     // count number of nodes in full BDD
     // also count number of positions of full BDD (satcount), has to match `total` count
-    reset_set(&nodecount_set);
-    bdd_nodecount = _nodecount(full_bdd, &nodecount_set);
+    bdd_nodecount = nodecount(full_bdd);
     cnt = connect4_satcount(full_bdd);
     printf("\nFullBDD(%"PRIu64") with satcount = %"PRIu64"\n", bdd_nodecount, cnt);
     undo_keepalive_ix(full_bdd);
@@ -237,10 +230,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     } else {
         printf("No memory leak detected.\n");
     }
-
-    // deallocate nodecount set
-    free(nodecount_set.buckets);
-    free(nodecount_set.entries);
 
 #if WRITE_TO_FILE
     // close file

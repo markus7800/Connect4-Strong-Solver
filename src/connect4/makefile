@@ -48,7 +48,7 @@ DTM = 1                 # compute distance to win/loss? or win/draw/loss score i
 
 CFLAGS = -O3 -flto -Wall -O3
 
-BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../bdd/ops.c ../bdd/uniquetable.c ../bdd/save.c ../bdd/nodeindexmap.c
+BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../bdd/ops.c ../bdd/uniquetable.c ../bdd/save.c
 
 SEARCHFLAGS = \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE) \

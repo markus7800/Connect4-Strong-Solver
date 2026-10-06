@@ -8,7 +8,6 @@
 #include "ops.h"
 #include "uniquetable.h"
 #include "save.h"
-#include "nodeindexmap.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -21,7 +20,7 @@
 uint64_t print_RAM_info(uint64_t log2size) {
     uint64_t num_nodes = ((uint64_t) 1) << log2size;
     printf("log2_size=%"PRIu64" - number of allocatable nodes: %g\n", log2size, (double) num_nodes);
-    // nodes + unique table buckets + op caches (does not include the sets/maps used for counting nodes and saving)
+    // nodes + unique table buckets + op cache
     uint64_t bytes = num_nodes*(sizeof(bddnode_t) + sizeof(bucket_t)) + (num_nodes >> OPCACHE_LOG2_REDUCTION) * sizeof(opcache_entry_t);
     printf("RAM needed %.3f GB\n", (double) bytes / 1000 / 1000 / 1000);
     return bytes;

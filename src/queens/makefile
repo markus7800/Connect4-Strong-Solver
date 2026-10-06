@@ -4,7 +4,7 @@ ENTER_TO_CONTINUE = 0 # should require to press enter to start?
 
 CFLAGS = -O3 -flto -Wall -O3
 
-BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../bdd/ops.c ../bdd/uniquetable.c ../bdd/save.c ../bdd/nodeindexmap.c
+BDDFILES = ../bdd/caches.c ../bdd/counts.c ../bdd/memorypool.c ../bdd/node.c ../bdd/ops.c ../bdd/uniquetable.c ../bdd/save.c
 
 QFLAGS = \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE)

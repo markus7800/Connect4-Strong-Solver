@@ -6,7 +6,7 @@ BDD node, then the time per operation, then the number of nodes the algorithm ke
 alive, and finally the size of the BDDs themselves.
 
 Regression test for every change: `python3 scripts/regress.py` (see
-[00-baseline](00-baseline.md)).
+[00-baseline](00-baseline.md)); it also runs the library unit tests in `tests/bdd_test.c`.
 
 | # | change | headline result |
 |---|---|---|
@@ -14,6 +14,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [01](01-intrusive-unique-table.md) | unique table chains through the nodes | 53 -> 45 bytes per node, GC 12–30 % faster, RSS follows actual usage |
 | [02](02-mark-sweep-gc.md) | mark-and-sweep GC, 16-byte node, 10-bit variables | 45 -> 41 bytes per node; GC on `solve` ~25 % slower until the GC schedule changes |
 | [03](03-unified-cache.md) | one 16-byte operation cache, entries can survive GC | 41 -> 32 bytes per node, no slowdown on small boards |
+| [04](04-no-scratch-map.md) | node count and save without hash maps | 32 -> 24 bytes per node; saving a BDD needs no extra memory |
 
 ## Running totals
 
@@ -28,6 +29,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 01 intrusive unique table | 45 | 27.2 | 21.8 | 47.9 |
 | 02 mark-and-sweep GC | 41 | 28.2 | 22.3 | 48.0 |
 | 03 unified cache | 32 | 27.4 | 21.2 | 52.9 |
+| 04 no scratch maps | 24 | 26.6 | 21.1 | 51.9 |
 
 Larger boards (tables of 2^26 nodes):
 

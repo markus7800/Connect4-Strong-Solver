@@ -15,9 +15,8 @@
 // number of assignments that satisify boolean formula encoded by BDD
 uint64_t satcount(nodeindex_t ix);
 
-// number of nodes reachable from ix
-// to count this we have to create a set
-uint64_t nodecount(nodeindex_t ix, uint64_t log2size);
-uint64_t _nodecount(nodeindex_t ix, uniquetable_t* set);
+// number of nodes reachable from ix (including the constants)
+// uses the visit bit of the nodes, no additional memory is needed
+uint64_t nodecount(nodeindex_t ix);
 
 #endif

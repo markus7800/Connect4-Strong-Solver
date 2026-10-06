@@ -12,30 +12,6 @@ nodetable_t uniquetable;
 #define GC_KEEPS_CACHE 1
 #endif
 
-void init_set(uniquetable_t* set, uint64_t log2size) {
-    assert(log2size <= 32);
-    uint64_t size = ((uint64_t) 1) << log2size;
-    set->mask = (uint32_t) (size - 1);
-    set->buckets = (bucket_t*) malloc(size * sizeof(bucket_t));
-    set->entries = (uniquetable_entry_t*) malloc(size * sizeof(uniquetable_entry_t));
-    if (set->buckets == NULL || set->entries == NULL) {
-        perror("Could not allocate set :(\n");
-        exit(EXIT_FAILURE);
-    }
-    // we do not want to allocate (nodeindex_t) -1 == MAX(uint32_t) in case of log2size = 32
-    // also (bucket_t) -1 == MAX(uint32_t) is special value declaring end of linked lists
-    if (log2size == 32) {
-        set->size = size-1;
-    } else {
-        set->size = size;
-    }
-    set->count = 0;
-    for (uint64_t i = 0; i < size; i++) {
-        set->buckets[i] = (bucket_t) -1;
-        set->entries[i].next = 0;
-        set->entries[i].value = (nodeindex_t) -1;
-    }
-}
 void init_uniquetable(uint64_t log2size) {
     GC_TIME = 0;
     GC_MAX_FILL_LEVEL = 0;
@@ -52,15 +28,6 @@ void init_uniquetable(uint64_t log2size) {
         perror("Could not allocate unique table :(\n");
         exit(EXIT_FAILURE);
     }
-}
-
-void reset_set(uniquetable_t* set) {
-    for (uint64_t i = 0; i < set->size; i++) {
-        set->buckets[i] = (bucket_t) -1;
-        set->entries[i].next = 0;
-        set->entries[i].value = (nodeindex_t) -1;
-    }
-    set->count = 0;
 }
 
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix) {
@@ -109,41 +76,6 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
 
     // allocate new node
     return add(var, low, high, target_bucket_ix);
-}
-
-
-void add_nodeindex(uniquetable_t* set, nodeindex_t index) {
-    bddnode_t* node = get_node(index);
-    uint32_t target_bucket_ix = hash_bddnode(node) & set->mask;
-
-    uint64_t i = set->count;
-    set->count++;
-    if (set->count == set->size) {
-        perror("Set is too small :(\n");
-        exit(EXIT_FAILURE);
-    }
-
-    set->entries[i].value = index;
-    set->entries[i].next = set->buckets[target_bucket_ix];
-    set->buckets[target_bucket_ix] = i;
-}
-
-bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index) {
-    uint32_t target_bucket_ix = hash_bddnode(get_node(query_index)) & set->mask;
-    bucket_t b = set->buckets[target_bucket_ix];
-    uniquetable_entry_t entry;
-    nodeindex_t index;
-
-    // try to find existing node
-    while (b != (bucket_t) -1) {
-        entry = set->entries[b];
-        index = entry.value;
-        if (query_index == index) {
-            return true;
-        }
-        b = entry.next;
-    }
-    return false;
 }
 
 
@@ -267,6 +199,30 @@ static void gc_run(bool force, bool in_op) {
 
     clock_gettime(CLOCK_REALTIME, &t1);
     GC_TIME += get_elapsed_time(t0, t1);
+}
+
+void rebuild_uniquetable() {
+    bddnode_t* node;
+    bddnode_t* nodes = memorypool.nodes;
+
+    memset(uniquetable.buckets, 0, uniquetable.size * sizeof(nodeindex_t));
+
+    // free nodes are disabled, all other nodes are re-inserted
+    nodeindex_t free_list = 0;
+    uint32_t target_bucket_ix;
+    for (uint64_t i = memorypool.hwm; i-- > 2; ) {
+        node = &nodes[i];
+        if (isdisabled(node)) {
+            node->next = free_list;
+            free_list = (nodeindex_t) i;
+        } else {
+            node->visit = 0;
+            target_bucket_ix = hash_bddnode(node) & uniquetable.mask;
+            node->next = uniquetable.buckets[target_bucket_ix];
+            uniquetable.buckets[target_bucket_ix] = (nodeindex_t) i;
+        }
+    }
+    memorypool.next = free_list;
 }
 
 void gc(bool disable_rec, bool force) {

@@ -29,24 +29,40 @@ uint64_t satcount(nodeindex_t ix) {
     return (1 << (level(u) - 1)) * res;
 }
 
-uint64_t _nodecount(nodeindex_t ix, uniquetable_t* set) {
-    if (has_nodeindex(set, ix)) {
-        return 0;
+// counts and flags all non-constant nodes below ix that are not flagged yet
+static uint64_t nodecount_visit(nodeindex_t ix) {
+    uint64_t count = 0;
+    while (ix > ONEINDEX) {
+        bddnode_t* u = get_node(ix);
+        if (u->visit) {
+            break;
+        }
+        u->visit = 1;
+        count += 1 + nodecount_visit(u->low);
+        ix = u->high;
     }
-    add_nodeindex(set, ix);
-
-    bddnode_t* u = get_node(ix);
-    if (isconstant(u)) {
-        return 1;
-    }
-    return 1 + _nodecount(u->low, set) + _nodecount(u->high, set);
+    return count;
 }
 
-uint64_t nodecount(nodeindex_t ix, uint64_t log2size) {
-    uniquetable_t set;
-    init_set(&set, log2size);
-    uint64_t res = _nodecount(ix, &set);
-    free(set.buckets);
-    free(set.entries);
-    return res;
+// removes the flags again
+static void nodecount_unvisit(nodeindex_t ix) {
+    while (ix > ONEINDEX) {
+        bddnode_t* u = get_node(ix);
+        if (!u->visit) {
+            break;
+        }
+        u->visit = 0;
+        nodecount_unvisit(u->low);
+        ix = u->high;
+    }
+}
+
+uint64_t nodecount(nodeindex_t ix) {
+    if (ix <= ONEINDEX) {
+        return 1;
+    }
+    uint64_t count = nodecount_visit(ix);
+    nodecount_unvisit(ix);
+    // a BDD that is not constant reaches both constants
+    return count + 2;
 }

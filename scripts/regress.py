@@ -97,6 +97,27 @@ def build(kind, comp, row, extra_make, src=SRC):
     return src / "build" / f"{kind}.out"
 
 
+def run_unit_tests():
+    """Builds and runs tests/bdd_test.c (with asserts enabled)."""
+    wd = WORK / "unit"
+    wd.mkdir(parents=True, exist_ok=True)
+    bddfiles = sorted(str(p) for p in (ROOT / "src" / "bdd").glob("*.c") if p.name != "uint_test.c")
+    exe = wd / "bdd_test.out"
+    cmd = ["clang", str(ROOT / "tests" / "bdd_test.c")] + bddfiles + ["-O2", "-Wall", "-DIN_OP_GC=1", "-o", str(exe)]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        print(res.stdout)
+        print(res.stderr)
+        sys.exit("unit test build failed")
+    res = subprocess.run([str(exe)], cwd=wd, capture_output=True, text=True)
+    lines = [l for l in res.stdout.splitlines() if l.startswith(("ok", "FAILED", "all unit"))]
+    print("\n".join(lines))
+    if res.returncode != 0:
+        print(res.stdout[-2000:])
+        print(res.stderr[-2000:])
+        sys.exit("unit tests failed")
+
+
 def time_cmd():
     if platform.system() == "Darwin":
         return ["/usr/bin/time", "-l"]
@@ -263,11 +284,17 @@ def main():
     ap.add_argument("--update-golden", action="store_true")
     ap.add_argument("--keep", action="store_true", help="keep solution folders in the scratch dir")
     ap.add_argument("--json", default=None, help="write metrics to this file")
+    ap.add_argument("--unit", action="store_true", help="only run the library unit tests (tests/bdd_test.c)")
     ap.add_argument("--tag", default="", help="suffix for the scratch directories (to run several suites concurrently)")
     ap.add_argument("--src", default=None, help="build from this src/connect4 directory (e.g. a git worktree of another commit)")
     ap.add_argument("--table", default=None, help="override the table size argument of every case")
     ap.add_argument("--make", action="append", default=[], help="extra make variable, e.g. --make IN_OP_GC=1")
     args = ap.parse_args()
+
+    if not args.src:
+        run_unit_tests()
+    if args.unit:
+        return
 
     cases = []
     for s in args.suite.split(","):

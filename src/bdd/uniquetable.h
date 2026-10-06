@@ -15,21 +15,6 @@
 
 typedef uint32_t bucket_t;
 
-typedef struct UniqueTableEntry {
-    bucket_t next;
-    nodeindex_t value;
-} uniquetable_entry_t;
-
-// Implementation of a hash map that can store up to 2^32 - 1 entries
-// The entries of the hash map are node indices (nodeindex_t)
-typedef struct UniqueTable {
-    uint32_t mask;                // mask for indexing into buckets
-    bucket_t* buckets;            // array of buckets, index into entries MAX(uint_32) == (bucket_t) -1 denotes end of linked list
-    uniquetable_entry_t* entries; // array for storing the entries, new entries are always stored at the end
-    uint64_t size;                // number of entries that can be stored in the hash map
-    uint64_t count;               // number of entries currently stored
-} uniquetable_t;
-
 // The global unique table storing all allocated BDD nodes.
 // It only consists of the bucket array: buckets[hash(node) & mask] is the index of the first node in the bucket,
 // the remaining nodes of the bucket are linked through the `next` field of the nodes themselves.
@@ -43,12 +28,13 @@ typedef struct NodeTable {
 
 extern nodetable_t uniquetable;
 
-// initialises a hash map with a maximum of 2^log2size elements
-void init_set(uniquetable_t* set, uint64_t log2size);
 // initialises the global BDD unique table
 void init_uniquetable(uint64_t log2size);
-// clears set from all entries
-void reset_set(uniquetable_t* set);
+
+// Rebuilds the bucket lists of the unique table and the list of free nodes from the nodes themselves
+// and resets the visit bit of all nodes.
+// Has to be called after the `next` field of allocated nodes was used for something else.
+void rebuild_uniquetable();
 
 // Consumes a node from the memorypool and writes var, low, and high to it
 // Stores the node at the front of bucket target_bucket_ix (= hash(node) & mask)
@@ -59,12 +45,6 @@ nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t targ
 // It checks if a node with (var, low, high) exists and in this case returns its node index.
 // If it does not exists it allocates a new node with above method.
 nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high);
-
-// add_nodeindex and has_nodeindex are methods for using a uniquetable_t struct
-// directly as hash map for node indices (e.g. for nodecount)
-void add_nodeindex(uniquetable_t* set, nodeindex_t index);
-bool has_nodeindex(uniquetable_t* set, nodeindex_t query_index);
-
 
 // Garbage collection (mark and sweep):
 // A node is alive if it is kept alive explicitly or if it can be reached from such a node via low / high edges.

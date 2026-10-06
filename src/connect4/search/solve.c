@@ -84,10 +84,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     gc(true, true);
     uint64_t num_nodes_pre_comp = uniquetable.count;
 
-    // We reuse the set to count the number of nodes in a BDD
-    nodeindexmap_t map;
-    init_map(&map, log2size-1);
-
     uint64_t total = 0;
     uint64_t bdd_nodecount;
 
@@ -101,7 +97,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     // PLY 0:
     nodeindex_t current = connect4_start(stm0, X, width, height);
     uint64_t cnt = connect4_satcount(current);
-    bdd_nodecount = _collect_nodes_into_map(current, &map);
+    bdd_nodecount = nodecount(current);
     printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
     total += cnt;
 
@@ -158,8 +154,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         
 
         // count number of nodes in current BDD
-        reset_map(&map);
-        bdd_nodecount = _collect_nodes_into_map(current, &map);
+        bdd_nodecount = nodecount(current);
         bddnodecount_per_ply[ply] = bdd_nodecount;
 
         clock_gettime(CLOCK_REALTIME, &t1);
@@ -258,10 +253,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_win.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
-        win_node_cnt = _safe_to_file_with_varmap(win, filename, &map, board_varmap);
+        win_node_cnt = _safe_to_file_with_varmap(win, filename, board_varmap);
 #else
-        reset_map(&map);
-        win_node_cnt = _collect_nodes_into_map(win, &map);
+        win_node_cnt = nodecount(win);
 #endif
 
         if (gc_level) {
@@ -295,10 +289,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_draw.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
-        draw_node_cnt = _safe_to_file_with_varmap(draw, filename, &map, board_varmap);
+        draw_node_cnt = _safe_to_file_with_varmap(draw, filename, board_varmap);
 #else
-        reset_map(&map);
-        draw_node_cnt = _collect_nodes_into_map(draw, &map);
+        draw_node_cnt = nodecount(draw);
 #endif
 
         if (gc_level) {
@@ -313,10 +306,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if SAVE_BDD_TO_DISK
         sprintf(filename, "%s/bdd_w%"PRIu32"_h%"PRIu32"_%d_loss.%u%u.bin", folder, width, height, ply, COMPRESSED_ENCODING, ALLOW_ROW_ORDER && (height > width));
-        lost_node_cnt = _safe_to_file_with_varmap(lost, filename, &map, board_varmap);
+        lost_node_cnt = _safe_to_file_with_varmap(lost, filename, board_varmap);
 #else
-        reset_map(&map);
-        lost_node_cnt = _collect_nodes_into_map(lost, &map);
+        lost_node_cnt = nodecount(lost);
 #endif
 
         // store the results of current ply for next ply
@@ -360,10 +352,6 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     } else {
         printf("No memory leak detected.\n");
     }
-
-    // deallocate map
-    free(map.buckets);
-    free(map.entries);
 
     // deallocate variables
     for (int col = 0; col < width; col++) {
