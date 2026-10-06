@@ -47,6 +47,9 @@ KNOWN_COUNTS = {
     (6, 6): 69173028785,
     (7, 5): 112829665923,
     (7, 6): 4531985219092,
+    (8, 6): 290433534225566,
+    (7, 7): 161965120344045,
+    (9, 6): 18651052587059938,
 }
 
 # (kind, width, height, table, compressed_encoding, allow_row_order)
@@ -73,6 +76,16 @@ SUITES = {
     "bench": [
         ("solve", 6, 6, "29", 1, 0),
         ("count", 7, 6, "28", 1, 0),
+    ],
+    # the 7x6 strong solve: many hours, 28 GiB; golden data is the table published in the README
+    # (run with --make SAVE_BDD_TO_DISK=0 unless you have 120 GB of disk to spare)
+    "7x6": [
+        ("solve", 7, 6, "28G", 1, 0),
+    ],
+    # hours and many GB
+    "ladder": [
+        ("count", 8, 6, "12G", 1, 0),
+        ("count", 7, 7, "20G", 1, 0),
     ],
 }
 
@@ -289,12 +302,22 @@ def main():
     ap.add_argument("--update-golden", action="store_true")
     ap.add_argument("--keep", action="store_true", help="keep solution folders in the scratch dir")
     ap.add_argument("--json", default=None, help="write metrics to this file")
+    ap.add_argument("--check", nargs=2, metavar=("RESULTS_CSV", "GOLDEN_CSV"), default=None,
+                    help="only compare the state counts of a results_solve_*.csv (also of a run that is still in progress) with a golden file")
     ap.add_argument("--unit", action="store_true", help="only run the library unit tests (tests/bdd_test.c)")
     ap.add_argument("--tag", default="", help="suffix for the scratch directories (to run several suites concurrently)")
     ap.add_argument("--src", default=None, help="build from this src/connect4 directory (e.g. a git worktree of another commit)")
     ap.add_argument("--table", default=None, help="override the table size argument of every case")
     ap.add_argument("--make", action="append", default=[], help="extra make variable, e.g. --make IN_OP_GC=1")
     args = ap.parse_args()
+
+    if args.check:
+        rows = read_solve_rows(args.check[0])
+        with open(args.check[1]) as f:
+            golden = {int(line.split(",")[0]): [int(x) for x in line.split(",")] for line in list(f)[1:]}
+        bad = [r[0] for r in rows if golden.get(r[0]) != r]
+        print(f"{len(rows)} of {len(golden)} plies present, {len(rows) - len(bad)} identical to golden" + (f", DIFFERENT at plies {bad}" if bad else ""))
+        sys.exit(1 if bad else 0)
 
     if not args.src:
         run_unit_tests()

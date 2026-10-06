@@ -154,8 +154,11 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         // i.e. S_{i+1} = ∃ S_i . trans(S_i, S_{i+1}) ∧ S_i
         // in a terminal position the player who made the last move has four in a row:
         // this is the second player (1) after an even number of moves > 0
-        nodeindex_t nonterminal = SUBTRACT_TERM ? connect4_subtract_term(&terminal, current, (d % 2) == 1 ? 1 : 0) : current;
-        reassign_and_keepalive(&current, successors(nonterminal, &moves));
+        // the set of the previous ply is not needed anymore once its non-terminal positions are known
+        if (SUBTRACT_TERM) {
+            reassign_and_keepalive(&current, connect4_subtract_term(&terminal, current, (d % 2) == 1 ? 1 : 0));
+        }
+        reassign_and_keepalive(&current, successors(current, &moves));
         checkpoint("IMAGE");
 
 #if FULLBDD

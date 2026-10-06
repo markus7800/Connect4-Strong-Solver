@@ -26,6 +26,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [13](13-retrograde-pass.md) | restricted pre-images, one fewer large BDD alive, GC by growth, in-op GC uses the whole pool | 6x5 needs 11.6 M nodes (1.03x the largest W+D+L) and completes in 0.24 GiB |
 | [14](14-dont-care-minimisation.md) | don't-care minimisation of the result BDDs (experiment) | not adopted: 11–14 % at the memory peak; one BDD for all plies would make a published solution 2.5x smaller |
 | [15](15-variable-order.md) | column / row order options (experiment) | default order stays for 7+ columns; centre-out is 36–41 % smaller for 5 columns but 26 % larger for 7 |
+| [16](16-sizing-ladder.md) | forward pass keeps two instead of three large BDDs; sizing measurements | count needs 1.5x the largest reachable-set BDD (was 2.2x); 7x6 count 626 s, 8x6 count 2920 s; outlook for 7x7 / 8x6 / 9x7 |
 
 ## Running totals
 
