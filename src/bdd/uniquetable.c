@@ -1,6 +1,9 @@
 
 #include "uniquetable.h"
 #include <string.h> // memset
+#ifdef HASH_STATS
+#include <math.h>
+#endif
 
 nodetable_t uniquetable;
 
@@ -124,6 +127,24 @@ static void mark_rec(nodeindex_t ix) {
 double GC_TIME;
 double GC_MAX_FILL_LEVEL;
 uint64_t GC_MAX_NODES_ALLOC;
+#ifdef HASH_STATS
+// quality of the hash function: distribution of bucket sizes compared to the ideal (Poisson) distribution
+static void print_hash_stats() {
+    uint64_t n = 0, probes = 0, maxlen = 0, used = 0;
+    for (uint64_t b = 0; b < uniquetable.size; b++) {
+        uint64_t len = 0;
+        for (nodeindex_t ix = uniquetable.buckets[b]; ix != 0; ix = memorypool.nodes[ix].next) len++;
+        n += len;
+        probes += len * (len + 1) / 2; // number of nodes visited to find each node of the bucket once
+        if (len > maxlen) maxlen = len;
+        if (len > 0) used++;
+    }
+    double load = (double) n / uniquetable.size;
+    printf("\nHASH_STATS nodes=%"PRIu64" load=%.4f avg_probes=%.4f (ideal %.4f) used_buckets=%.4f (ideal %.4f) max_chain=%"PRIu64"\n",
+        n, load, (double) probes / (n ? n : 1), 1 + load / 2, (double) used / uniquetable.size, 1 - exp(-load), maxlen);
+}
+#endif
+
 static void gc_run(bool force, bool in_op) {
     double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
     if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
@@ -139,6 +160,10 @@ static void gc_run(bool force, bool in_op) {
 
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
+
+#ifdef HASH_STATS
+    if (uniquetable.count > uniquetable.size / 16) print_hash_stats();
+#endif
 
     bddnode_t* node;
     bddnode_t* nodes = memorypool.nodes;

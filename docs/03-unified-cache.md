@@ -81,7 +81,15 @@ between the two columns is run-to-run noise.)
   policies: 25.2 s (keep) vs 24.4 s (clear).
 * Regression: all 11 cases pass, including `--bytes`, for policies 0, 1 and 2.
 
-The measurements that matter for this change need a table larger than the CPU caches and
-real memory pressure: 6x5 at 2^26 (does a single N/4 cache hold up?) and 6x5 at 2^24 with
-`IN_OP_GC` (does keeping entries help when GC interrupts operations?). Both are appended
-below when the runs finish.
+### Larger tables
+
+6x5 solve and 6x6 count with 2^26 nodes (the cache has 2^24 entries instead of three
+times that):
+
+| case | baseline: time / GC [s] | after 01–03: time / GC [s] | time outside GC | RSS |
+|---|---:|---:|---:|---:|
+| solve 6x5 | 466.3 / 79.3 | 444.0 / 69.8 | 387.0 -> 374.3 | 3.31 -> 1.43 GB |
+| count 6x6 | 859.1 / 82.1 | 798.9 / 36.8 | 777.0 -> 762.1 | 2.98 -> 1.48 GB |
+
+A single cache with N/4 entries is enough: the time outside GC went down slightly, not
+up, although the three caches together had three times as many entries.

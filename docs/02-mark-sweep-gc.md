@@ -76,3 +76,17 @@ percent are noise.
   to turn positive once the GC schedule stops forcing collections (change 12) and on
   tables that exceed the caches; the running table in [README](README.md) tracks it.
 * Regression: all 11 cases pass, including `--bytes`.
+
+### Larger tables (added after change 03)
+
+6x5 solve and 6x6 count with 2^26 nodes, where the node pool (up to 0.6 GB in use) no
+longer fits the CPU caches. Baseline vs. the state after changes 01–03:
+
+| case | GC baseline [s] | GC after 01–03 [s] | total baseline [s] | total after 01–03 [s] |
+|---|---:|---:|---:|---:|
+| solve 6x5 | 79.3 | 69.8 | 466.3 | 444.0 |
+| count 6x6 | 82.1 | 36.8 | 859.1 | 798.9 |
+
+At this size the GC is faster than the reference-counting one, also for `solve`: the
+sequential sweep and the absence of the disable cascade outweigh the marking of live
+nodes. The slowdown seen on the small boards does not carry over.

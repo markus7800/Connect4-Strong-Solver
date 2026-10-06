@@ -52,7 +52,7 @@ void clear_opcache();
 void gc_opcache();
 
 static inline uint32_t opcache_index(uint32_t tag, nodeindex_t a, nodeindex_t b) {
-    return hash_3((uint8_t) tag, a, b) & opcache.mask;
+    return hash_3(tag & 0xFF, a, b) & opcache.mask;
 }
 
 static inline void opcache_store(uint32_t cache_ix, uint32_t tag, nodeindex_t a, nodeindex_t b, nodeindex_t result) {

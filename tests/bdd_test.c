@@ -116,6 +116,21 @@ static void test_ops_against_truthtables() {
     printf("ok ops against truth tables\n");
 }
 
+static void test_hash_range() {
+    // all 32 bits of the hash are used, each about half of the time
+    const int n = 1 << 20;
+    int bitcount[32] = {0};
+    for (int i = 0; i < n; i++) {
+        // inputs like the ones of the unique table: small variable, two node indices of similar size
+        uint32_t h = hash_3(1 + i % 97, 1000 + (uint32_t) (rng() % 5000000), 1000 + (uint32_t) (rng() % 5000000));
+        for (int b = 0; b < 32; b++) bitcount[b] += (h >> b) & 1;
+    }
+    for (int b = 0; b < 32; b++) {
+        CHECK(bitcount[b] > 0.49 * n && bitcount[b] < 0.51 * n);
+    }
+    printf("ok hash range\n");
+}
+
 static void test_canonical_and_gc() {
     uint64_t before = uniquetable.count;
     nodeindex_t f = random_bdd(NVARS, 400); keepalive_ix(f);
@@ -182,6 +197,7 @@ int main() {
     for (int i = 0; i < NVARS; i++) {
         X[i] = create_variable();
     }
+    test_hash_range();
     test_ops_against_truthtables();
     test_canonical_and_gc();
     test_save_and_read();

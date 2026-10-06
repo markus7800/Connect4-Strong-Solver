@@ -33,10 +33,28 @@ typedef struct BBDNode {
 } bddnode_t;
 
 // hashing utilities
-extern uint32_t hash_2(uint8_t a, uint32_t b);
-extern uint32_t hash_3(uint8_t a, uint32_t b, uint32_t c);
-extern uint32_t hash_varlowhigh(variable_t var, uint32_t low, uint32_t high);
-extern uint32_t hash_bddnode(bddnode_t* node);
+
+// Hash of a small number a (variable or operation) and two node indices.
+// The two indices are concatenated to a 64-bit number, which is mixed with two multiplications
+// (xor-shift in between), the upper 32 bits are the hash.
+// All 2^32 values occur, so tables with up to 2^32 buckets are used fully.
+static inline uint32_t hash_3(uint32_t a, uint32_t b, uint32_t c) {
+    uint64_t x = (((uint64_t) b) << 32) | c;
+    x ^= (uint64_t) a * 0x9E3779B97F4A7C15ULL;
+    x *= 0xFF51AFD7ED558CCDULL;
+    x ^= x >> 32;
+    x *= 0xC4CEB9FE1A85EC53ULL;
+    return (uint32_t) (x >> 32);
+}
+static inline uint32_t hash_2(uint32_t a, uint32_t b) {
+    return hash_3(a, b, 0);
+}
+static inline uint32_t hash_varlowhigh(variable_t var, uint32_t low, uint32_t high) {
+    return hash_3(var, low, high);
+}
+static inline uint32_t hash_bddnode(bddnode_t* node) {
+    return hash_varlowhigh(node->var, node->low, node->high);
+}
 
 // disabling nodes is done by setting low == high = MAX(nodeindex_t)
 extern void disable(bddnode_t* node);
