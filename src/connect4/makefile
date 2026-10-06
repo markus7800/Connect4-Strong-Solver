@@ -79,7 +79,14 @@ SEARCHFLAGS = \
 -DENTER_TO_CONTINUE=$(ENTER_TO_CONTINUE) \
 -DWRITE_TO_FILE=$(WRITE_TO_FILE)
 
+# experimental variable orders for the compressed encoding (not compatible with the probing programs)
+# COL_ORDER: 0 = left to right, 1 = centre out, 2 = outside in; ROW_DIR: 0 = bottom up, 1 = top down
+COL_ORDER = 0
+ROW_DIR = 0
+
 ENCODING = \
+-DCOL_ORDER=$(COL_ORDER) \
+-DROW_DIR=$(ROW_DIR) \
 -DPARTITIONED_IMAGE=$(PARTITIONED_IMAGE) \
 -DALLOW_ROW_ORDER=$(ALLOW_ROW_ORDER) \
 -DCOMPRESSED_ENCODING=$(COMPRESSED_ENCODING)

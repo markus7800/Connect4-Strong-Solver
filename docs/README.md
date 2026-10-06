@@ -25,6 +25,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [12](12-reach-on-disk.md) | reachable sets are stored on disk between the two passes | 10–20 % fewer live nodes, ~10 % faster |
 | [13](13-retrograde-pass.md) | restricted pre-images, one fewer large BDD alive, GC by growth, in-op GC uses the whole pool | 6x5 needs 11.6 M nodes (1.03x the largest W+D+L) and completes in 0.24 GiB |
 | [14](14-dont-care-minimisation.md) | don't-care minimisation of the result BDDs (experiment) | not adopted: 11–14 % at the memory peak; one BDD for all plies would make a published solution 2.5x smaller |
+| [15](15-variable-order.md) | column / row order options (experiment) | default order stays for 7+ columns; centre-out is 36–41 % smaller for 5 columns but 26 % larger for 7 |
 
 ## Running totals
 
@@ -62,3 +63,10 @@ Larger boards (tables of 2^26 nodes):
 "Peak nodes" is the largest number of allocated nodes seen at a GC, garbage included, so
 it depends on the GC schedule. From change 13 on GC runs less often; the number of nodes
 that are actually needed is the "max alive" figure in [13](13-retrograde-pass.md).
+
+6x6 solve (2^28 nodes; the baseline ran with `IN_OP_GC=1` at 0.9, which is the default now):
+
+| after | time [s] | GC [s] | RSS |
+|---|---:|---:|---:|
+| 00 baseline | 7262 | 935 | 12.35 GB |
+| 13 retrograde pass, GC schedule | 1722 | 60 | 5.78 GB |

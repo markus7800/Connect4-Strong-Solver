@@ -7,21 +7,46 @@
 // type of the array of cell variables: X[col][row][board]
 typedef nodeindex_t (**cellvars_t)[2];
 
+// Experimental variable orders, see docs/15-variable-order.md.
+// Solutions computed with a non-default order are not compatible with the probing programs.
+// COL_ORDER: 0 ... columns left to right (default), 1 ... centre column first, then outwards, 2 ... outer columns first, then inwards
+// ROW_DIR:   0 ... rows bottom up (default), 1 ... top down
+#ifndef COL_ORDER
+#define COL_ORDER 0
+#endif
+#ifndef ROW_DIR
+#define ROW_DIR 0
+#endif
+
+// the i-th column / row in the variable order
+static uint8_t column_at(uint8_t i, uint32_t width) {
+    if (COL_ORDER == 0) {
+        return i;
+    }
+    // centre out: (w-1)/2, then alternating right and left
+    uint8_t k = (COL_ORDER == 1) ? i : (uint8_t) (width - 1 - i);
+    uint8_t centre = (uint8_t) ((width - 1) / 2);
+    return (k % 2 == 1) ? (uint8_t) (centre + (k + 1) / 2) : (uint8_t) (centre - k / 2);
+}
+static uint8_t row_at(uint8_t i, uint32_t num_rows) {
+    return ROW_DIR == 0 ? i : (uint8_t) (num_rows - 1 - i);
+}
+
 void initialise_variables(nodeindex_t (**X)[2], uint32_t width, uint32_t height) {
     // Second, cells: order column, row, player, board
     if (!ALLOW_ROW_ORDER || width >= height) {
-        for (uint8_t col = 0; col < width; col++) {
-            for (uint8_t row = 0; row < height + 1; row++) {
+        for (uint8_t c = 0; c < width; c++) {
+            for (uint8_t r = 0; r < height + 1; r++) {
                 for (uint8_t board = 0; board < 2; board++) {
-                    X[col][row][board] = create_variable();
+                    X[column_at(c, width)][row_at(r, height + 1)][board] = create_variable();
                 }
             }
         }
     } else {
-        for (uint8_t row = 0; row < height + 1; row++) {
-            for (uint8_t col = 0; col < width; col++) {
+        for (uint8_t r = 0; r < height + 1; r++) {
+            for (uint8_t c = 0; c < width; c++) {
                 for (uint8_t board = 0; board < 2; board++) {
-                    X[col][row][board] = create_variable();
+                    X[column_at(c, width)][row_at(r, height + 1)][board] = create_variable();
                 }
             }
         }
