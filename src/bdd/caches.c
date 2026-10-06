@@ -12,7 +12,7 @@ void init_opcache(uint64_t log2size) {
     opcache.size = size;
     opcache.mask = (uint32_t) (size - 1);
     // zero-initialised = all entries are empty
-    opcache.data = (opcache_entry_t*) calloc(size, sizeof(opcache_entry_t));
+    opcache.data = (opcache_entry_t*) alloc_zeroed(size * sizeof(opcache_entry_t));
     if (opcache.data == NULL) {
         perror("Could not allocate op cache :(\n");
         exit(EXIT_FAILURE);

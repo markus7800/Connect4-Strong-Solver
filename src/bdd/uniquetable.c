@@ -23,7 +23,7 @@ void init_uniquetable(uint64_t log2size) {
     uniquetable.size = size;
     uniquetable.count = 0;
     // all buckets are empty (0)
-    uniquetable.buckets = (nodeindex_t*) calloc(size, sizeof(nodeindex_t));
+    uniquetable.buckets = (nodeindex_t*) alloc_zeroed(size * sizeof(nodeindex_t));
     if (uniquetable.buckets == NULL) {
         perror("Could not allocate unique table :(\n");
         exit(EXIT_FAILURE);

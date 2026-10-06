@@ -1,0 +1,2 @@
+width,height,ply,win_count,draw_count,loss_count,term_count,total_count,win_nodecount,draw_nodecount,loss_nodecount,total_nodecount,time
+0, 0, 0, 0, 1, 0, 0, 1, 1, 3, 1, 1, 1.276

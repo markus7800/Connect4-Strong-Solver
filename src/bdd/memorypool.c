@@ -1,23 +1,38 @@
 
 #include "memorypool.h"
+#include <sys/mman.h> // mmap
 
 memorypool_t memorypool;
 
-void init_memorypool(uint64_t log2size) {
-    assert(log2size <= 32);
-    uint64_t capacity = ((uint64_t) 1) << log2size;
+void* alloc_zeroed(uint64_t bytes) {
+    void* ptr = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (ptr == MAP_FAILED) {
+        return NULL;
+    }
+#ifdef MADV_HUGEPAGE
+    madvise(ptr, bytes, MADV_HUGEPAGE);
+#endif
+    return ptr;
+}
+
+void free_zeroed(void* ptr, uint64_t bytes) {
+    munmap(ptr, bytes);
+}
+
+void init_memorypool(uint64_t capacity) {
+    // (nodeindex_t) -1 == MAX(uint32_t) is a special value (disabled nodes), it must never be allocated
+    assert(capacity <= (((uint64_t) 1) << 32) - 1);
 
     memorypool.num_nodes = 0;
     memorypool.num_variables = 0;
     // zero-initialised and never touched before a node is allocated,
     // the OS only backs the part of the pool that is actually used
-    memorypool.nodes = (bddnode_t*) calloc(capacity, sizeof(bddnode_t));
+    memorypool.nodes = (bddnode_t*) alloc_zeroed(capacity * sizeof(bddnode_t));
     if (memorypool.nodes == NULL) {
         perror("Could not allocate memorypool :(\n");
         exit(EXIT_FAILURE);
     }
-    // (nodeindex_t) -1 == MAX(uint32_t) is a special value (disabled nodes), it must never be allocated
-    memorypool.capacity = (log2size == 32) ? capacity - 1 : capacity;
+    memorypool.capacity = capacity;
     memorypool.hwm = 0;
     memorypool.next = 0;
 }

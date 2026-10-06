@@ -15,6 +15,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [02](02-mark-sweep-gc.md) | mark-and-sweep GC, 16-byte node, 10-bit variables | 45 -> 41 bytes per node; GC on `solve` ~25 % slower until the GC schedule changes |
 | [03](03-unified-cache.md) | one 16-byte operation cache, entries can survive GC | 41 -> 32 bytes per node, no slowdown on small boards |
 | [04](04-no-scratch-map.md) | node count and save without hash maps | 32 -> 24 bytes per node; saving a BDD needs no extra memory |
+| [05](05-memory-budget.md) | table size as RAM budget (`28G`), any pool capacity, huge pages on Linux | 20–24 bytes per node; 28 GiB hold 1.34 G nodes, 2^32 nodes fit in 103 GB |
 
 ## Running totals
 
@@ -30,6 +31,7 @@ Small boards (tables of 2^24 nodes, timings ±5 % because other jobs were runnin
 | 02 mark-and-sweep GC | 41 | 28.2 | 22.3 | 48.0 |
 | 03 unified cache | 32 | 27.4 | 21.2 | 52.9 |
 | 04 no scratch maps | 24 | 26.6 | 21.1 | 51.9 |
+| 05 memory budget | 20–24 | 26.2 | 21.0 | 51.4 |
 
 Larger boards (tables of 2^26 nodes):
 

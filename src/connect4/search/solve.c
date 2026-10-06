@@ -379,7 +379,8 @@ int main(int argc, char const *argv[]) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("solve.out log2_tablesize width height\n");
             printf("  strongly solves connect4 with retrograde symbolic analysis.\n");
-            printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");
+            printf("  log2_tablesize  ... log2 of number of allocatable nodes,\n");
+            printf("                      or a RAM budget like 12G or 800M.\n");
             printf("  width           ... width of connect4 board.\n");
             printf("  height          ... height of connect4 board.\n");
             return 0;
@@ -394,9 +395,10 @@ int main(int argc, char const *argv[]) {
     uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
     printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
 
-    uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
+    tablesizes_t sizes = parse_tablesize(argv[1]);
+    uint64_t log2size = sizes.log2size;
 
-    print_RAM_info(log2size);
+    print_RAM_info_sizes(sizes);
 
 
     if (IN_OP_GC && !IN_OP_GC_EXCL) {
@@ -425,7 +427,7 @@ int main(int argc, char const *argv[]) {
     while (enter != '\r' && enter != '\n') { enter = (char) getchar(); }
 #endif
 
-    init_all(log2size);
+    init_all_sizes(sizes);
     
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);

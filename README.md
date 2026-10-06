@@ -26,9 +26,11 @@ You can find a paper describing this work [here](paper.pdf).
 In `src/bdd`, you can find a simple library to work with [binary decision diagrams](https://en.wikipedia.org/wiki/Binary_decision_diagram).  
 It is designed to give the user great control over memory.  
 The user specifies the number of all allocatable BDD nodes with the `log2_tablesize` parameter.  
-For instance, `log2_tablesize=28` fits into 16 GB RAM and allows you to allocate 2^28 = 268,435,456 nodes simultaniously.  
+For instance, `log2_tablesize=28` needs 6.4 GB RAM (24 bytes per node) and allows you to allocate 2^28 = 268,435,456 nodes simultaniously.  
 If you increase, `log2_tablesize` by one, it doubles the required RAM and number of allocatable nodes.  
-The maximum number is  `log2_tablesize=32`.
+The maximum number is  `log2_tablesize=32`.  
+Instead of `log2_tablesize` you can also pass a RAM budget like `12G` or `800M`; then as many nodes as fit into it are allocated (the number does not have to be a power of two).  
+The RAM numbers in the examples below were measured with an older, less compact memory layout (53 bytes per node), see [docs](docs/README.md) for the changes since then.
 
 The user has to manually keep track of BDD node references and manually perform garbage collection to free and reuse nodes, see [src/bdd/uniquetable.h]().
 

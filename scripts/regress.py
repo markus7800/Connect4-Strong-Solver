@@ -60,6 +60,7 @@ SUITES = {
         ("solve", 4, 5, "22", 0, 1),
         ("solve", 6, 4, "24", 1, 0),
         ("solve", 5, 5, "24", 1, 0),
+        ("solve", 5, 5, "150M", 1, 0),  # RAM budget instead of log2, capacity is not a power of two
         ("count", 5, 5, "22", 1, 0),
         ("count", 5, 5, "22", 0, 0),
         ("count", 4, 5, "22", 1, 1),
@@ -188,7 +189,8 @@ def sha_folder(folder):
 def run_case(case, binary, args):
     kind, w, h, table, comp, row = case
     name = case_name(case)
-    wd = WORK / (name + args.tag)
+    label = name if table.isdigit() else f"{name}_t{table}"
+    wd = WORK / (label + args.tag)
     if wd.exists():
         shutil.rmtree(wd)
     wd.mkdir(parents=True)
@@ -199,7 +201,7 @@ def run_case(case, binary, args):
     (wd / "stdout.txt").write_text(res.stdout)
     (wd / "stderr.txt").write_text(res.stderr)
 
-    metrics = {"case": name, "table": table, "ok": True, "notes": []}
+    metrics = {"case": label, "table": table, "ok": True, "notes": []}
     metrics.update(parse_stdout(res.stdout))
     metrics["peak_rss_bytes"] = parse_rss(res.stderr)
     if res.returncode != 0:

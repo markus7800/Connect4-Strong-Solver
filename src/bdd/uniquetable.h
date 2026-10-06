@@ -28,7 +28,7 @@ typedef struct NodeTable {
 
 extern nodetable_t uniquetable;
 
-// initialises the global BDD unique table
+// initialises the global BDD unique table with 2^log2size buckets
 void init_uniquetable(uint64_t log2size);
 
 // Rebuilds the bucket lists of the unique table and the list of free nodes from the nodes themselves

@@ -263,7 +263,8 @@ int main(int argc, char const *argv[]) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("counts.out log2_tablesize width height\n");
             printf("  counts the number of positions for connect4 per ply symbolic search.\n");
-            printf("  log2_tablesize  ... log2 of number of allocatable nodes.\n");
+            printf("  log2_tablesize  ... log2 of number of allocatable nodes,\n");
+            printf("                      or a RAM budget like 12G or 800M.\n");
             printf("  width           ... width of connect4 board.\n");
             printf("  height          ... height of connect4 board.\n");
             return 0;
@@ -279,9 +280,10 @@ int main(int argc, char const *argv[]) {
     uint32_t height = (uint32_t) strtoul(argv[3], &succ, 10);
     printf("Connect4: width=%"PRIu32" x height=%"PRIu32" board\n", width, height);
 
-    uint64_t log2size = (uint64_t) strtoull(argv[1], &succ, 10);
+    tablesizes_t sizes = parse_tablesize(argv[1]);
+    uint64_t log2size = sizes.log2size;
 
-    uint64_t bytes = print_RAM_info(log2size);
+    uint64_t bytes = print_RAM_info_sizes(sizes);
 
     if (FULLBDD) {
         printf("Computes full BDD.\n");
@@ -318,7 +320,7 @@ int main(int argc, char const *argv[]) {
     while (enter != '\r' && enter != '\n') { enter = (char) getchar(); }
 #endif
 
-    init_all(log2size);
+    init_all_sizes(sizes);
     
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);

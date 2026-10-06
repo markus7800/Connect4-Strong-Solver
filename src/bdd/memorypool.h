@@ -15,8 +15,8 @@ The maximum number of allocatable nodes is 2^32 (nodeindex_t = uint32_t).
 This is one more than uint32_t can count, so we need num_nodes and capicity to be uint64_t.
 */ 
 typedef struct MemoryPool {
-    bddnode_t* nodes;         // array of allocatable nodes size = 2^log2size
-    uint64_t capacity;        // number of alloctable nodes = 2^log2size (2^32 - 1 for log2size = 32)
+    bddnode_t* nodes;         // array of allocatable nodes
+    uint64_t capacity;        // number of alloctable nodes (at most 2^32 - 1)
     uint64_t hwm;             // high-water mark: nodes with index >= hwm were never allocated
     nodeindex_t next;         // first node of the free list (singly linked list through node.next, 0 = empty)
     variable_t num_variables; // number of variables already created (max = MAX_VARIABLES)
@@ -26,8 +26,14 @@ typedef struct MemoryPool {
 // global memorypool
 extern memorypool_t memorypool;
 
-// initialises memorypool with 2^log2size alloctable nodes
-void init_memorypool(uint64_t log2size);
+// Allocates zero-initialised memory for the big arrays (nodes, buckets, cache).
+// The memory is only backed by the OS once it is touched.
+// On Linux, transparent huge pages are requested, which reduces TLB misses for the random accesses.
+void* alloc_zeroed(uint64_t bytes);
+void free_zeroed(void* ptr, uint64_t bytes);
+
+// initialises memorypool with `capacity` alloctable nodes
+void init_memorypool(uint64_t capacity);
 
 // Consumes the node index of the next allocatable node
 // i.e. the corresponding node can be allocated in the uniquetable
