@@ -7,10 +7,10 @@ uint64_t _satcount(nodeindex_t ix) {
         return constant(u);
     }
 
-    uint32_t cache_ix = unaryop_hash(ix, SAT_OP) & unaryopcache.mask;
-    unaryopcache_entry_t cacheentry = unaryopcache.data[cache_ix];
-    if (cacheentry.arg == ix && cacheentry.op == SAT_OP) {
-        return cacheentry.result;
+    uint32_t cache_ix = opcache_index(SAT_OP, ix, 0);
+    uint64_t cached;
+    if (opcache_lookup_count(cache_ix, SAT_OP, ix, &cached)) {
+        return cached;
     }
     
     uint64_t l = _satcount(u->low);
@@ -18,9 +18,7 @@ uint64_t _satcount(nodeindex_t ix) {
 
     uint64_t res = (1 << (level(get_node(u->low)) - level(u) - 1)) * l + (1 << (level(get_node(u->high)) - level(u) - 1)) * h;
 
-    unaryopcache.data[cache_ix].arg = ix;
-    unaryopcache.data[cache_ix].op = SAT_OP;
-    unaryopcache.data[cache_ix].result = res;
+    opcache_store_count(cache_ix, SAT_OP, ix, res);
 
     return res;
 }

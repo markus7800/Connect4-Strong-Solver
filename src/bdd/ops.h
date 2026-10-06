@@ -16,9 +16,13 @@
 #define OR_OP 2
 #define IFF_OP 3
 #define NOT_OP 4
-#define SAT_OP 5
 #define EXISTS_OP 6
 #define IMAGE_OP 7
+// operation numbers 16 to 127 are free for user defined operations
+#define USER_OP 16
+// counting operations store a 64-bit number in the cache
+#define SAT_OP (OP_COUNT_FLAG | 1)
+#define USER_COUNT_OP (OP_COUNT_FLAG | 16)
 
 // struct to define a set of variables
 // for caching we give each variable set an index by representing it internally as BDD(var1 and var2 and ...)
@@ -27,6 +31,7 @@
 typedef struct VariableSet {
     nodeindex_t index;
     bool* variables;
+    uint32_t id; // unique number of the set (part of the cache key for image)
 } variable_set_t;
 
 void init_variableset(variable_set_t* variable_set);

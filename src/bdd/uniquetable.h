@@ -85,9 +85,14 @@ extern void reassign_and_keepalive(nodeindex_t* target, nodeindex_t value);
 // This behaviour can be overwritten by setting force = true.
 // disable_rec is ignored (kept for compatibility), gc always collects everything that is not alive.
 // The bucket lists and the list of free nodes are rebuilt from scratch.
-// Also clears all caches. (Deallocating nodes means giving back the index to the memorypool.
-// If this index is still in some cache we can get segfault)
+// Also clears the cache. (Deallocating nodes means giving back the index to the memorypool.
+// If this index is still in the cache we would get wrong results.)
 void gc(bool disable_rec, bool force);
+
+// Garbage collection that is triggered while an operation is running.
+// The partial results of the running operation are valuable, so (by default) the cache is not cleared,
+// only entries that refer to a deallocated node are removed.
+void gc_in_op();
 
 // Returns elapsed time in seconds from timespec.
 double get_elapsed_time(struct timespec t0, struct timespec t1);

@@ -62,7 +62,14 @@ WIDTH_HEIGHT = \
 -DWIDTH=$(WIDTH) \
 -DHEIGHT=$(HEIGHT)
 
+# the op cache has 2^(log2_tablesize - CACHE_SHIFT) entries of 16 bytes
+CACHE_SHIFT = 2
+# keep cache entries of surviving nodes when garbage collecting? 0 = never, 1 = for GC during ops, 2 = always
+GC_KEEPS_CACHE = 1
+
 GCFLAGS = \
+-DOPCACHE_LOG2_REDUCTION=$(CACHE_SHIFT) \
+-DGC_KEEPS_CACHE=$(GC_KEEPS_CACHE) \
 -DIN_OP_GC=$(IN_OP_GC) \
 -DIN_OP_GC_EXCL=$(IN_OP_GC_EXCL) \
 -DIN_OP_GC_THRES=$(IN_OP_GC_THRES)

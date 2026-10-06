@@ -4,6 +4,14 @@
 
 nodetable_t uniquetable;
 
+// Which cache entries survive gc?
+// 0 ... none, the cache is always cleared
+// 1 ... if gc was triggered inside of an operation, entries that only refer to nodes which are alive survive (default)
+// 2 ... entries that only refer to nodes which are alive always survive
+#ifndef GC_KEEPS_CACHE
+#define GC_KEEPS_CACHE 1
+#endif
+
 void init_set(uniquetable_t* set, uint64_t log2size) {
     assert(log2size <= 32);
     uint64_t size = ((uint64_t) 1) << log2size;
@@ -184,7 +192,7 @@ static void mark_rec(nodeindex_t ix) {
 double GC_TIME;
 double GC_MAX_FILL_LEVEL;
 uint64_t GC_MAX_NODES_ALLOC;
-void gc(bool disable_rec, bool force) {
+static void gc_run(bool force, bool in_op) {
     double fill_level = (double) memorypool.num_nodes / memorypool.capacity;
     if (fill_level > GC_MAX_FILL_LEVEL) { GC_MAX_FILL_LEVEL = fill_level; GC_MAX_NODES_ALLOC = memorypool.num_nodes; }
 
@@ -213,6 +221,13 @@ void gc(bool disable_rec, bool force) {
         }
     }
     printf("%"PRIu64" roots ... ", n_roots);
+
+    // Remove cache entries that refer to nodes which will be deallocated
+    if (GC_KEEPS_CACHE == 2 || (GC_KEEPS_CACHE == 1 && in_op)) {
+        gc_opcache();
+    } else {
+        clear_opcache();
+    }
 
     // Reset all buckets
     memset(uniquetable.buckets, 0, uniquetable.size * sizeof(nodeindex_t));
@@ -250,15 +265,17 @@ void gc(bool disable_rec, bool force) {
     memorypool.num_nodes = num_alive;
     memorypool.next = free_list;
 
-    // clear caches
-    clear_unaryopcache();
-    clear_binaryopcache();
-    clear_ternaryopcache();
-
     clock_gettime(CLOCK_REALTIME, &t1);
     GC_TIME += get_elapsed_time(t0, t1);
 }
 
+void gc(bool disable_rec, bool force) {
+    gc_run(force, false);
+}
+
+void gc_in_op() {
+    gc_run(true, true);
+}
 
 
 void verify_uniquetable() {

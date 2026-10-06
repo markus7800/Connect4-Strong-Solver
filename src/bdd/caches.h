@@ -8,82 +8,77 @@
 
 #include "node.h"
 
-// Three types of caches: One of unary, one for binary, and one for ternary operations.
-// AFTER DEALLOCATING A SINGLE NODE ALL CASHES MUST BE CLEARED!
-// The maximum size of caches is 2^31. By default caches have size memorypool.capacity / 4.
+// One cache for all operations.
+// An entry stores the result of op(a, b). The tag identifies the operation:
+//   bits 0-7:  operation (0 = empty entry)
+//   bits 8-31: extra operand that is part of the key (e.g. the id of the variable set for image)
+// For counting operations (OP_COUNT_FLAG set in the operation) the key is (tag, a)
+// and the fields b and result hold a 64-bit number instead of node indices.
+//
+// The cache is cleaned by gc: entries that refer to a deallocated node are removed,
+// all other entries stay valid.
 
 // Probing pseudo code:
-// uint32_t cache_ix = <ARITY>op_hash(ix1,..., OP) & <ARITY>opcache.mask;
-// <ARITY>opcache_entry_t cacheentry = <ARITY>opcache.data[cache_ix];
-// if (cacheentry.arg1 == ix1 && ... && cacheentry.op == OP) {
-//     if (!isdisabled(get_node(cacheentry.result))) {
-//         return cacheentry.result;
-//     }
-// }
-// Since nodes can be disabled (but not yet deallocated) we have to check for it in probing
+// uint32_t cache_ix = opcache_index(OP, ix1, ix2);
+// opcache_entry_t* e = &opcache.data[cache_ix];
+// if (e->a == ix1 && e->b == ix2 && e->tag == OP) return e->result;
+//
+// Storing:
+// opcache_store(cache_ix, OP, ix1, ix2, result_ix);
 
-// Storing pseudo code
-// <ARITY>opcache.data[cache_ix].arg1 = ix1;
-// ...
-// <ARITY>opcache.data[cache_ix].op = OP;
-// <ARITY>opcache.data[cache_ix].result = result_ix;
+#define OP_COUNT_FLAG 0x80
 
-typedef struct UnaryOpCacheEntry {
-    nodeindex_t arg;
-    uint8_t op;
-    uint64_t result;
-} unaryopcache_entry_t;
-
-typedef struct UnaryOpCache {
-    unaryopcache_entry_t* data;
-    uint32_t mask;
-    uint32_t size;
-} unaryopcache_t;
-
-extern unaryopcache_t unaryopcache;
-
-typedef struct BinaryOpCacheEntry {
-    nodeindex_t arg1;
-    nodeindex_t arg2;
-    uint8_t op;
+typedef struct OpCacheEntry {
+    nodeindex_t a;
+    nodeindex_t b;
     nodeindex_t result;
-} binaryopcache_entry_t;
+    uint32_t tag;
+} opcache_entry_t;
 
-typedef struct BinaryOpCache {
-    binaryopcache_entry_t* data;
+typedef struct OpCache {
+    opcache_entry_t* data;
     uint32_t mask;
-    uint32_t size;
-} binaryopcache_t;
+    uint64_t size;
+} opcache_t;
 
-extern binaryopcache_t binaryopcache;
+extern opcache_t opcache;
 
+// the cache has 2^log2size entries
+void init_opcache(uint64_t log2size);
+// removes all entries
+void clear_opcache();
+// removes all entries that refer to nodes which are not marked
+// has to be called by gc after marking and before sweeping
+void gc_opcache();
 
-typedef struct TernaryOpCacheEntry {
-    nodeindex_t arg1;
-    nodeindex_t arg2;
-    nodeindex_t arg3;
-    uint8_t op;
-    nodeindex_t result;
-} ternaryopcache_entry_t;
+static inline uint32_t opcache_index(uint32_t tag, nodeindex_t a, nodeindex_t b) {
+    return hash_3((uint8_t) tag, a, b) & opcache.mask;
+}
 
-typedef struct TernaryOpCache {
-    ternaryopcache_entry_t* data;
-    uint32_t mask;
-    uint32_t size;
-} ternaryopcache_t;
+static inline void opcache_store(uint32_t cache_ix, uint32_t tag, nodeindex_t a, nodeindex_t b, nodeindex_t result) {
+    opcache_entry_t* e = &opcache.data[cache_ix];
+    e->a = a;
+    e->b = b;
+    e->result = result;
+    e->tag = tag;
+}
 
-extern ternaryopcache_t ternaryopcache;
+// counting operations: key = (tag, a), value = 64-bit number
+static inline bool opcache_lookup_count(uint32_t cache_ix, uint32_t tag, nodeindex_t a, uint64_t* value) {
+    opcache_entry_t* e = &opcache.data[cache_ix];
+    if (e->a == a && e->tag == tag) {
+        *value = ((uint64_t) e->result << 32) | e->b;
+        return true;
+    }
+    return false;
+}
 
-void init_unaryopcache(uint64_t log2size);
-extern uint32_t unaryop_hash(nodeindex_t ix, uint8_t op);
-void clear_unaryopcache();
-
-void init_binaryopcache(uint64_t log2size);
-extern uint32_t binaryop_hash(nodeindex_t ix1, nodeindex_t ix2, uint8_t op);
-void clear_binaryopcache();
-
-void init_ternaryopcache(uint64_t log2size);
-extern uint32_t ternaryop_hash(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, uint8_t op);
-void clear_ternaryopcache();
+static inline void opcache_store_count(uint32_t cache_ix, uint32_t tag, nodeindex_t a, uint64_t value) {
+    opcache_entry_t* e = &opcache.data[cache_ix];
+    e->a = a;
+    e->b = (uint32_t) value;
+    e->result = (uint32_t) (value >> 32);
+    e->tag = tag;
+}
 
 #endif

@@ -26,7 +26,7 @@ void in_op_gc(uint8_t op) {
         case IMAGE_OP:
             printf("(image) "); break;
         }
-        gc(true, true);
+        gc_in_op();
         if (memorypool.num_nodes == prev_num_nodes) {
             perror("Could not decrease number of nodes in op GC :(\n.");
             exit(EXIT_FAILURE);
@@ -50,9 +50,9 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
         }
     }
 
-    uint32_t cache_ix = binaryop_hash(ix1, ix2, op) & binaryopcache.mask;
-    binaryopcache_entry_t cacheentry = binaryopcache.data[cache_ix];
-    if (cacheentry.arg1 == ix1 && cacheentry.arg2 == ix2 && cacheentry.op == op) {
+    uint32_t cache_ix = opcache_index(op, ix1, ix2);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix1 && cacheentry.b == ix2 && cacheentry.tag == op) {
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -84,10 +84,7 @@ nodeindex_t apply_binary(nodeindex_t ix1, nodeindex_t ix2, uint8_t op) {
     undo_keepalive(get_node(u));
 #endif
 
-    binaryopcache.data[cache_ix].arg1 = ix1;
-    binaryopcache.data[cache_ix].arg2 = ix2;
-    binaryopcache.data[cache_ix].op = op;
-    binaryopcache.data[cache_ix].result = u;
+    opcache_store(cache_ix, op, ix1, ix2, u);
 
     return u;
 }
@@ -98,11 +95,11 @@ nodeindex_t apply_not(nodeindex_t ix) {
         return constant(u) == 1 ? 0 : 1;
     }
 
-    uint32_t cache_ix = unaryop_hash(ix, NOT_OP) & unaryopcache.mask;
-    unaryopcache_entry_t cacheentry = unaryopcache.data[cache_ix];
-    if (cacheentry.arg == ix && cacheentry.op == NOT_OP) {
-        if (!isdisabled(get_node((nodeindex_t) cacheentry.result))) {
-            return (nodeindex_t) cacheentry.result;
+    uint32_t cache_ix = opcache_index(NOT_OP, ix, 0);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix && cacheentry.b == 0 && cacheentry.tag == NOT_OP) {
+        if (!isdisabled(get_node(cacheentry.result))) {
+            return cacheentry.result;
         }
     }
     
@@ -118,9 +115,7 @@ nodeindex_t apply_not(nodeindex_t ix) {
     undo_keepalive(get_node(new_u));
 #endif
 
-    unaryopcache.data[cache_ix].arg = ix;
-    unaryopcache.data[cache_ix].op = NOT_OP;
-    unaryopcache.data[cache_ix].result = new_u;
+    opcache_store(cache_ix, NOT_OP, ix, 0, new_u);
 
     return new_u;
 }
@@ -153,7 +148,9 @@ nodeindex_t not(nodeindex_t ix) {
 
 
 // should only be created after all variables were created
+static uint32_t num_variable_sets = 0;
 void init_variableset(variable_set_t* variable_set) {
+    variable_set->id = num_variable_sets++;
     variable_set->index = ONEINDEX;
     variable_set->variables = (bool*) malloc(memorypool.num_variables * sizeof(bool));
     for (size_t i = 0; i < memorypool.num_variables; i++) {
@@ -184,9 +181,9 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
     }
 
     nodeindex_t ix2 = variable_set->index;
-    uint32_t cache_ix = binaryop_hash(ix, ix2, EXISTS_OP) & binaryopcache.mask;
-    binaryopcache_entry_t cacheentry = binaryopcache.data[cache_ix];
-    if (cacheentry.arg1 == ix && cacheentry.arg2 == ix2 && cacheentry.op == EXISTS_OP) {
+    uint32_t cache_ix = opcache_index(EXISTS_OP, ix, ix2);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix && cacheentry.b == ix2 && cacheentry.tag == EXISTS_OP) {
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -209,10 +206,7 @@ nodeindex_t apply_exists(nodeindex_t ix, variable_set_t* variable_set) {
     undo_keepalive(get_node(new_u));
 #endif
 
-    binaryopcache.data[cache_ix].arg1 = ix;
-    binaryopcache.data[cache_ix].arg2 = ix2;
-    binaryopcache.data[cache_ix].op = EXISTS_OP;
-    binaryopcache.data[cache_ix].result = new_u;
+    opcache_store(cache_ix, EXISTS_OP, ix, ix2, new_u);
 
     return new_u;
 }
@@ -231,10 +225,11 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
         return constant(u1) & constant(u2);
     }
 
-    nodeindex_t ix3 = variable_set->index;
-    uint32_t cache_ix = ternaryop_hash(ix1, ix2, ix3, IMAGE_OP) & ternaryopcache.mask;
-    ternaryopcache_entry_t cacheentry = ternaryopcache.data[cache_ix];
-    if (cacheentry.arg1 == ix1 && cacheentry.arg2 == ix2 && cacheentry.arg3 == ix3 && cacheentry.op == IMAGE_OP) {
+    // the variable set is part of the cache key
+    uint32_t tag = IMAGE_OP | (variable_set->id << 8);
+    uint32_t cache_ix = opcache_index(tag, ix1, ix2);
+    opcache_entry_t cacheentry = opcache.data[cache_ix];
+    if (cacheentry.a == ix1 && cacheentry.b == ix2 && cacheentry.tag == tag) {
         if (!isdisabled(get_node(cacheentry.result))) {
             return cacheentry.result;
         }
@@ -271,11 +266,7 @@ nodeindex_t apply_image(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* variab
     undo_keepalive(get_node(new_u));
 #endif
 
-    ternaryopcache.data[cache_ix].arg1 = ix1;
-    ternaryopcache.data[cache_ix].arg2 = ix2;
-    ternaryopcache.data[cache_ix].arg3 = ix3;
-    ternaryopcache.data[cache_ix].op = IMAGE_OP;
-    ternaryopcache.data[cache_ix].result = new_u;
+    opcache_store(cache_ix, tag, ix1, ix2, new_u);
 
     return new_u;
 }
