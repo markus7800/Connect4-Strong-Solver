@@ -91,8 +91,8 @@ nodeindex_t image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* varia
 // ix3 only depends on variables of the set (it is a set of states like ix1).
 // The recursion stops wherever ix3 is 0, so the (possibly much larger) unrestricted image is never built.
 //
-// The nodes of the relation ix2 are part of the cache key with 24 bits: the relation has to be built
-// before the node pool has more than 2^24 nodes (otherwise the unrestricted image is computed first).
+// A relation ix2 that was used here is kept alive for the rest of the program
+// (its nodes are numbered for the cache, the numbers are attached to the node indices).
 nodeindex_t image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, variable_set_t* variable_set);
 
 

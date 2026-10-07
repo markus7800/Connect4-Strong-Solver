@@ -14,12 +14,15 @@
 //
 // No additional memory is needed: the file index of a node is temporarily stored in its `next` field.
 // This destroys the bucket lists of the unique table, which are rebuilt before the function returns.
+// (With COMPACT_NODES the nodes are written in the order of their index instead, the root last,
+// which needs 1.5 bits per slot of the node array as temporary memory.)
 uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, variable_t varmap[MAX_VARIABLES + 1]);
 uint64_t _safe_to_file(nodeindex_t root, char* filename);
 
 // Reads a BDD from a file and returns its root.
 // varmap maps the variable stored in the file to the variable of the node that is created.
 // The returned node is not kept alive.
+// The nodes may be stored in any order, as long as the root is last.
 // Needs 4 bytes per node in the file as temporary memory.
 nodeindex_t _read_from_file_with_varmap(char* filename, variable_t varmap[256]);
 nodeindex_t _read_from_file(char* filename);

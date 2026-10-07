@@ -316,7 +316,13 @@ static void test_save_and_read() {
         CHECK(nodecount(g) == nc);
         CHECK(satcount(g) == sc);
         _safe_to_file(g, file2);
+#if COMPACT_NODES
+        // the order of the nodes in the file depends on where the nodes are stored
+        (void) files_equal;
+        CHECK(_read_from_file(file2) == g);
+#else
         CHECK(files_equal(file1, file2));
+#endif
         undo_keepalive_ix(g);
         gc(true, true);
     }

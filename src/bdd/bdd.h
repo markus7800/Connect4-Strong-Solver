@@ -24,6 +24,15 @@
 #define UNIQUETABLE_LOG2_REDUCTION 0
 #endif
 
+#if COMPACT_NODES
+// the node array is the unique table, there are no buckets
+#define BUCKET_BYTES(log2_buckets) ((uint64_t) 0)
+#define NODES_PER_BLOCK_OR_ONE NODES_PER_BLOCK
+#else
+#define BUCKET_BYTES(log2_buckets) ((((uint64_t) 1) << (log2_buckets)) * sizeof(nodeindex_t))
+#define NODES_PER_BLOCK_OR_ONE 1
+#endif
+
 // The sizes of the three big arrays:
 // - memorypool: `capacity` nodes (any number up to 2^32 - 1)
 // - unique table: 2^log2_buckets buckets
@@ -54,13 +63,17 @@ tablesizes_t tablesizes_for_capacity(uint64_t capacity) {
     if (capacity < 1024) {
         capacity = 1024;
     }
+#if COMPACT_NODES
+    // the node array consists of blocks
+    capacity -= capacity % NODES_PER_BLOCK;
+#endif
     sizes.capacity = capacity;
     // 2^32 - 1 nodes get 2^32 buckets
-    sizes.log2size = floor_log2(capacity + 1);
+    sizes.log2size = floor_log2(capacity + NODES_PER_BLOCK_OR_ONE);
     sizes.log2_buckets = sizes.log2size > UNIQUETABLE_LOG2_REDUCTION + 4 ? sizes.log2size - UNIQUETABLE_LOG2_REDUCTION : 4;
     sizes.log2_cache = sizes.log2size > OPCACHE_LOG2_REDUCTION + 4 ? sizes.log2size - OPCACHE_LOG2_REDUCTION : 4;
     sizes.bytes = capacity * sizeof(bddnode_t)
-        + (((uint64_t) 1) << sizes.log2_buckets) * sizeof(nodeindex_t)
+        + BUCKET_BYTES(sizes.log2_buckets)
         + (((uint64_t) 1) << sizes.log2_cache) * sizeof(opcache_entry_t);
     return sizes;
 }
@@ -81,8 +94,8 @@ tablesizes_t tablesizes_for_bytes(uint64_t bytes) {
             break;
         }
         uint64_t capacity = p + (bytes - lower.bytes) / sizeof(bddnode_t);
-        if (capacity > 2*p - 1) {
-            capacity = 2*p - 1;
+        if (capacity > 2*p - 1 - NODES_PER_BLOCK_OR_ONE) {
+            capacity = 2*p - 1 - NODES_PER_BLOCK_OR_ONE;
         }
         best = tablesizes_for_capacity(capacity);
     }
@@ -117,7 +130,11 @@ tablesizes_t parse_tablesize(const char* arg) {
 
 uint64_t print_RAM_info_sizes(tablesizes_t sizes) {
     printf("log2_size=%"PRIu64" - number of allocatable nodes: %"PRIu64" (%g)\n", sizes.log2size, sizes.capacity, (double) sizes.capacity);
+#if COMPACT_NODES
+    printf("compact node layout (the node array is the unique table), op cache entries: 2^%"PRIu64"\n", sizes.log2_cache);
+#else
     printf("unique table buckets: 2^%"PRIu64", op cache entries: 2^%"PRIu64"\n", sizes.log2_buckets, sizes.log2_cache);
+#endif
     printf("RAM needed %.3f GB (%.3f GiB, %.1f bytes per node)\n", (double) sizes.bytes / 1000 / 1000 / 1000, (double) sizes.bytes / 1024 / 1024 / 1024, (double) sizes.bytes / sizes.capacity);
     return sizes.bytes;
 }
@@ -141,7 +158,9 @@ void init_all(uint64_t log2size) {
 }
 
 void free_all() {
-    free_zeroed(uniquetable.buckets, uniquetable.size * sizeof(nodeindex_t));
+    if (uniquetable.buckets != NULL) {
+        free_zeroed(uniquetable.buckets, uniquetable.size * sizeof(nodeindex_t));
+    }
     free_zeroed(memorypool.nodes, memorypool.capacity * sizeof(bddnode_t));
     free_zeroed(opcache.data, opcache.size * sizeof(opcache_entry_t));
 }

@@ -23,6 +23,41 @@ typedef uint16_t variable_t;
 #define VAR_BITS 10
 #define MAX_VARIABLES ((1 << VAR_BITS) - 2) // level of the constants is num_variables + 1 and has to fit too
 
+// Two memory layouts for the nodes and the unique table can be selected at compile time:
+//
+// COMPACT_NODES=0 (default): 16 bytes per node, the unique table is an array of bucket heads (4 bytes per bucket)
+//   and the nodes of a bucket are linked through `next`. About 20 bytes per allocatable node.
+//   Up to 2^32 - 1 nodes.
+//
+// COMPACT_NODES=1: 12 bytes per node, the node array itself is the unique table: a node is stored in one of two
+//   blocks of NODES_PER_BLOCK slots that are determined by its hash (see uniquetable.c).
+//   12 bytes per slot, of which about 90 % can be used. A node index is a slot number, so at most
+//   0.9 * 2^32 nodes; and the whole array is in use from the start, however few nodes are allocated.
+#ifndef COMPACT_NODES
+#define COMPACT_NODES 0
+#endif
+
+#if COMPACT_NODES
+
+#define NODES_PER_BLOCK 5
+#define EXTREF_BITS 19
+
+// A node takes 12 bytes. A slot is free if low == high (0 if it was never used, MAX(nodeindex_t) if it was freed).
+typedef struct BBDNode {
+    nodeindex_t low;      // index to low node
+    nodeindex_t high;     // index to high node
+    uint32_t var : VAR_BITS; // variable 1 to MAX_VARIABLES, 0 for the constants
+    uint32_t mark : 1;    // set during garbage collection for nodes that are reachable from a kept-alive node
+    uint32_t visit : 1;   // scratch bit for traversals
+    uint32_t overflow : 1; // only used in the first slot of a block: some node that belongs into this block
+                           // is stored in a later block (this bit is independent of the node in the slot)
+    uint32_t extref : EXTREF_BITS; // number of external references (keepalive), such a node is a root for garbage collection
+} bddnode_t;
+
+#else
+
+#define EXTREF_BITS 20
+
 // A node takes 16 bytes.
 typedef struct BBDNode {
     nodeindex_t low;      // index to low node
@@ -33,8 +68,10 @@ typedef struct BBDNode {
     uint32_t var : VAR_BITS; // variable 1 to MAX_VARIABLES, 0 for the constants
     uint32_t mark : 1;    // set during garbage collection for nodes that are reachable from a kept-alive node
     uint32_t visit : 1;   // scratch bit for traversals
-    uint32_t extref : 20; // number of external references (keepalive), such a node is a root for garbage collection
+    uint32_t extref : EXTREF_BITS; // number of external references (keepalive), such a node is a root for garbage collection
 } bddnode_t;
+
+#endif
 
 // hashing utilities
 
@@ -61,6 +98,8 @@ static inline uint32_t hash_bddnode(bddnode_t* node) {
 }
 
 // disabling nodes is done by setting low == high = MAX(nodeindex_t)
+// (with COMPACT_NODES every slot with low == high counts as disabled, i.e. also slots that were never used;
+//  only meaningful for indices >= 2, the constants also have low == high)
 extern void disable(bddnode_t* node);
 extern bool isdisabled(bddnode_t* node);
 

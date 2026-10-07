@@ -33,7 +33,13 @@ void init_memorypool(uint64_t capacity) {
         exit(EXIT_FAILURE);
     }
     memorypool.capacity = capacity;
+#if COMPACT_NODES
+    // nodes are placed by their hash, there is no order of allocation: all slots count as used
+    BDD_CHECK(capacity % NODES_PER_BLOCK == 0 && capacity >= 2 * NODES_PER_BLOCK, "Capacity has to be a multiple of the block size :(");
+    memorypool.hwm = capacity;
+#else
     memorypool.hwm = 0;
+#endif
     memorypool.next = 0;
 }
 
@@ -44,6 +50,11 @@ Nodes that were freed by the garbage collection are reused first (in ascending o
 otherwise the next never-used node is taken.
 */
 nodeindex_t pop_index() {
+#if COMPACT_NODES
+    // nodes are placed by their hash (see make in uniquetable.c)
+    BDD_CHECK(false, "pop_index is not available with COMPACT_NODES :(");
+    return 0;
+#else
     nodeindex_t index;
     if (memorypool.next != 0) {
         index = memorypool.next;
@@ -57,6 +68,7 @@ nodeindex_t pop_index() {
     }
     memorypool.num_nodes++;
     return index;
+#endif
 }
 
 inline bddnode_t* get_node(nodeindex_t index) {
@@ -67,13 +79,21 @@ inline bddnode_t* get_node(nodeindex_t index) {
 
 // the constants are stored at index 0 and 1, they are not part of the unique table buckets
 static void create_constant(nodeindex_t value) {
+#if COMPACT_NODES
+    // the first block is reserved for the constants
+    nodeindex_t index = value;
+    memorypool.num_nodes++;
+#else
     nodeindex_t index = pop_index();
     assert(index == value);
+#endif
     bddnode_t* node = get_node(index);
     node->var = 0;
     node->low = value;
     node->high = value;
+#if !COMPACT_NODES
     node->next = 0;
+#endif
     uniquetable.count++;
     assert(isconstant(node));
     assert(constant(node) == value);

@@ -28,6 +28,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [15](15-variable-order.md) | column / row order options (experiment) | default order stays for 7+ columns; centre-out is 36–41 % smaller for 5 columns but 26 % larger for 7 |
 | [16](16-sizing-ladder.md) | forward pass keeps two instead of three large BDDs; sizing measurements | count needs 1.5x the largest reachable-set BDD (was 2.2x); 7x6 count 626 s, 8x6 count 2920 s; outlook for 7x7 / 8x6 / 9x7 |
 | [17](17-7x6-on-32gb.md) | 7x6 on the 32 GB Mac; `BUCKET_SHIFT`, `IN_OP_GC_GROWTH` options | needs 24–28 GiB; first 8 plies verified, then stopped: the machine had ~21 GB to give next to the desktop session |
+| [18](18-compact-node-layout.md) | optional compact layout (`COMPACT_NODES=1`): 12-byte nodes in a two-choice hash table | 12.6 instead of 20 bytes per usable node; 6x6 solves in 1.75 GiB instead of 2.5 GiB, 1.3x slower |
 
 ## Running totals
 

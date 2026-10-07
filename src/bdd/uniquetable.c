@@ -7,6 +7,11 @@
 
 nodetable_t uniquetable;
 
+#if COMPACT_NODES
+// whether any block has the overflow flag
+static bool compact_has_overflow = false;
+#endif
+
 nodeindex_t gc_stack[GC_STACK_SIZE];
 uint32_t gc_stack_top = 0;
 
@@ -21,8 +26,18 @@ double GC_IN_OP_THRES = 0;
 #define IN_OP_GC_GROWTH 0
 #endif
 
+// Fraction of the node pool that can be filled.
+// The search for a node in the compact layout gets slow when (almost) all slots are taken.
+#if COMPACT_NODES
+#define USABLE_FRACTION 0.95
+#else
+#define USABLE_FRACTION 1.0
+#endif
+
 static void update_in_op_trigger() {
-    uint64_t regular = (uint64_t) (GC_IN_OP_THRES * (double) memorypool.capacity);
+    uint64_t usable = (uint64_t) (USABLE_FRACTION * (double) memorypool.capacity);
+    uint64_t limit = (uint64_t) (GC_IN_OP_THRES * (double) usable);
+    uint64_t regular = limit;
     uint64_t alive = memorypool.num_nodes;
     if (IN_OP_GC_GROWTH > 0) {
         // not before a 64th of the pool is allocated
@@ -31,8 +46,11 @@ static void update_in_op_trigger() {
             regular = (uint64_t) growth;
         }
     }
-    uint64_t halfway = alive + (memorypool.capacity - alive) / 2;
-    uint64_t limit = (uint64_t) (GC_IN_OP_THRES * (double) memorypool.capacity);
+    if (alive + 16 >= usable) {
+        fprintf(stderr, "Ran out of nodes :( The table is too small for the nodes that are alive.\n");
+        exit(EXIT_FAILURE);
+    }
+    uint64_t halfway = alive + (usable - alive) / 2;
     // above the regular threshold the rest of the pool is used step by step
     GC_IN_OP_TRIGGER = alive >= limit || (regular == limit && halfway > regular) ? halfway : regular;
 }
@@ -57,6 +75,15 @@ void init_uniquetable(uint64_t log2size) {
     GC_MAX_NODES_ALIVE = 0;
     GC_LAST_NODES_ALIVE = 0;
 
+#if COMPACT_NODES
+    // the node array is the table
+    uniquetable.mask = 0;
+    uniquetable.size = 0;
+    uniquetable.count = 0;
+    uniquetable.buckets = NULL;
+    compact_has_overflow = false;
+}
+#else
     assert(log2size <= 32);
     uint64_t size = ((uint64_t) 1) << log2size;
     uniquetable.mask = (uint32_t) (size - 1);
@@ -69,6 +96,141 @@ void init_uniquetable(uint64_t log2size) {
         exit(EXIT_FAILURE);
     }
 }
+#endif
+
+#if COMPACT_NODES
+
+/*
+The unique table of the compact layout.
+
+The node array is divided into blocks of NODES_PER_BLOCK slots. The first block holds the constants.
+A node (var, low, high) has two home blocks that are given by two hash values. It is stored in the one
+that has more free slots when the node is created. Looking a node up means searching its two home blocks.
+
+If both home blocks are full, the node is stored in the first block after its first home block that has a free slot,
+and the overflow flag is set in all blocks from the first home block up to the block before.
+A lookup that finds the overflow flag in the first home block continues with the following blocks
+as long as the block it just searched has the overflow flag.
+
+Freeing a node only marks its slot as free. The overflow flags are recomputed by gc.
+
+A node never moves, so its index (slot number) is stable.
+*/
+
+static inline uint64_t compact_num_blocks() {
+    return memorypool.capacity / NODES_PER_BLOCK;
+}
+
+// maps a hash to a block (not the first one)
+static inline uint64_t compact_block(uint32_t hash, uint64_t num_blocks) {
+    return 1 + (((uint64_t) hash * (num_blocks - 1)) >> 32);
+}
+
+static inline uint32_t compact_hash2(variable_t var, nodeindex_t low, nodeindex_t high) {
+    return hash_3((uint32_t) var + (1 << VAR_BITS), high, low);
+}
+
+nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
+    if (low == high) {
+        return low;
+    }
+    assert(var <= memorypool.num_variables);
+    assert(level_for_var(var) < level(get_node(low)));
+    assert(level_for_var(var) < level(get_node(high)));
+
+    bddnode_t* nodes = memorypool.nodes;
+    uint64_t num_blocks = compact_num_blocks();
+    uint64_t home[2];
+    home[0] = compact_block(hash_varlowhigh(var, low, high), num_blocks);
+    home[1] = compact_block(compact_hash2(var, low, high), num_blocks);
+
+    // search the two home blocks, remember the first free slot and the number of free slots of each
+    nodeindex_t free_slot[2] = {0, 0};
+    int num_free[2] = {0, 0};
+    for (int k = 0; k < 2; k++) {
+        if (k == 1 && home[1] == home[0]) {
+            break;
+        }
+        nodeindex_t first = (nodeindex_t) (home[k] * NODES_PER_BLOCK);
+        for (nodeindex_t index = first; index < first + NODES_PER_BLOCK; index++) {
+            bddnode_t* node = &nodes[index];
+            if (node->low == low && node->high == high && node->var == var) {
+                return index;
+            }
+            if (node->low == node->high) {
+                if (num_free[k] == 0) free_slot[k] = index;
+                num_free[k]++;
+            }
+        }
+    }
+
+    // search the overflow blocks of the first home block
+    nodeindex_t overflow_free_slot = 0;
+    if (nodes[home[0] * NODES_PER_BLOCK].overflow) {
+        uint64_t block = home[0];
+        do {
+            block = block + 1 == num_blocks ? 1 : block + 1;
+            nodeindex_t first = (nodeindex_t) (block * NODES_PER_BLOCK);
+            for (nodeindex_t index = first; index < first + NODES_PER_BLOCK; index++) {
+                bddnode_t* node = &nodes[index];
+                if (node->low == low && node->high == high && node->var == var) {
+                    return index;
+                }
+                if (node->low == node->high && overflow_free_slot == 0) {
+                    overflow_free_slot = index;
+                }
+            }
+        } while (nodes[block * NODES_PER_BLOCK].overflow && block != home[0]);
+    }
+
+    // the node does not exist: allocate it
+    nodeindex_t index;
+    if (num_free[0] > 0 && num_free[0] >= num_free[1]) {
+        index = free_slot[0];
+    } else if (num_free[1] > 0) {
+        index = free_slot[1];
+    } else if (overflow_free_slot != 0) {
+        // all blocks before this slot already have the overflow flag
+        index = overflow_free_slot;
+    } else {
+        // both home blocks are full: go on from the first home block until there is a free slot
+        if (memorypool.num_nodes + NODES_PER_BLOCK >= memorypool.capacity) {
+            fprintf(stderr, "Ran out of nodes :( The table is too small for the nodes that are alive.\n");
+            exit(EXIT_FAILURE);
+        }
+        compact_has_overflow = true;
+        uint64_t block = home[0];
+        index = 0;
+        while (index == 0) {
+            nodes[block * NODES_PER_BLOCK].overflow = 1;
+            block = block + 1 == num_blocks ? 1 : block + 1;
+            nodeindex_t first = (nodeindex_t) (block * NODES_PER_BLOCK);
+            for (nodeindex_t i = first; i < first + NODES_PER_BLOCK; i++) {
+                if (nodes[i].low == nodes[i].high) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+    }
+    if (memorypool.num_nodes + NODES_PER_BLOCK >= memorypool.capacity) {
+        fprintf(stderr, "Ran out of nodes :( The table is too small for the nodes that are alive.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    bddnode_t* node = &nodes[index];
+    node->var = var;
+    node->low = low;
+    node->high = high;
+    node->mark = 0;
+    node->visit = 0;
+    node->extref = 0;
+    memorypool.num_nodes++;
+    uniquetable.count++;
+    return index;
+}
+
+#else
 
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix) {
     // consume node from memorypool
@@ -118,10 +280,12 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
     return add(var, low, high, target_bucket_ix);
 }
 
+#endif
+
 
 // increment external reference count to keep alive
 inline void keepalive(bddnode_t* node) {
-    BDD_CHECK(node->extref < (1 << 20) - 1, "Too many external references to a node :(");
+    BDD_CHECK(node->extref < (1 << EXTREF_BITS) - 1, "Too many external references to a node :(");
     node->extref++;
 }
 inline void undo_keepalive(bddnode_t* node) {
@@ -166,7 +330,7 @@ double GC_MAX_FILL_LEVEL;
 uint64_t GC_MAX_NODES_ALLOC;
 uint64_t GC_MAX_NODES_ALIVE;
 uint64_t GC_LAST_NODES_ALIVE;
-#ifdef HASH_STATS
+#if defined(HASH_STATS) && !COMPACT_NODES
 // quality of the hash function: distribution of bucket sizes compared to the ideal (Poisson) distribution
 static void print_hash_stats() {
     uint64_t n = 0, probes = 0, maxlen = 0, used = 0;
@@ -200,7 +364,7 @@ static void gc_run(bool force, bool in_op) {
     struct timespec t0, t1;
     clock_gettime(CLOCK_REALTIME, &t0);
 
-#ifdef HASH_STATS
+#if defined(HASH_STATS) && !COMPACT_NODES
     if (uniquetable.count > uniquetable.size / 16) print_hash_stats();
 #endif
 
@@ -228,6 +392,48 @@ static void gc_run(bool force, bool in_op) {
         clear_opcache();
     }
 
+#if COMPACT_NODES
+    // Sweep: free the slots of all nodes that are not alive
+    uint64_t num_alive = 2;
+    for (uint64_t i = NODES_PER_BLOCK; i < memorypool.capacity; i++) {
+        node = &nodes[i];
+        if (node->low == node->high) {
+            continue; // free slot
+        }
+        if (node->mark) {
+            node->mark = 0;
+            num_alive++;
+        } else {
+            disable(node);
+            node->visit = 0;
+            node->extref = 0;
+        }
+    }
+    // Recompute the overflow flags: a node that is not stored in one of its two home blocks
+    // needs the flag in all blocks from its first home block up to the block before its own.
+    if (compact_has_overflow) {
+        uint64_t num_blocks = compact_num_blocks();
+        for (uint64_t block = 0; block < num_blocks; block++) {
+            nodes[block * NODES_PER_BLOCK].overflow = 0;
+        }
+        compact_has_overflow = false;
+        for (uint64_t i = NODES_PER_BLOCK; i < memorypool.capacity; i++) {
+            node = &nodes[i];
+            if (node->low == node->high) {
+                continue;
+            }
+            uint64_t own = i / NODES_PER_BLOCK;
+            uint64_t home0 = compact_block(hash_bddnode(node), num_blocks);
+            if (own == home0 || own == compact_block(compact_hash2(node->var, node->low, node->high), num_blocks)) {
+                continue;
+            }
+            compact_has_overflow = true;
+            for (uint64_t block = home0; block != own; block = block + 1 == num_blocks ? 1 : block + 1) {
+                nodes[block * NODES_PER_BLOCK].overflow = 1;
+            }
+        }
+    }
+#else
     // Reset all buckets
     memset(uniquetable.buckets, 0, uniquetable.size * sizeof(nodeindex_t));
 
@@ -257,6 +463,7 @@ static void gc_run(bool force, bool in_op) {
             free_list = (nodeindex_t) i;
         }
     }
+#endif
     double perc_before = (double) uniquetable.count / memorypool.capacity * 100;
     double perc_after = (double) num_alive / memorypool.capacity * 100;
     printf("decreased number of nodes from %"PRIu64" (%.2f%%) to %"PRIu64" (%.2f%%)\n", uniquetable.count, perc_before, num_alive, perc_after);
@@ -264,7 +471,9 @@ static void gc_run(bool force, bool in_op) {
     GC_LAST_NODES_ALIVE = num_alive;
     uniquetable.count = num_alive;
     memorypool.num_nodes = num_alive;
+#if !COMPACT_NODES
     memorypool.next = free_list;
+#endif
 
     if (GC_IN_OP_THRES > 0) {
         update_in_op_trigger();
@@ -274,6 +483,15 @@ static void gc_run(bool force, bool in_op) {
     GC_TIME += get_elapsed_time(t0, t1);
 }
 
+#if COMPACT_NODES
+void rebuild_uniquetable() {
+    // nothing is linked in this layout, only the visit bits are reset
+    bddnode_t* nodes = memorypool.nodes;
+    for (uint64_t i = NODES_PER_BLOCK; i < memorypool.capacity; i++) {
+        nodes[i].visit = 0;
+    }
+}
+#else
 void rebuild_uniquetable() {
     bddnode_t* node;
     bddnode_t* nodes = memorypool.nodes;
@@ -297,6 +515,7 @@ void rebuild_uniquetable() {
     }
     memorypool.next = free_list;
 }
+#endif
 
 void gc(bool disable_rec, bool force) {
     gc_run(force, false);
@@ -353,7 +572,11 @@ void print_nodes(bool statsonly) {
         }
         printf("Index(%"PRIu64") -> ", i);
         print_bddnode(node);
+#if COMPACT_NODES
+        printf("\n");
+#else
         printf(" ... next=%d\n", node->next);
+#endif
         printed++;
     }
 }

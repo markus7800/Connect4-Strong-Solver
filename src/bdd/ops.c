@@ -413,6 +413,92 @@ nodeindex_t image_rename(nodeindex_t ix1, nodeindex_t ix2, variable_set_t* varia
 }
 
 
+// The cache entry of image_rename_and has to identify three nodes. The relation (ix2) only has a few thousand
+// nodes, so its nodes are numbered and the number is stored in the 24 spare bits of the tag.
+// relation_id maps a node index to this number with a small hash table.
+// The relations have to stay alive (their node indices must not be reused for other nodes).
+static nodeindex_t* relation_keys = NULL; // 0 = empty
+static uint32_t* relation_ids = NULL;
+static uint32_t relation_mask = 0;
+static uint32_t relation_count = 0;
+
+static inline uint32_t relation_id(nodeindex_t ix) {
+    if (ix <= ONEINDEX) {
+        return ix;
+    }
+    uint32_t slot = hash_2(0, ix) & relation_mask;
+    while (relation_keys[slot] != ix) {
+        assert(relation_keys[slot] != 0);
+        slot = (slot + 1) & relation_mask;
+    }
+    return relation_ids[slot];
+}
+
+static void relation_insert(nodeindex_t ix, uint32_t id) {
+    uint32_t slot = hash_2(0, ix) & relation_mask;
+    while (relation_keys[slot] != 0) {
+        slot = (slot + 1) & relation_mask;
+    }
+    relation_keys[slot] = ix;
+    relation_ids[slot] = id;
+}
+
+static bool relation_contains(nodeindex_t ix) {
+    if (relation_keys == NULL) {
+        return false;
+    }
+    uint32_t slot = hash_2(0, ix) & relation_mask;
+    while (relation_keys[slot] != 0) {
+        if (relation_keys[slot] == ix) return true;
+        slot = (slot + 1) & relation_mask;
+    }
+    return false;
+}
+
+// numbers all nodes below ix that do not have a number yet
+static void relation_register_rec(nodeindex_t ix) {
+    if (ix <= ONEINDEX || relation_contains(ix)) {
+        // a node that has a number is kept alive, so the nodes below it have their numbers too
+        return;
+    }
+    if (relation_keys == NULL || 2 * (relation_count + 1) > relation_mask) {
+        // (re)build with twice the size
+        uint32_t old_size = relation_keys == NULL ? 0 : relation_mask + 1;
+        nodeindex_t* old_keys = relation_keys;
+        uint32_t* old_ids = relation_ids;
+        uint32_t size = old_size == 0 ? 1024 : 2 * old_size;
+        relation_keys = (nodeindex_t*) calloc(size, sizeof(nodeindex_t));
+        relation_ids = (uint32_t*) calloc(size, sizeof(uint32_t));
+        BDD_CHECK(relation_keys != NULL && relation_ids != NULL, "Could not allocate :(");
+        relation_mask = size - 1;
+        for (uint32_t i = 0; i < old_size; i++) {
+            if (old_keys[i] != 0) relation_insert(old_keys[i], old_ids[i]);
+        }
+        free(old_keys);
+        free(old_ids);
+    }
+    // the ids 0 and 1 are the constants
+    BDD_CHECK(relation_count + 2 < (1 << 24), "The relations of image_rename_and have too many nodes :(");
+    relation_insert(ix, relation_count + 2);
+    relation_count++;
+    bddnode_t* u = get_node(ix);
+    nodeindex_t low = u->low;
+    nodeindex_t high = u->high;
+    relation_register_rec(low);
+    relation_register_rec(high);
+}
+
+// Numbers the nodes of a relation the first time it is used.
+// The relation is kept alive from then on: the numbers are attached to node indices,
+// which must not be reused for other nodes (cache entries refer to them).
+static void relation_register(nodeindex_t ix) {
+    if (ix <= ONEINDEX || relation_contains(ix)) {
+        return;
+    }
+    keepalive_ix(ix);
+    relation_register_rec(ix);
+}
+
 nodeindex_t apply_image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, variable_set_t* variable_set) {
     if (ix1 == ZEROINDEX || ix2 == ZEROINDEX || ix3 == ZEROINDEX) {
         return ZEROINDEX;
@@ -438,8 +524,8 @@ nodeindex_t apply_image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t
         return ix3;
     }
 
-    // the node of the relation is part of the cache key (24 bits, checked in image_rename_and)
-    uint32_t tag = IMAGE_RENAME_AND_OP | (ix2 << 8);
+    // the node of the relation is part of the cache key
+    uint32_t tag = IMAGE_RENAME_AND_OP | (relation_id(ix2) << 8);
     uint32_t cache_ix = opcache_index(tag, ix1, ix3) ^ (hash_2(0, ix2) & opcache.mask);
     opcache_entry_t cacheentry = opcache.data[cache_ix];
     if (cacheentry.a == ix1 && cacheentry.b == ix3 && cacheentry.tag == tag) {
@@ -485,34 +571,6 @@ nodeindex_t apply_image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t
     return new_u;
 }
 
-// largest node index below ix (inclusive)
-static nodeindex_t max_index_rec(nodeindex_t ix) {
-    nodeindex_t res = ix;
-    while (ix > ONEINDEX) {
-        bddnode_t* u = get_node(ix);
-        if (u->visit) {
-            break;
-        }
-        u->visit = 1;
-        if (ix > res) res = ix;
-        nodeindex_t m = max_index_rec(u->low);
-        if (m > res) res = m;
-        ix = u->high;
-    }
-    return res;
-}
-static void unvisit_rec(nodeindex_t ix) {
-    while (ix > ONEINDEX) {
-        bddnode_t* u = get_node(ix);
-        if (!u->visit) {
-            break;
-        }
-        u->visit = 0;
-        unvisit_rec(u->low);
-        ix = u->high;
-    }
-}
-
 nodeindex_t image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, variable_set_t* variable_set) {
     BDD_CHECK(variable_set->primed != NULL, "prepare_image_rename has to be called before image_rename_and :(");
     // only one variable set is supported (it is not part of the cache key)
@@ -520,34 +578,11 @@ nodeindex_t image_rename_and(nodeindex_t ix1, nodeindex_t ix2, nodeindex_t ix3, 
     if (used_variable_set == NULL) used_variable_set = variable_set;
     BDD_CHECK(used_variable_set == variable_set, "image_rename_and only supports one variable set :(");
 
+    // number the nodes of the relation (only does something the first time a relation is used)
+    relation_register(ix2);
+
     keepalive(get_node(ix1)); keepalive(get_node(ix2)); keepalive(get_node(ix3));
-    nodeindex_t res;
-    // all nodes of the relation have to fit into the 24 bits of the cache key
-    static nodeindex_t checked_relation[4] = {0, 0, 0, 0};
-    static bool checked_fits[4];
-    int slot = -1;
-    for (int i = 0; i < 4; i++) {
-        if (checked_relation[i] == ix2) slot = i;
-    }
-    if (slot < 0) {
-        // remember the result of the check for the last relations (they are kept alive by the caller)
-        static int next_slot = 0;
-        slot = next_slot;
-        next_slot = (next_slot + 1) % 4;
-        checked_relation[slot] = ix2;
-        checked_fits[slot] = max_index_rec(ix2) < (1 << 24);
-        unvisit_rec(ix2);
-    }
-    if (checked_fits[slot]) {
-        res = apply_image_rename_and(ix1, ix2, ix3, variable_set);
-    } else {
-        nodeindex_t image = apply_image_rename(ix1, ix2, variable_set);
-        IN_OP_GC_keepalive(image);
-        res = apply_binary(image, ix3, AND_OP);
-#if IN_OP_GC
-        gc_stack_pop(1);
-#endif
-    }
+    nodeindex_t res = apply_image_rename_and(ix1, ix2, ix3, variable_set);
     undo_keepalive(get_node(ix1)); undo_keepalive(get_node(ix2)); undo_keepalive(get_node(ix3));
     return res;
 }

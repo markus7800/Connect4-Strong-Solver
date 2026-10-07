@@ -78,6 +78,7 @@ Options:
 - `GC_GROWTH`: between the steps of the computation, garbage collection runs if more than `GC_GROWTH` times the nodes that survived the previous collection are allocated (default: `2.0`)
 - `FORCE_GC`: whether to run garbage collection after every step, for measuring how many nodes are really needed (default: `0`)
 - `GC_KEEPS_CACHE`: whether cache entries of surviving nodes are kept by garbage collection: `0` never, `1` if it runs during an operation, `2` always (default: `1`)
+- `COMPACT_NODES`: `1` selects a node layout with 12 instead of 20 bytes per node, for runs that are limited by RAM; it is slower, especially if the table is much larger than needed (default: `0`, see [docs](docs/18-compact-node-layout.md))
 - `CACHE_SHIFT`: the operation cache has `2^(log2_tablesize - CACHE_SHIFT)` entries (default: `2`)
 - `BUCKET_SHIFT`: the unique table has `2^(log2_tablesize - BUCKET_SHIFT)` buckets (default: `0`)
 - `IN_OP_GC_GROWTH`: if greater than `0`, garbage collection during BDD operations also runs when more than this many times the nodes that survived the previous collection are allocated (default: `0`)
@@ -130,7 +131,7 @@ Options:
 - `ALLOW_ROW_ORDER`
 - `ENTER_TO_CONTINUE`
 - `WRITE_TO_FILE`
-- `IN_OP_GC`, `IN_OP_GC_THRES`, `IN_OP_GC_GROWTH`, `GC_GROWTH`, `FORCE_GC`, `GC_KEEPS_CACHE`, `CACHE_SHIFT`, `BUCKET_SHIFT`, `PARTITIONED_IMAGE`, `DEBUG`
+- `IN_OP_GC`, `IN_OP_GC_THRES`, `IN_OP_GC_GROWTH`, `GC_GROWTH`, `FORCE_GC`, `GC_KEEPS_CACHE`, `COMPACT_NODES`, `CACHE_SHIFT`, `BUCKET_SHIFT`, `PARTITIONED_IMAGE`, `DEBUG`
 - `SAVE_BDD_TO_DISK`: whether to save the strong solution as BDD to disk (default: `1`)
 - `KEEP_REACH`: whether to keep the BDDs of the reachable positions per ply, which are stored in the `reach_w{WIDTH}_h{HEIGHT}` folder during the computation (default: `0`)
 

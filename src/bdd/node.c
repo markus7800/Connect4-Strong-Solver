@@ -9,7 +9,11 @@ inline void disable(bddnode_t* node) {
 }
 
 inline bool isdisabled(bddnode_t* node) {
+#if COMPACT_NODES
+    return node->low == node->high;
+#else
     return (node->low == (nodeindex_t) -1) && (node->high == (nodeindex_t) -1);
+#endif
 }
 
 inline bool isconstant(bddnode_t* node) {

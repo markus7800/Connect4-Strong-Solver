@@ -112,24 +112,67 @@ def build(kind, comp, row, extra_make, src=SRC):
 
 
 def run_unit_tests():
-    """Builds and runs tests/bdd_test.c (with asserts enabled)."""
+    """Builds and runs tests/bdd_test.c (with asserts enabled) for both node layouts."""
     wd = WORK / "unit"
     wd.mkdir(parents=True, exist_ok=True)
     bddfiles = sorted(str(p) for p in (ROOT / "src" / "bdd").glob("*.c") if p.name != "uint_test.c")
-    exe = wd / "bdd_test.out"
-    cmd = ["clang", str(ROOT / "tests" / "bdd_test.c")] + bddfiles + ["-O2", "-Wall", "-DIN_OP_GC=1", "-o", str(exe)]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode != 0:
-        print(res.stdout)
-        print(res.stderr)
-        sys.exit("unit test build failed")
-    res = subprocess.run([str(exe)], cwd=wd, capture_output=True, text=True)
-    lines = [l for l in res.stdout.splitlines() if l.startswith(("ok", "FAILED", "all unit"))]
-    print("\n".join(lines))
-    if res.returncode != 0:
-        print(res.stdout[-2000:])
-        print(res.stderr[-2000:])
-        sys.exit("unit tests failed")
+    for compact in (0, 1):
+        exe = wd / f"bdd_test_{compact}.out"
+        cmd = ["clang", str(ROOT / "tests" / "bdd_test.c")] + bddfiles + ["-O2", "-Wall", "-DIN_OP_GC=1", f"-DCOMPACT_NODES={compact}", "-o", str(exe)]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            print(res.stdout)
+            print(res.stderr)
+            sys.exit("unit test build failed")
+        res = subprocess.run([str(exe)], cwd=wd, capture_output=True, text=True)
+        lines = [l for l in res.stdout.splitlines() if l.startswith(("ok", "FAILED", "all unit"))]
+        print(f"unit tests, COMPACT_NODES={compact}:")
+        print("\n".join("  " + l for l in lines))
+        if res.returncode != 0:
+            print(res.stdout[-2000:])
+            print(res.stderr[-2000:])
+            sys.exit("unit tests failed")
+
+
+def canonical_sha(path):
+    """sha256 of a BDD file after renumbering its nodes in post-order (low before high, node after its children).
+    This is the order in which the default node layout writes the file; the compact layout writes the nodes in
+    another order. Two files of the same BDD have the same canonical hash."""
+    with open(path, "rb") as f:
+        raw = f.read()
+    n = len(raw) // 9
+    var = raw[0::9]
+    low = [int.from_bytes(raw[9 * i + 1:9 * i + 5], "little") for i in range(n)]
+    high = [int.from_bytes(raw[9 * i + 5:9 * i + 9], "little") for i in range(n)]
+    new = [-1] * n
+    out = bytearray()
+    count = 0
+    def emit(i, l, h):
+        nonlocal count
+        new[i] = count
+        count += 1
+        out.append(var[i])
+        out.extend(l.to_bytes(4, "little"))
+        out.extend(h.to_bytes(4, "little"))
+    # constants first, as in the file
+    emit(0, 0, 0)
+    if n > 1:
+        emit(1, 1, 1)
+    stack = [n - 1]
+    while stack:
+        i = stack[-1]
+        if new[i] >= 0:
+            stack.pop()
+            continue
+        l, h = low[i], high[i]
+        if new[l] < 0:
+            stack.append(l)
+        elif new[h] < 0:
+            stack.append(h)
+        else:
+            emit(i, new[l], new[h])
+            stack.pop()
+    return hashlib.sha256(bytes(out)).hexdigest()
 
 
 def time_cmd():
@@ -261,8 +304,15 @@ def run_case(case, binary, args):
                 if args.update_golden:
                     golden_sha.write_text("\n".join(lines) + "\n")
                 elif golden_sha.read_text().splitlines() != lines:
-                    metrics["ok"] = False
-                    metrics["notes"].append(".bin files differ from golden")
+                    # the files may store the same BDDs with the nodes in a different order (COMPACT_NODES=1)
+                    golden_by_name = {l.split("  ")[1]: l.split("  ")[0] for l in golden_sha.read_text().splitlines()}
+                    files = sorted(folder.glob("*.bin"))
+                    same = len(files) == len(golden_by_name) and all(canonical_sha(p) == golden_by_name.get(p.name) for p in files)
+                    if same:
+                        metrics["notes"].append("node order in .bin files differs, BDDs identical")
+                    else:
+                        metrics["ok"] = False
+                        metrics["notes"].append(".bin files differ from golden")
             if not args.keep:
                 shutil.rmtree(folder)
     else:

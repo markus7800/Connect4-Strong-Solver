@@ -39,6 +39,7 @@ void rebuild_uniquetable();
 // Consumes a node from the memorypool and writes var, low, and high to it
 // Stores the node at the front of bucket target_bucket_ix (= hash(node) & mask)
 // Does not check whether such a node already exists
+// (not available with COMPACT_NODES)
 nodeindex_t add(variable_t var, nodeindex_t low, nodeindex_t high, uint32_t target_bucket_ix);
 
 // This is the BDD make function.
