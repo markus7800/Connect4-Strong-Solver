@@ -1,18 +1,19 @@
 
 
+#include <inttypes.h>
 #include "node.h"
 #include "memorypool.h"
 
 inline void disable(bddnode_t* node) {
-    node->low = (nodeindex_t) -1; // (underflow)
-    node->high = (nodeindex_t) -1;
+    node->low = NODEINDEX_NONE;
+    node->high = NODEINDEX_NONE;
 }
 
 inline bool isdisabled(bddnode_t* node) {
 #if COMPACT_NODES
     return node->low == node->high;
 #else
-    return (node->low == (nodeindex_t) -1) && (node->high == (nodeindex_t) -1);
+    return (node->low == NODEINDEX_NONE) && (node->high == NODEINDEX_NONE);
 #endif
 }
 
@@ -39,8 +40,8 @@ inline variable_t level(bddnode_t* node) {
 
 void print_bddnode(bddnode_t* node) {
     if (isconstant(node)) {
-        printf("BDDNode(%d, #extref=%d)", constant(node), node->extref);
+        printf("BDDNode(%"PRIu64", #extref=%"PRIu64")", (uint64_t) constant(node), (uint64_t) node->extref);
     } else {
-        printf("BDDNode(var=%d, low=%d, high=%d, #extref=%d)", node->var, node->low, node->high, node->extref);
+        printf("BDDNode(var=%d, low=%"PRIu64", high=%"PRIu64", #extref=%"PRIu64")", (int) node->var, (uint64_t) node->low, (uint64_t) node->high, (uint64_t) node->extref);
     }
 }

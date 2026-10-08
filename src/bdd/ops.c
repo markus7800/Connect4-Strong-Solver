@@ -424,7 +424,7 @@ static uint32_t relation_count = 0;
 
 static inline uint32_t relation_id(nodeindex_t ix) {
     if (ix <= ONEINDEX) {
-        return ix;
+        return (uint32_t) ix;
     }
     uint32_t slot = hash_2(0, ix) & relation_mask;
     while (relation_keys[slot] != ix) {

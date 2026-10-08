@@ -56,9 +56,9 @@ static uint64_t floor_log2(uint64_t x) {
 // i.e. there are between one and two nodes per bucket when the pool is full.
 tablesizes_t tablesizes_for_capacity(uint64_t capacity) {
     tablesizes_t sizes;
-    if (capacity > (((uint64_t) 1) << 32) - 1) {
-        // node indices have 32 bits and MAX(uint32_t) is a special value
-        capacity = (((uint64_t) 1) << 32) - 1;
+    if (capacity > NODEINDEX_NONE) {
+        // the largest node index is a special value
+        capacity = NODEINDEX_NONE;
     }
     if (capacity < 1024) {
         capacity = 1024;
@@ -72,6 +72,10 @@ tablesizes_t tablesizes_for_capacity(uint64_t capacity) {
     sizes.log2size = floor_log2(capacity + NODES_PER_BLOCK_OR_ONE);
     sizes.log2_buckets = sizes.log2size > UNIQUETABLE_LOG2_REDUCTION + 4 ? sizes.log2size - UNIQUETABLE_LOG2_REDUCTION : 4;
     sizes.log2_cache = sizes.log2size > OPCACHE_LOG2_REDUCTION + 4 ? sizes.log2size - OPCACHE_LOG2_REDUCTION : 4;
+    if (sizes.log2_cache > 32) {
+        // the cache is indexed with 32 bits
+        sizes.log2_cache = 32;
+    }
     sizes.bytes = capacity * sizeof(bddnode_t)
         + BUCKET_BYTES(sizes.log2_buckets)
         + (((uint64_t) 1) << sizes.log2_cache) * sizeof(opcache_entry_t);
@@ -79,14 +83,14 @@ tablesizes_t tablesizes_for_capacity(uint64_t capacity) {
 }
 
 tablesizes_t tablesizes_for_log2(uint64_t log2size) {
-    BDD_CHECK(log2size <= 32, "log2size has to be at most 32 :(");
+    BDD_CHECK(log2size <= INDEX_BITS, "log2size has to be at most the number of bits of a node index :(");
     return tablesizes_for_capacity(((uint64_t) 1) << log2size);
 }
 
 // The largest sizes that fit into the given number of bytes.
 tablesizes_t tablesizes_for_bytes(uint64_t bytes) {
     tablesizes_t best = tablesizes_for_capacity(0);
-    for (uint64_t l = 10; l <= 32; l++) {
+    for (uint64_t l = 10; l <= INDEX_BITS; l++) {
         // capacity in [2^l, 2^(l+1)) has 2^l buckets and 2^(l-OPCACHE_LOG2_REDUCTION) cache entries
         uint64_t p = ((uint64_t) 1) << l;
         tablesizes_t lower = tablesizes_for_capacity(p);
@@ -100,7 +104,7 @@ tablesizes_t tablesizes_for_bytes(uint64_t bytes) {
         best = tablesizes_for_capacity(capacity);
     }
     // if the node capacity is at its maximum, the remaining budget goes into a larger op cache
-    if (best.capacity == (((uint64_t) 1) << 32) - 1) {
+    if (best.capacity + NODES_PER_BLOCK_OR_ONE > NODEINDEX_NONE) {
         while (best.log2_cache < 32 && best.bytes + (((uint64_t) 1) << best.log2_cache) * sizeof(opcache_entry_t) <= bytes) {
             best.bytes += (((uint64_t) 1) << best.log2_cache) * sizeof(opcache_entry_t);
             best.log2_cache++;
@@ -121,8 +125,8 @@ tablesizes_t parse_tablesize(const char* arg) {
     if (*end == 'M' || *end == 'm') {
         return tablesizes_for_bytes((uint64_t) (value * 1024 * 1024));
     }
-    if (*end != 0 || value < 10 || value > 32) {
-        printf("Invalid table size %s: use log2 of the number of nodes (10 to 32) or a RAM budget like 12G.\n", arg);
+    if (*end != 0 || value < 10 || value > INDEX_BITS) {
+        printf("Invalid table size %s: use log2 of the number of nodes (10 to %d) or a RAM budget like 12G.\n", arg, INDEX_BITS);
         exit(EXIT_FAILURE);
     }
     return tablesizes_for_log2((uint64_t) value);
@@ -131,7 +135,7 @@ tablesizes_t parse_tablesize(const char* arg) {
 uint64_t print_RAM_info_sizes(tablesizes_t sizes) {
     printf("log2_size=%"PRIu64" - number of allocatable nodes: %"PRIu64" (%g)\n", sizes.log2size, sizes.capacity, (double) sizes.capacity);
 #if COMPACT_NODES
-    printf("compact node layout (the node array is the unique table), op cache entries: 2^%"PRIu64"\n", sizes.log2_cache);
+    printf("compact node layout (the node array is the unique table), %d-bit node indices, op cache entries: 2^%"PRIu64"\n", INDEX_BITS, sizes.log2_cache);
 #else
     printf("unique table buckets: 2^%"PRIu64", op cache entries: 2^%"PRIu64"\n", sizes.log2_buckets, sizes.log2_cache);
 #endif

@@ -19,6 +19,12 @@
 uint64_t _safe_to_file_with_varmap(nodeindex_t root, char* filename, variable_t varmap[MAX_VARIABLES + 1]);
 uint64_t _safe_to_file(nodeindex_t root, char* filename);
 
+// With INDEX_BITS=40, a BDD with 2^32 or more nodes is written with 5 instead of 4 bytes per index (11 bytes per node)
+// to a file with the additional suffix ".wide". The probing programs cannot read these files.
+
+// removes the file of a BDD (whichever of the two formats it has)
+void _remove_bdd_file(char* filename);
+
 // Reads a BDD from a file and returns its root.
 // varmap maps the variable stored in the file to the variable of the node that is created.
 // The returned node is not kept alive.

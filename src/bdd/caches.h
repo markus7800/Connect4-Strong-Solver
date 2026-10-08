@@ -29,12 +29,25 @@
 
 #define OP_COUNT_FLAG 0x80
 
+#if INDEX_BITS > 32
+// 20 bytes
+typedef struct __attribute__((packed)) OpCacheEntry {
+    uint64_t a : INDEX_BITS;
+    uint64_t b : INDEX_BITS;
+    uint64_t result : INDEX_BITS;
+    uint32_t tag;
+    uint8_t unused;
+} opcache_entry_t;
+_Static_assert(sizeof(opcache_entry_t) == 20, "unexpected cache entry size");
+#else
+// 16 bytes
 typedef struct OpCacheEntry {
     nodeindex_t a;
     nodeindex_t b;
     nodeindex_t result;
     uint32_t tag;
 } opcache_entry_t;
+#endif
 
 typedef struct OpCache {
     opcache_entry_t* data;
@@ -64,11 +77,11 @@ static inline void opcache_store(uint32_t cache_ix, uint32_t tag, nodeindex_t a,
     e->tag = tag;
 }
 
-// counting operations: key = (tag, a), value = 64-bit number
+// counting operations: key = (tag, a), value = 64-bit number, stored in the fields b (lower bits) and result
 static inline bool opcache_lookup_count(uint32_t cache_ix, uint32_t tag, nodeindex_t a, uint64_t* value) {
     opcache_entry_t* e = &opcache.data[cache_ix];
     if (e->a == a && e->tag == tag) {
-        *value = ((uint64_t) e->result << 32) | e->b;
+        *value = ((uint64_t) e->result << INDEX_BITS) | e->b;
         return true;
     }
     return false;
@@ -77,8 +90,8 @@ static inline bool opcache_lookup_count(uint32_t cache_ix, uint32_t tag, nodeind
 static inline void opcache_store_count(uint32_t cache_ix, uint32_t tag, nodeindex_t a, uint64_t value) {
     opcache_entry_t* e = &opcache.data[cache_ix];
     e->a = a;
-    e->b = (uint32_t) value;
-    e->result = (uint32_t) (value >> 32);
+    e->b = (nodeindex_t) (value & NODEINDEX_NONE);
+    e->result = (nodeindex_t) (value >> INDEX_BITS);
     e->tag = tag;
 }
 

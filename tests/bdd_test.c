@@ -326,8 +326,8 @@ static void test_save_and_read() {
         undo_keepalive_ix(g);
         gc(true, true);
     }
-    unlink(file1);
-    unlink(file2);
+    _remove_bdd_file(file1);
+    _remove_bdd_file(file2);
     printf("ok save and read\n");
 }
 

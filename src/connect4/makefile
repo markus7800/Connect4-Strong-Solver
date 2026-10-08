@@ -98,6 +98,8 @@ WIDTH_HEIGHT = \
 # node layout: 0 = 16 byte nodes and a separate bucket array (default), 1 = 12 byte nodes that are their own hash table
 # (less memory per node, but at most 0.9 * 2^32 nodes and the node array is fully in use from the start)
 COMPACT_NODES = 0
+# number of bits of a node index: 32 or 40 (40 needs COMPACT_NODES=1; for tables with more than 2^32 nodes)
+INDEX_BITS = 32
 # the op cache has 2^(log2_tablesize - CACHE_SHIFT) entries of 16 bytes
 CACHE_SHIFT = 2
 # the unique table has 2^(log2_tablesize - BUCKET_SHIFT) buckets of 4 bytes
@@ -109,6 +111,7 @@ GC_KEEPS_CACHE = 1
 
 GCFLAGS = \
 -DCOMPACT_NODES=$(COMPACT_NODES) \
+-DINDEX_BITS=$(INDEX_BITS) \
 -DOPCACHE_LOG2_REDUCTION=$(CACHE_SHIFT) \
 -DUNIQUETABLE_LOG2_REDUCTION=$(BUCKET_SHIFT) \
 -DIN_OP_GC_GROWTH=$(IN_OP_GC_GROWTH) \

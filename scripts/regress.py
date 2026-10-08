@@ -116,9 +116,16 @@ def run_unit_tests():
     wd = WORK / "unit"
     wd.mkdir(parents=True, exist_ok=True)
     bddfiles = sorted(str(p) for p in (ROOT / "src" / "bdd").glob("*.c") if p.name != "uint_test.c")
-    for compact in (0, 1):
-        exe = wd / f"bdd_test_{compact}.out"
-        cmd = ["clang", str(ROOT / "tests" / "bdd_test.c")] + bddfiles + ["-O2", "-Wall", "-DIN_OP_GC=1", f"-DCOMPACT_NODES={compact}", "-o", str(exe)]
+    # (COMPACT_NODES, INDEX_BITS, extra flags)
+    configs = [
+        (0, 32, []),
+        (1, 32, []),
+        # with 40-bit indices, also use the file format for BDDs with 2^32 or more nodes for all larger test BDDs
+        (1, 40, ["-DWIDE_FILE_MIN_NODES=1000"]),
+    ]
+    for compact, bits, extra in configs:
+        exe = wd / f"bdd_test_{compact}_{bits}.out"
+        cmd = ["clang", str(ROOT / "tests" / "bdd_test.c")] + bddfiles + ["-O2", "-Wall", "-DIN_OP_GC=1", f"-DCOMPACT_NODES={compact}", f"-DINDEX_BITS={bits}"] + extra + ["-o", str(exe)]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
             print(res.stdout)
@@ -126,12 +133,32 @@ def run_unit_tests():
             sys.exit("unit test build failed")
         res = subprocess.run([str(exe)], cwd=wd, capture_output=True, text=True)
         lines = [l for l in res.stdout.splitlines() if l.startswith(("ok", "FAILED", "all unit"))]
-        print(f"unit tests, COMPACT_NODES={compact}:")
+        print(f"unit tests, COMPACT_NODES={compact} INDEX_BITS={bits}:")
         print("\n".join("  " + l for l in lines))
         if res.returncode != 0:
             print(res.stdout[-2000:])
             print(res.stderr[-2000:])
             sys.exit("unit tests failed")
+
+
+def run_wide_index_test():
+    """Builds and runs tests/wide_index_test.c: 40-bit node indices in a table with 2^33 slots."""
+    wd = WORK / "unit"
+    wd.mkdir(parents=True, exist_ok=True)
+    bddfiles = sorted(str(p) for p in (ROOT / "src" / "bdd").glob("*.c") if p.name != "uint_test.c")
+    exe = wd / "wide_index_test.out"
+    cmd = ["clang", str(ROOT / "tests" / "wide_index_test.c")] + bddfiles + ["-O2", "-Wall", "-DIN_OP_GC=0", "-DCOMPACT_NODES=1", "-DINDEX_BITS=40", "-o", str(exe)]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        print(res.stdout)
+        print(res.stderr)
+        sys.exit("wide index test build failed")
+    res = subprocess.run([str(exe)], cwd=wd, capture_output=True, text=True)
+    print("\n".join(l for l in res.stdout.splitlines() if l.startswith(("ok", "FAILED", "all wide", "nodes seen"))))
+    if res.returncode != 0:
+        print(res.stdout[-2000:])
+        print(res.stderr[-2000:])
+        sys.exit("wide index test failed")
 
 
 def canonical_sha(path):
@@ -354,6 +381,7 @@ def main():
     ap.add_argument("--json", default=None, help="write metrics to this file")
     ap.add_argument("--check", nargs=2, metavar=("RESULTS_CSV", "GOLDEN_CSV"), default=None,
                     help="only compare the state counts of a results_solve_*.csv (also of a run that is still in progress) with a golden file")
+    ap.add_argument("--wide", action="store_true", help="only run the test of node indices above 2^32 (tests/wide_index_test.c, needs a few GB of RAM)")
     ap.add_argument("--unit", action="store_true", help="only run the library unit tests (tests/bdd_test.c)")
     ap.add_argument("--tag", default="", help="suffix for the scratch directories (to run several suites concurrently)")
     ap.add_argument("--src", default=None, help="build from this src/connect4 directory (e.g. a git worktree of another commit)")
@@ -368,6 +396,10 @@ def main():
         bad = [r[0] for r in rows if golden.get(r[0]) != r]
         print(f"{len(rows)} of {len(golden)} plies present, {len(rows) - len(bad)} identical to golden" + (f", DIFFERENT at plies {bad}" if bad else ""))
         sys.exit(1 if bad else 0)
+
+    if args.wide:
+        run_wide_index_test()
+        return
 
     if not args.src:
         run_unit_tests()

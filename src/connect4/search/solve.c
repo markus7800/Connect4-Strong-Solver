@@ -238,7 +238,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         cnt = count_per_ply[ply];
         BDD_CHECK(nodecount(reachable) == bddnodecount_per_ply[ply], "BDD read from disk differs from the one that was written :(");
 #if !KEEP_REACH
-        remove(filename);
+        _remove_bdd_file(filename);
 #endif
 
         // Terminal positions: the player who made the last move has four in a row.

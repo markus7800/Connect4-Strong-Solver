@@ -121,13 +121,20 @@ static inline uint64_t compact_num_blocks() {
     return memorypool.capacity / NODES_PER_BLOCK;
 }
 
-// maps a hash to a block (not the first one)
-static inline uint64_t compact_block(uint32_t hash, uint64_t num_blocks) {
-    return 1 + (((uint64_t) hash * (num_blocks - 1)) >> 32);
-}
-
-static inline uint32_t compact_hash2(variable_t var, nodeindex_t low, nodeindex_t high) {
-    return hash_3((uint32_t) var + (1 << VAR_BITS), high, low);
+// the two home blocks of a node (never the first block)
+static inline void compact_homes(variable_t var, nodeindex_t low, nodeindex_t high, uint64_t num_blocks, uint64_t home[2]) {
+#if INDEX_BITS > 32
+    // there can be more than 2^32 blocks
+    uint64_t h0 = hash64_3(var, low, high);
+    uint64_t h1 = hash64_3((uint64_t) var + (1 << VAR_BITS), high, low);
+    home[0] = 1 + (uint64_t) (((__uint128_t) h0 * (num_blocks - 1)) >> 64);
+    home[1] = 1 + (uint64_t) (((__uint128_t) h1 * (num_blocks - 1)) >> 64);
+#else
+    uint32_t h0 = hash_varlowhigh(var, low, high);
+    uint32_t h1 = hash_3((uint32_t) var + (1 << VAR_BITS), high, low);
+    home[0] = 1 + (((uint64_t) h0 * (num_blocks - 1)) >> 32);
+    home[1] = 1 + (((uint64_t) h1 * (num_blocks - 1)) >> 32);
+#endif
 }
 
 nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
@@ -141,8 +148,7 @@ nodeindex_t make(variable_t var, nodeindex_t low, nodeindex_t high) {
     bddnode_t* nodes = memorypool.nodes;
     uint64_t num_blocks = compact_num_blocks();
     uint64_t home[2];
-    home[0] = compact_block(hash_varlowhigh(var, low, high), num_blocks);
-    home[1] = compact_block(compact_hash2(var, low, high), num_blocks);
+    compact_homes(var, low, high, num_blocks, home);
 
     // search the two home blocks, remember the first free slot and the number of free slots of each
     nodeindex_t free_slot[2] = {0, 0};
@@ -423,12 +429,13 @@ static void gc_run(bool force, bool in_op) {
                 continue;
             }
             uint64_t own = i / NODES_PER_BLOCK;
-            uint64_t home0 = compact_block(hash_bddnode(node), num_blocks);
-            if (own == home0 || own == compact_block(compact_hash2(node->var, node->low, node->high), num_blocks)) {
+            uint64_t home[2];
+            compact_homes(node->var, node->low, node->high, num_blocks, home);
+            if (own == home[0] || own == home[1]) {
                 continue;
             }
             compact_has_overflow = true;
-            for (uint64_t block = home0; block != own; block = block + 1 == num_blocks ? 1 : block + 1) {
+            for (uint64_t block = home[0]; block != own; block = block + 1 == num_blocks ? 1 : block + 1) {
                 nodes[block * NODES_PER_BLOCK].overflow = 1;
             }
         }
@@ -555,7 +562,7 @@ void verify_uniquetable() {
 
 void print_nodes(bool statsonly) {
     double perc = (double) memorypool.num_nodes / memorypool.capacity * 100;
-    printf("Memorypool(num_nodes=%"PRIu64" (%.2f%%), capacity=%"PRIu64", num_variables=%d)\n", memorypool.num_nodes, perc, memorypool.capacity, memorypool.num_variables);
+    printf("Memorypool(num_nodes=%"PRIu64" (%.2f%%), capacity=%"PRIu64", num_variables=%d)\n", memorypool.num_nodes, perc, memorypool.capacity, (int) memorypool.num_variables);
     printf("Uniquetable(count=%"PRIu64", size=%"PRIu64")\n", uniquetable.count, uniquetable.size);
     if (statsonly) return;
 
@@ -575,7 +582,7 @@ void print_nodes(bool statsonly) {
 #if COMPACT_NODES
         printf("\n");
 #else
-        printf(" ... next=%d\n", node->next);
+        printf(" ... next=%"PRIu64"\n", (uint64_t) node->next);
 #endif
         printed++;
     }
@@ -587,9 +594,9 @@ void print_dot() {
     for (uint64_t i = 2; i < memorypool.hwm; i++) {
         node = get_node((nodeindex_t) i);
         if (!isdisabled(node)) {
-            printf("%"PRIu64" [label=\"x%d (%"PRIu64")\"]\n", i, node->var, i);
-            printf("%"PRIu64" -> %d [style=dashed]\n", i, node->low);
-            printf("%"PRIu64" -> %d\n", i, node->high);
+            printf("%"PRIu64" [label=\"x%d (%"PRIu64")\"]\n", i, (int) node->var, i);
+            printf("%"PRIu64" -> %"PRIu64" [style=dashed]\n", i, (uint64_t) node->low);
+            printf("%"PRIu64" -> %"PRIu64"\n", i, (uint64_t) node->high);
         }
     }
     printf("0 [label=\"0\"]\n");
