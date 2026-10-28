@@ -123,6 +123,19 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     gc(true, true);
     uint64_t num_nodes_pre_comp = uniquetable.count;
 
+    // For the evaluation of the initial moves: the positions of ply 1 with the stone of the first player in column col.
+    // At ply 1 there is only one such position per column.
+    bool has_first_moves = width * height > 0;
+    nodeindex_t* first_move = (nodeindex_t*) malloc(width * sizeof(nodeindex_t));
+    int8_t* first_move_wdl = (int8_t*) malloc(width * sizeof(int8_t));
+    BDD_CHECK(first_move != NULL && first_move_wdl != NULL, "Could not allocate :(");
+    if (has_first_moves) {
+        for (uint8_t col = 0; col < width; col++) {
+            first_move[col] = cell_of_player(X, height, col, 0, 0, 0);
+            keepalive_ix(first_move[col]);
+        }
+    }
+
     uint64_t total = 0;
     uint64_t bdd_nodecount;
 
@@ -224,7 +237,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 #if WRITE_TO_FILE
     sprintf(filename, "results_solve_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
     FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,ply,win_count,draw_count,loss_count,term_count,total_count,win_nodecount,draw_nodecount,loss_nodecount,total_nodecount,time\n");
+    fprintf(f, "width,height,ply,win_count,draw_count,loss_count,term_count,total_count,win_nodecount,draw_nodecount,loss_nodecount,total_nodecount,time,first_move_wdl\n");
 #endif
 
     for (int ply = width*height; ply >= 0; ply--) {
@@ -342,6 +355,21 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             draw_node_cnt, draw_min_reach, draw_min_notwon, lost_node_cnt, lost_min_reach, lost_min_notwon);
 #endif
 
+        if (ply == 1) {
+            // ply 1 is lost / drawn / won for the second player to move,
+            // i.e. the initial move into col wins / draws / loses for the first player
+            for (uint8_t col = 0; col < width; col++) {
+                if (and(lost, first_move[col]) != ZEROINDEX) {
+                    first_move_wdl[col] = 1;
+                } else if (and(draw, first_move[col]) != ZEROINDEX) {
+                    first_move_wdl[col] = 0;
+                } else {
+                    first_move_wdl[col] = -1;
+                }
+                undo_keepalive_ix(first_move[col]);
+            }
+        }
+
         // the results of this ply are the input for the next one (both are kept alive)
         next_draw = draw;
         next_lost = lost;
@@ -358,11 +386,21 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 
         if (f != NULL) {
-            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %"PRIu64", %.3f\n",
+            fprintf(f, "%"PRIu32",%"PRIu32",%d,%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%.3f,",
                 width, height, ply,
                 win_cnt, draw_cnt, lost_cnt, term_cnt, win_cnt + draw_cnt + lost_cnt,
                 win_node_cnt, draw_node_cnt, lost_node_cnt, bddnodecount_per_ply[ply],
                 t);
+            // the evaluation of the initial moves belongs to the start position (ply 0), e.g. "-1 0 0 0 -1"
+            // (no space before the quote, so that the field is parsed as a quoted string)
+            if (ply == 0 && has_first_moves) {
+                fprintf(f, "\"");
+                for (uint8_t col = 0; col < width; col++) {
+                    fprintf(f, col == 0 ? "%d" : " %d", first_move_wdl[col]);
+                }
+                fprintf(f, "\"");
+            }
+            fprintf(f, "\n");
             fflush(f);
         }
 #endif
@@ -372,6 +410,24 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
     undo_keepalive_ix(win_all); undo_keepalive_ix(draw_all); undo_keepalive_ix(lost_all); undo_keepalive_ix(reach_all);
 #endif
     undo_keepalive_ix(next_draw); undo_keepalive_ix(next_lost);
+
+    if (has_first_moves) {
+        printf("\nEvaluation of the initial moves:\n");
+        for (uint8_t col = 0; col < width; col++) {
+            printf("%3d ", col);
+        }
+        printf("\n");
+        for (uint8_t col = 0; col < width; col++) {
+            printf("%3d ", first_move_wdl[col]);
+        }
+        printf("\n\n");
+        printf(" 1 ... move leads to forced win,\n");
+        printf(" 0 ... move leads to forced draw,\n");
+        printf("-1 ... move leads to forced loss\n\n");
+    }
+    free(first_move);
+    free(first_move_wdl);
+
     printf("DEINIT GC: ");
     gc(true, true);
     uint64_t num_nodes_post_comp = uniquetable.count;
