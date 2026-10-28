@@ -138,6 +138,9 @@ Options:
 
 Run with `./build/solve.out log2_tablesize width height`.
 
+At the end, the solver prints the evaluation of every initial move for the first player (1 win, 0 draw, -1 loss).
+With `WRITE_TO_FILE=1` it is also stored in the `first_move_wdl` column of the `.csv` file (row of ply 0), e.g. `"-1 0 0 0 -1"`.
+
 If `SAVE_BDD_TO_DISK=1`, then for each ply three files will be generated. One BDD that is sat for won positions, one for drawn, and one for lost positions.
 These files will be stored in the `solution_w{WIDTH}_h{HEIGHT}` folder.
 For information on other options, see previous section.
