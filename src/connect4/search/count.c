@@ -52,6 +52,14 @@
 #define CHECKPOINT 0
 #endif
 
+// CHECKPOINT_LOW_DISK=1: the checkpoint is removed right after it was read and before the next one is written,
+// so there is never more than one checkpoint on disk (otherwise two while the next one is written).
+// A crash while a checkpoint is written, or before the first checkpoint after a resume is complete,
+// loses the checkpoint and the computation starts again from ply 0.
+#ifndef CHECKPOINT_LOW_DISK
+#define CHECKPOINT_LOW_DISK 0
+#endif
+
 #if CHECKPOINT
 // everything that is needed to continue after a ply (besides the BDDs)
 typedef struct CountState {
@@ -77,10 +85,25 @@ static void checkpoint_filename(char* filename, const char* folder, const char* 
     sprintf(filename, "%s/%s_%d.bin", folder, name, ply);
 }
 
+// the state first, so that it never refers to BDD files that are gone
+static void remove_checkpoint_files(const char* folder, int ply) {
+    char filename[100];
+    sprintf(filename, "%s/state.txt", folder);
+    remove(filename);
+    checkpoint_filename(filename, folder, "ply", ply);
+    _remove_bdd_file(filename);
+    checkpoint_filename(filename, folder, "full", ply);
+    _remove_bdd_file(filename);
+}
+
 // Stores the BDDs of the ply, then the state (written to a temporary file and renamed, so that a crash leaves
 // either the old or the new checkpoint), and only then removes the BDDs of the previous checkpoint.
+// With CHECKPOINT_LOW_DISK the previous checkpoint is removed first.
 static void save_checkpoint(const char* folder, countstate_t* state, nodeindex_t current, nodeindex_t full_bdd, variable_t* board_varmap) {
     char filename[100], tmpname[100];
+    if (CHECKPOINT_LOW_DISK) {
+        remove_checkpoint_files(folder, state->ply - 1);
+    }
     checkpoint_filename(filename, folder, "ply", state->ply);
     state->nodecount = _safe_to_file_with_varmap(current, filename, board_varmap);
     state->full_nodecount = 0;
@@ -122,13 +145,7 @@ static bool read_checkpoint_state(const char* folder, countstate_t* state) {
 }
 
 static void remove_checkpoint(const char* folder, int ply) {
-    char filename[100];
-    checkpoint_filename(filename, folder, "ply", ply);
-    _remove_bdd_file(filename);
-    checkpoint_filename(filename, folder, "full", ply);
-    _remove_bdd_file(filename);
-    sprintf(filename, "%s/state.txt", folder);
-    remove(filename);
+    remove_checkpoint_files(folder, ply);
     rmdir(folder);
 }
 
@@ -291,6 +308,10 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         keepalive_ix(full_bdd);
 #endif
         printf("  PlyBDD(%"PRIu64") with satcount = %"PRIu64"\n", state.nodecount, cnt);
+        if (CHECKPOINT_LOW_DISK) {
+            remove_checkpoint_files(checkpoint_folder, state.ply);
+            printf("  Removed the checkpoint (CHECKPOINT_LOW_DISK=1).\n");
+        }
         total = state.total;
         total_t = state.total_t;
         first_ply = state.ply + 1;

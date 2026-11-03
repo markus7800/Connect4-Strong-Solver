@@ -28,6 +28,10 @@ checkpoint_w9_h8/
   `results_ply_*.csv` (crash between the row and the checkpoint) are removed and
   computed again; the rest of the file is kept.
 * When the last ply is done the checkpoint is removed, so the next run starts from ply 0.
+* `CHECKPOINT_LOW_DISK=1` halves the disk space: the checkpoint is removed right after
+  it was read (state first, then the BDDs) and before the next one is written, so there
+  is never more than one on disk. The price: a crash while a checkpoint is written, or
+  in the first ply after a resume, loses it and the next run starts from ply 0.
 
 `CHECKPOINT=0` (the default) compiles to the previous code.
 
@@ -49,7 +53,7 @@ For a ply BDD of 8 083 017 773 nodes (more than 2^32, so only possible with
 | | size |
 |---|---:|
 | file (`.wide`, 11 bytes per node) | 88.9 GB (82.8 GiB) |
-| disk while switching to the next ply (old + new file) | up to ~180 GB, plus the full BDD with `FULLBDD=1` |
+| disk while switching to the next ply (old + new file) | up to ~180 GB, plus the full BDD with `FULLBDD=1`; 88.9 GB with `CHECKPOINT_LOW_DISK=1` |
 | temporary RAM for writing (rank bitmap, 1.5 bits per table slot, 2^34 slots) | 3.2 GB |
 | temporary RAM for reading (5 bytes per node) | 40.4 GB (64.7 GB before this change) |
 | node table to hold the BDD (16 bytes per slot, 95 % usable) | ≥ 136 GB, in practice the run's own table |
@@ -70,7 +74,12 @@ uninterrupted run without checkpoints):
 | `COMPACT_NODES=1` | 20, 21 | 20, 21 | identical | 2 818 972 642 |
 | `COMPACT_NODES=1 INDEX_BITS=40 FULLBDD=1` | 20, 21 | 20, 21 | identical, full BDD 2 542 289 nodes with satcount = total | 2 818 972 642 |
 
-A checkpoint made with `FULLBDD=1` is refused by a `FULLBDD=0` build with a message.
+The same test with `CHECKPOINT_LOW_DISK=1` (default layout, and 40-bit with `FULLBDD=1`):
+killed after plies 21/23 and 20/21, each resume removed the checkpoint it read, at most
+one checkpoint was on disk at any kill, per-ply rows identical.
+
+A checkpoint made with `FULLBDD=1` is refused by a `FULLBDD=0` build with a message
+(before anything is removed, also with `CHECKPOINT_LOW_DISK=1`).
 
 Overhead on 6x5 (2^22 nodes, every ply ~0.4 s): 12.2 s without, 13.1 s with checkpoints
 (0.9 s for 11.8 M nodes / 106 MB written, ~13 M nodes per second). At that rate the

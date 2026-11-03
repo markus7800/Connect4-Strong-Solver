@@ -39,6 +39,9 @@ FULLBDD = 0
 SUBTRACT_TERM = 1
 # store the BDD of every ply in checkpoint_w{WIDTH}_h{HEIGHT} and continue from there when restarted?
 CHECKPOINT = 0
+# remove the checkpoint after it was read and before the next one is written? (one instead of two on disk, but a crash
+# while writing loses it)
+CHECKPOINT_LOW_DISK = 0
 
 # for solve
 
@@ -125,7 +128,7 @@ GCFLAGS = \
 -DIN_OP_GC_THRES=$(IN_OP_GC_THRES)
 
 count:
-	$(CC) search/count.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -DCHECKPOINT=$(CHECKPOINT) -o build/count.out
+	$(CC) search/count.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -DCHECKPOINT=$(CHECKPOINT) -DCHECKPOINT_LOW_DISK=$(CHECKPOINT_LOW_DISK) -o build/count.out
 
 solve:
 	$(CC) search/solve.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -DKEEP_REACH=$(KEEP_REACH) -o build/solve.out
