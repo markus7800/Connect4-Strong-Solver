@@ -29,7 +29,7 @@ void _remove_bdd_file(char* filename);
 // varmap maps the variable stored in the file to the variable of the node that is created.
 // The returned node is not kept alive.
 // The nodes may be stored in any order, as long as the root is last.
-// Needs 4 bytes per node in the file as temporary memory.
+// Needs 4 bytes (INDEX_BITS=40: 5 bytes) per node in the file as temporary memory.
 nodeindex_t _read_from_file_with_varmap(char* filename, variable_t varmap[256]);
 nodeindex_t _read_from_file(char* filename);
 

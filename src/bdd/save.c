@@ -214,9 +214,13 @@ uint64_t _safe_to_file(nodeindex_t root, char* filename) {
 }
 
 
+// the node index of every position of the file is kept with as many bytes as a node index has bits
+// (5 bytes with INDEX_BITS=40, not the 8 bytes of a nodeindex_t)
+#define READ_INDEX_BYTES (INDEX_BITS / 8)
+
 typedef struct ReadState {
     const unsigned char* data; // the file
-    nodeindex_t* index;        // maps the position of a node in the file to its node index, all bits set if not built yet
+    unsigned char* index;      // maps the position of a node in the file to its node index, all bits set if not built yet
     variable_t* varmap;
     uint64_t filenodes;
     int index_bytes;           // 4 or 5
@@ -226,8 +230,10 @@ typedef struct ReadState {
 // the depth of the recursion is bounded by the number of variables
 static nodeindex_t read_rec(readstate_t* state, uint64_t i) {
     BDD_CHECK(i < state->filenodes, "Invalid node index in file :(");
-    if (state->index[i] != (nodeindex_t) -1) {
-        return state->index[i];
+    nodeindex_t built = 0;
+    memcpy(&built, &state->index[READ_INDEX_BYTES * i], READ_INDEX_BYTES);
+    if (built != NODEINDEX_NONE) {
+        return built;
     }
     uint64_t low = 0, high = 0;
     uint8_t var;
@@ -244,7 +250,7 @@ static nodeindex_t read_rec(readstate_t* state, uint64_t i) {
         nodeindex_t h = read_rec(state, high);
         res = make(state->varmap[var], l, h);
     }
-    state->index[i] = res;
+    memcpy(&state->index[READ_INDEX_BYTES * i], &res, READ_INDEX_BYTES);
     return res;
 }
 
@@ -270,14 +276,18 @@ nodeindex_t _read_from_file_with_varmap(char* filename, variable_t varmap[256]) 
     state.varmap = varmap;
     // the nodes can be stored in any order (only the root has to be last), so the file is accessed randomly
     state.data = (const unsigned char*) mmap(NULL, (size_t) st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    state.index = (nodeindex_t*) malloc(state.filenodes * sizeof(nodeindex_t));
+    state.index = (unsigned char*) malloc(state.filenodes * READ_INDEX_BYTES);
     if (state.data == MAP_FAILED || state.index == NULL) {
         perror("Could not read file :(\n");
         exit(EXIT_FAILURE);
     }
-    memset(state.index, 0xFF, state.filenodes * sizeof(nodeindex_t));
+    memset(state.index, 0xFF, state.filenodes * READ_INDEX_BYTES);
 
-    // root is last
+    // every node of the file belongs to the BDD: building them in the order of the file
+    // reads the file mostly sequentially instead of jumping around from the root (the root is last)
+    for (uint64_t i = 0; i < state.filenodes - 1; i++) {
+        read_rec(&state, i);
+    }
     nodeindex_t root = read_rec(&state, state.filenodes - 1);
 
     free(state.index);

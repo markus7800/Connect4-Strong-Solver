@@ -30,6 +30,7 @@ Regression test for every change: `python3 scripts/regress.py` (see
 | [17](17-7x6-on-32gb.md) | 7x6 on the 32 GB Mac; `BUCKET_SHIFT`, `IN_OP_GC_GROWTH` options | needs 24–28 GiB; first 8 plies verified, then stopped: the machine had ~21 GB to give next to the desktop session |
 | [18](18-compact-node-layout.md) | optional compact layout (`COMPACT_NODES=1`): 12-byte nodes in a two-choice hash table | 12.6 instead of 20 bytes per usable node; 6x6 solves in 1.75 GiB instead of 2.5 GiB, 1.3x slower |
 | [19](19-wide-node-index.md) | optional 40-bit node indices (`COMPACT_NODES=1 INDEX_BITS=40`); estimates for larger boards | tables beyond 2^32 nodes at 19 bytes per node; 8x8 count ~160 GB / ~4 days, 7x7 solve ~210 GB / ~2 weeks; 8x8 solve ~19 TB |
+| [20](20-count-checkpoint.md) | `count` stores a checkpoint after every ply and resumes from it (`CHECKPOINT=1`); 5-byte read buffer with 40-bit indices | a 8.08 G-node ply checkpoint is 88.9 GB on disk, ~10 min to write; resuming needs 40 GB temporary RAM (was 65 GB) |
 
 ## Running totals
 

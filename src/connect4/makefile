@@ -37,6 +37,8 @@ PARTITIONED_IMAGE = 0
 FULLBDD = 0
 # SUBTRACT_TERM = 0 disables terminal condition (connect4 win rule)
 SUBTRACT_TERM = 1
+# store the BDD of every ply in checkpoint_w{WIDTH}_h{HEIGHT} and continue from there when restarted?
+CHECKPOINT = 0
 
 # for solve
 
@@ -123,7 +125,7 @@ GCFLAGS = \
 -DIN_OP_GC_THRES=$(IN_OP_GC_THRES)
 
 count:
-	$(CC) search/count.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -o build/count.out
+	$(CC) search/count.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DFULLBDD=$(FULLBDD) -DSUBTRACT_TERM=$(SUBTRACT_TERM) -DCHECKPOINT=$(CHECKPOINT) -o build/count.out
 
 solve:
 	$(CC) search/solve.c $(BDDFILES) $(SEARCHCFLAGS) $(GCFLAGS) $(ENCODING) $(SEARCHFLAGS) -DSAVE_BDD_TO_DISK=$(SAVE_BDD_TO_DISK) -DKEEP_REACH=$(KEEP_REACH) -o build/solve.out

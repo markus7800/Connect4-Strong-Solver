@@ -4,6 +4,10 @@
 #include <time.h>
 #include <string.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h> // rmdir
+
 #include "../../bdd/bdd.h"
 
 #include "ops.c"
@@ -39,6 +43,123 @@
 
 #ifndef IN_OP_GC_EXCL
 #define IN_OP_GC_EXCL 0
+#endif
+
+// CHECKPOINT=1: after every ply the BDD of the ply (and the full BDD) is stored in the folder checkpoint_w{W}_h{H},
+// and a run that finds a checkpoint there continues after its ply instead of starting from the beginning.
+// The checkpoint is removed when the computation is finished.
+#ifndef CHECKPOINT
+#define CHECKPOINT 0
+#endif
+
+#if CHECKPOINT
+// everything that is needed to continue after a ply (besides the BDDs)
+typedef struct CountState {
+    uint32_t width, height;
+    int ply;
+    uint64_t total;
+    double total_t;
+    uint64_t cnt;            // satcount of the BDD of the ply
+    uint64_t nodecount;      // nodes of the BDD of the ply, as written to the file
+    uint64_t full_nodecount; // nodes of the full BDD (FULLBDD=1)
+    // compile-time options that change the BDDs or the counts, have to be the same to continue
+    int compressed_encoding, allow_row_order, subtract_term, fullbdd;
+} countstate_t;
+
+static void fill_options(countstate_t* state) {
+    state->compressed_encoding = COMPRESSED_ENCODING;
+    state->allow_row_order = ALLOW_ROW_ORDER;
+    state->subtract_term = SUBTRACT_TERM;
+    state->fullbdd = FULLBDD;
+}
+
+static void checkpoint_filename(char* filename, const char* folder, const char* name, int ply) {
+    sprintf(filename, "%s/%s_%d.bin", folder, name, ply);
+}
+
+// Stores the BDDs of the ply, then the state (written to a temporary file and renamed, so that a crash leaves
+// either the old or the new checkpoint), and only then removes the BDDs of the previous checkpoint.
+static void save_checkpoint(const char* folder, countstate_t* state, nodeindex_t current, nodeindex_t full_bdd, variable_t* board_varmap) {
+    char filename[100], tmpname[100];
+    checkpoint_filename(filename, folder, "ply", state->ply);
+    state->nodecount = _safe_to_file_with_varmap(current, filename, board_varmap);
+    state->full_nodecount = 0;
+    if (FULLBDD) {
+        checkpoint_filename(filename, folder, "full", state->ply);
+        state->full_nodecount = _safe_to_file_with_varmap(full_bdd, filename, board_varmap);
+    }
+
+    sprintf(filename, "%s/state.txt", folder);
+    sprintf(tmpname, "%s/state.txt.tmp", folder);
+    FILE* f = fopen(tmpname, "w");
+    BDD_CHECK(f != NULL, "Could not write checkpoint :(");
+    fprintf(f, "%"PRIu32" %"PRIu32" %d %"PRIu64" %.3f %"PRIu64" %"PRIu64" %"PRIu64" %d %d %d %d\n",
+        state->width, state->height, state->ply, state->total, state->total_t, state->cnt, state->nodecount, state->full_nodecount,
+        state->compressed_encoding, state->allow_row_order, state->subtract_term, state->fullbdd);
+    BDD_CHECK(fflush(f) == 0 && fsync(fileno(f)) == 0 && fclose(f) == 0, "Could not write checkpoint :(");
+    BDD_CHECK(rename(tmpname, filename) == 0, "Could not write checkpoint :(");
+
+    checkpoint_filename(filename, folder, "ply", state->ply - 1);
+    _remove_bdd_file(filename);
+    checkpoint_filename(filename, folder, "full", state->ply - 1);
+    _remove_bdd_file(filename);
+}
+
+// returns false if there is no checkpoint
+static bool read_checkpoint_state(const char* folder, countstate_t* state) {
+    char filename[100];
+    sprintf(filename, "%s/state.txt", folder);
+    FILE* f = fopen(filename, "r");
+    if (f == NULL) {
+        return false;
+    }
+    int n = fscanf(f, "%"SCNu32" %"SCNu32" %d %"SCNu64" %lf %"SCNu64" %"SCNu64" %"SCNu64" %d %d %d %d",
+        &state->width, &state->height, &state->ply, &state->total, &state->total_t, &state->cnt, &state->nodecount, &state->full_nodecount,
+        &state->compressed_encoding, &state->allow_row_order, &state->subtract_term, &state->fullbdd);
+    fclose(f);
+    BDD_CHECK(n == 12, "Could not read checkpoint state :(");
+    return true;
+}
+
+static void remove_checkpoint(const char* folder, int ply) {
+    char filename[100];
+    checkpoint_filename(filename, folder, "ply", ply);
+    _remove_bdd_file(filename);
+    checkpoint_filename(filename, folder, "full", ply);
+    _remove_bdd_file(filename);
+    sprintf(filename, "%s/state.txt", folder);
+    remove(filename);
+    rmdir(folder);
+}
+
+#if WRITE_TO_FILE
+// The rows of the plies after the checkpoint may already be in the results file (crash after a row was written
+// but before the checkpoint of its ply was complete). They are removed, they are computed again.
+// Returns the file opened for appending.
+static FILE* truncate_results_file(const char* filename, int ply) {
+    char tmpname[100], line[256];
+    sprintf(tmpname, "%s.tmp", filename);
+    FILE* in = fopen(filename, "r");
+    FILE* out = fopen(tmpname, "w");
+    BDD_CHECK(out != NULL, "Could not open results file :(");
+    if (in == NULL) {
+        fprintf(out, "width,height,ply,poscount,nodecount,time\n");
+    } else {
+        bool header = true;
+        while (fgets(line, sizeof(line), in) != NULL) {
+            int row_ply;
+            if (header || (sscanf(line, "%*u, %*u, %d,", &row_ply) == 1 && row_ply <= ply)) {
+                fputs(line, out);
+            }
+            header = false;
+        }
+        fclose(in);
+    }
+    fclose(out);
+    BDD_CHECK(rename(tmpname, filename) == 0, "Could not open results file :(");
+    return fopen(filename, "a");
+}
+#endif
 #endif
 
 uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
@@ -117,36 +238,100 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
     uint64_t total = 0;
     uint64_t bdd_nodecount;
-
-    // PLY 0:
-    nodeindex_t current = connect4_start(stm0, X, width, height);
-    uint64_t cnt = connect4_satcount(current);
-    bdd_nodecount = nodecount(current);
-    printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
-    total += cnt;
+    uint64_t cnt;
+    nodeindex_t current;
+#if FULLBDD
+    nodeindex_t full_bdd;
+#endif
+    double total_t = 0;
+    int first_ply = 1;
 
 #if WRITE_TO_FILE
-    // Write header and ply 0 to file
     char filename[50];
     sprintf(filename, "results_ply_w%"PRIu32"_h%"PRIu32"_ls%"PRIu64".csv", width, height, log2size);
-    FILE* f = fopen(filename, "w");
-    fprintf(f, "width,height,ply,poscount,nodecount,time\n");
-    if (f != NULL) {
-        fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %.3f\n", width, height, 0, cnt, bdd_nodecount, 0.0);
+    FILE* f = NULL;
+#endif
+
+#if CHECKPOINT
+    // the BDDs only contain board0 variables, which are stored as variables 1, 2, 3, ... (as in solve.c)
+    variable_t board_varmap[MAX_VARIABLES + 1];
+    board_varmap[0] = 0; board_varmap[1] = 1;
+    for (size_t v = 2; v <= MAX_VARIABLES; v++) {
+        board_varmap[v] = (v + 1) / 2;
+    }
+    variable_t file_varmap[256];
+    file_varmap[0] = 0;
+    for (size_t v = 1; v <= 255; v++) {
+        file_varmap[v] = 2 * v - 1;
+    }
+
+    char checkpoint_folder[50];
+    sprintf(checkpoint_folder, "checkpoint_w%"PRIu32"_h%"PRIu32"", width, height);
+    mkdir(checkpoint_folder, 0777);
+    countstate_t state;
+    if (read_checkpoint_state(checkpoint_folder, &state)) {
+        countstate_t expected;
+        fill_options(&expected);
+        BDD_CHECK(state.width == width && state.height == height
+            && state.compressed_encoding == expected.compressed_encoding && state.allow_row_order == expected.allow_row_order
+            && state.subtract_term == expected.subtract_term && state.fullbdd == expected.fullbdd,
+            "Checkpoint was made with other options (see state.txt) :(");
+        printf("Resume from checkpoint of ply %d in %s:\n", state.ply, checkpoint_folder);
+
+        char bddname[100];
+        checkpoint_filename(bddname, checkpoint_folder, "ply", state.ply);
+        current = _read_from_file_with_varmap(bddname, file_varmap);
+        keepalive_ix(current);
+        cnt = connect4_satcount(current);
+        BDD_CHECK(nodecount(current) == state.nodecount && cnt == state.cnt, "BDD read from checkpoint differs from the one that was written :(");
+#if FULLBDD
+        checkpoint_filename(bddname, checkpoint_folder, "full", state.ply);
+        full_bdd = _read_from_file_with_varmap(bddname, file_varmap);
+        BDD_CHECK(nodecount(full_bdd) == state.full_nodecount, "BDD read from checkpoint differs from the one that was written :(");
+        keepalive_ix(full_bdd);
+#endif
+        printf("  PlyBDD(%"PRIu64") with satcount = %"PRIu64"\n", state.nodecount, cnt);
+        total = state.total;
+        total_t = state.total_t;
+        first_ply = state.ply + 1;
+#if WRITE_TO_FILE
+        f = truncate_results_file(filename, state.ply);
+#endif
+    } else {
+        state.width = width;
+        state.height = height;
+        fill_options(&state);
     }
 #endif
 
-#if FULLBDD
-    nodeindex_t full_bdd = current;
-    keepalive_ix(full_bdd);
+    if (first_ply == 1) {
+        // PLY 0:
+        current = connect4_start(stm0, X, width, height);
+        keepalive_ix(current);
+        cnt = connect4_satcount(current);
+        bdd_nodecount = nodecount(current);
+        printf("Ply 0/%d: BDD(%"PRIu64") %"PRIu64"\n", width*height, bdd_nodecount, cnt);
+        total += cnt;
+
+#if WRITE_TO_FILE
+        // Write header and ply 0 to file
+        f = fopen(filename, "w");
+        if (f != NULL) {
+            fprintf(f, "width,height,ply,poscount,nodecount,time\n");
+            fprintf(f, "%"PRIu32", %"PRIu32", %d, %"PRIu64", %"PRIu64", %.3f\n", width, height, 0, cnt, bdd_nodecount, 0.0);
+        }
 #endif
+
+#if FULLBDD
+        full_bdd = current;
+        keepalive_ix(full_bdd);
+#endif
+    }
 
     struct timespec t0, t1;
     double t;
-    double total_t = 0;
 
-    keepalive_ix(current);
-    for (int d = 1; d <= width*height+1; d++) {
+    for (int d = first_ply; d <= width*height+1; d++) {
         printf("Ply %d/%d:\n", d, width*height);
         clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -194,8 +379,29 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             fflush(f);
         }
 #endif
-           
-    } 
+
+#if CHECKPOINT
+        if (d <= width*height) {
+            clock_gettime(CLOCK_REALTIME, &t0);
+            state.ply = d;
+            state.total = total;
+            state.total_t = total_t;
+            state.cnt = cnt;
+#if FULLBDD
+            save_checkpoint(checkpoint_folder, &state, current, full_bdd, board_varmap);
+#else
+            save_checkpoint(checkpoint_folder, &state, current, ZEROINDEX, board_varmap);
+#endif
+            clock_gettime(CLOCK_REALTIME, &t1);
+            printf("  Checkpoint in %.3f seconds\n", get_elapsed_time(t0, t1));
+        }
+#endif
+    }
+
+#if CHECKPOINT
+    // the computation is complete, a new run starts from the beginning
+    remove_checkpoint(checkpoint_folder, width*height);
+#endif
 
 
 #if FULLBDD
@@ -230,7 +436,9 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
 
 #if WRITE_TO_FILE
     // close file
-    fclose(f);
+    if (f != NULL) {
+        fclose(f);
+    }
 #endif
 
     // deallocate variables
