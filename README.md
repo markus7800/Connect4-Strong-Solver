@@ -12,12 +12,42 @@ In KI 2008: Advances in Artificial Intelligence: 31st Annual German Conference o
 ```
 to count the number of unique positions and to produce a strong solution of a Connect4 game of a given board size, respectively.
 
-The number of positions for the conventional 7 x 6 board can be computed in ~3h with 16 GB RAM.
+## Old and new results at a glance
 
-The strong solution of the 7 x 6 instance takes ~47 hours and 128 GB RAM.
-It is published on [Zenodo](https://zenodo.org/records/14582823).
+The code was optimised in 21 small steps (see [docs](docs/README.md) for one document per step with measurements).
+All numbers (counts, solutions) are unchanged; only time and memory differ.
+**Original** = the version that produced the [paper](paper.pdf) and the Zenodo data; **current** = this branch.
+The machines differ, so compare only within a row: the original 7 x 6 runs and the current 7 x 6 solve used a Ryzen 9 5950X, the small-board timings of the current version were measured on an Apple M2 Pro (single thread, see the docs for the exact setup).
 
-You can find a paper describing this work [here](paper.pdf).
+| | original | current |
+|---|---|---|
+| count 7 x 6 | ~3 h (6300-6900 s), 16 GB RAM | 626 s, ~4 GB of BDD nodes ([docs 16](docs/16-sizing-ladder.md)) |
+| solve 6 x 5 | 466 s | 135 s, 0.24 GiB ([docs 13](docs/13-retrograde-pass.md)) |
+| solve 6 x 6 | 7262 s, 12.35 GB | 1722 s, 5.78 GB; 2.5 GiB table is enough ([docs 13](docs/13-retrograde-pass.md), [18](docs/18-compact-node-layout.md)) |
+| solve 7 x 6 | ~47 h (168,000 s), 128 GB | 50,292 s (14 h), 28 GiB ([docs 17](docs/17-7x6-on-32gb.md)) |
+| bytes per BDD node (solve) | 53 | 20-24 (12.6 with `COMPACT_NODES=1`) |
+
+The strong solution of the 7 x 6 instance is published on [Zenodo](https://zenodo.org/records/14582823).
+The timings in the "Some examples" lists below and the tables in [Results](#results) are from the **original** version unless marked otherwise.
+A paper describing the original work is [here](paper.pdf).
+
+### How the improvement was achieved
+
+1. **Fewer bytes per node (53 -> 20-24).**
+   The unique table chains through the nodes themselves, reference counts were replaced by mark-and-sweep (16-byte node),
+   three operation caches became one, and the scratch hash maps for counting and saving were removed.
+   Optionally the node is its own hash-table slot (12 bytes, `COMPACT_NODES=1`).
+2. **Less work per operation (2-5x).**
+   `and`/`or`/`iff` stop as soon as one operand is a constant or both are equal, there is a dedicated `diff`,
+   cache hits do not touch nodes, the hash function is better, and the four-in-a-line condition is built once per player instead of per line.
+3. **Fewer BDDs alive at the same time.**
+   The reachable set of every ply is stored on disk between the forward and the retrograde pass,
+   pre-images are restricted to reachable positions while they are computed, only one position set is used (renaming instead of two variable copies),
+   and garbage collection runs only when it pays off.
+4. **Memory as a budget.**
+   The table size can be any RAM budget (`28G`), not only a power of two, and tables beyond 2^32 nodes are possible with 40-bit indices.
+   Together with checkpoints this makes much larger boards feasible.
+5. **Tried and rejected:** don't-care minimisation of the results, column-partitioned image, other variable orders (centre-out helps only on 5-column boards).
 
 ## Overview
 
@@ -26,7 +56,7 @@ You can find a paper describing this work [here](paper.pdf).
 In `src/bdd`, you can find a simple library to work with [binary decision diagrams](https://en.wikipedia.org/wiki/Binary_decision_diagram).  
 It is designed to give the user great control over memory.  
 The user specifies the number of all allocatable BDD nodes with the `log2_tablesize` parameter.  
-For instance, `log2_tablesize=28` needs 6.4 GB RAM (24 bytes per node) and allows you to allocate 2^28 = 268,435,456 nodes simultaniously.  
+For instance, `log2_tablesize=28` needs 5.4–6.4 GB RAM (20–24 bytes per node, 12.6 with `COMPACT_NODES=1`) and allows you to allocate 2^28 = 268,435,456 nodes simultaniously.  
 If you increase, `log2_tablesize` by one, it doubles the required RAM and number of allocatable nodes.  
 The maximum number is  `log2_tablesize=32` (more with `INDEX_BITS=40`, see below).  
 Instead of `log2_tablesize` you can also pass a RAM budget like `12G` or `800M`; then as many nodes as fit into it are allocated (the number does not have to be a power of two).  
@@ -64,27 +94,40 @@ To facilitate this logic, we need an additional row.
 This encoding outperforms the standard encoding for the 7 x 6 board configuration, but performs poorly if the number of rows is large.
 
 
+#### Memory, speed and garbage-collection options (`count` and `solve`)
+These are `make` variables that are valid for both programs. All have a sensible default; the first two groups are what you tune when RAM is the limit.
+
+Node pool and tables (compile-time layout):
+- `COMPACT_NODES`: `0` = 16-byte nodes + 4-byte bucket array (20 bytes per node, fast). `1` = 12-byte nodes that are their own hash-table slot (two-choice hashing, 12.6 bytes per usable node). Use `1` if the run is limited by RAM; it is ~1.3x slower, more so if the table is much larger than needed (default: `0`, see [docs](docs/18-compact-node-layout.md)).
+- `INDEX_BITS`: `32` allows up to 2^32 nodes. `40` uses 40-bit node indices for tables with more than 2^32 nodes (needs `COMPACT_NODES=1`, 16 bytes per node, see [docs](docs/19-wide-node-index.md)) (default: `32`).
+- `CACHE_SHIFT`: the operation cache has `2^(log2_tablesize - CACHE_SHIFT)` entries of 16 bytes. Larger means less memory but more recomputation (default: `2`, i.e. 4 bytes per node).
+- `BUCKET_SHIFT`: the unique table has `2^(log2_tablesize - BUCKET_SHIFT)` buckets, i.e. longer hash chains but less memory. Only for `COMPACT_NODES=0` (the compact layout has no bucket array). `BUCKET_SHIFT=1 CACHE_SHIFT=3` brings the default layout from 22.4 to 19.2 bytes per node (default: `0`, see [docs](docs/17-7x6-on-32gb.md)).
+
+Garbage collection (GC) frees BDD nodes that are no longer needed:
+- `IN_OP_GC`: `1` allows GC in the middle of a BDD operation when the node pool is nearly full. Needed to run with a table barely larger than the live data (default: `1`).
+- `IN_OP_GC_THRES`: fill level of the node pool above which GC is triggered during an operation (default: `0.9`).
+- `IN_OP_GC_GROWTH`: if greater than `0`, GC during an operation also runs when more than this many times the nodes that survived the previous GC are allocated. Without it the pool is always filled up to `IN_OP_GC_THRES` with garbage, even if little is alive, so the process always grows to the full table size (default: `0` = off).
+- `GC_GROWTH`: between the steps of the computation, GC runs if more than `GC_GROWTH` times the nodes that survived the previous GC are allocated (default: `2.0`).
+- `FORCE_GC`: `1` runs GC after every step, only for measuring how many nodes are really needed (default: `0`).
+- `GC_KEEPS_CACHE`: whether operation-cache entries whose nodes survive GC are kept: `0` never (clear the cache), `1` if GC runs during an operation, `2` always (default: `1`).
+- `IN_OP_GC_EXCL`: legacy, no effect any more (default: `0`).
+
+Other:
+- `PARTITIONED_IMAGE`: `1` applies the moves of each column separately instead of all at once. Slower and kept only for comparison (default: `0`).
+- `DEBUG`: `1` keeps asserts (default: `0`).
+
+The table size is given at run time (`./build/count.out`/`solve.out TABLE width height`): either `log2_tablesize` or a RAM budget like `28G` (see the library section).
+
 #### Counting number of unique positions
 Compile with `make count`.
-Options:
+Options specific to `count` (memory/GC options: see the previous section):
 - `COMPRESSED_ENCODING`: whether to use compressed encoding (default: `1`)
 - `ALLOW_ROW_ORDER`: whether to sort variables by row instead of column if `heigth > width`. Is irrelevant if `height <= width` (default: `0`)
 - `FULLBDD`: whether to compute BDD that represents all unique positions (= union of positions per ply, default: `0`)
 - `SUBTRACT_TERM`: whether to use Connect4 termination criterion (default: `1`)
 - `ENTER_TO_CONTINUE`: whether to require to press enter to start computation (default: `0`)
 - `WRITE_TO_FILE`: whether to write results to `.csv` file (default: `1`)
-- `IN_OP_GC`: whether to allow automatic garbage collection during BDD operations (default: `1`)
-- `IN_OP_GC_THRES`: fill-level of node pool above which garbage collection is triggerd if `IN_OP_GC=1` (default: `0.9`)
-- `GC_GROWTH`: between the steps of the computation, garbage collection runs if more than `GC_GROWTH` times the nodes that survived the previous collection are allocated (default: `2.0`)
-- `FORCE_GC`: whether to run garbage collection after every step, for measuring how many nodes are really needed (default: `0`)
-- `GC_KEEPS_CACHE`: whether cache entries of surviving nodes are kept by garbage collection: `0` never, `1` if it runs during an operation, `2` always (default: `1`)
-- `COMPACT_NODES`: `1` selects a node layout with 12 instead of 20 bytes per node, for runs that are limited by RAM; it is slower, especially if the table is much larger than needed (default: `0`, see [docs](docs/18-compact-node-layout.md))
-- `INDEX_BITS`: `40` builds with 40-bit instead of 32-bit node indices, for tables with more than 2^32 nodes (needs `COMPACT_NODES=1`; 16 bytes per node; see [docs](docs/19-wide-node-index.md)) (default: `32`)
-- `CACHE_SHIFT`: the operation cache has `2^(log2_tablesize - CACHE_SHIFT)` entries (default: `2`)
-- `BUCKET_SHIFT`: the unique table has `2^(log2_tablesize - BUCKET_SHIFT)` buckets (default: `0`)
-- `IN_OP_GC_GROWTH`: if greater than `0`, garbage collection during BDD operations also runs when more than this many times the nodes that survived the previous collection are allocated (default: `0`)
-- `PARTITIONED_IMAGE`: whether to apply the moves of each column separately instead of all at once (default: `0`, slower)
-- `DEBUG`: whether to keep asserts (default: `0`)
+- `CHECKPOINT`: `1` writes the state (BDD of the current ply, running total, time) to `checkpoint_w{W}_h{H}/` after every ply (atomically; the previous checkpoint is deleted afterwards). A later run with the same board and the same `COMPRESSED_ENCODING`, `ALLOW_ROW_ORDER`, `SUBTRACT_TERM` and `FULLBDD` resumes automatically, table size and node layout may differ. The checkpoint is removed when the last ply is done. Useful for runs that take days; costs the time to write the BDD of every ply (default: `0`, see [docs](docs/20-count-checkpoint.md))
 
 Run with `./build/counts.out log2_tablesize width height`.
 
@@ -127,14 +170,10 @@ If this takes too long on your computer you may try:
 
 #### Solving Connect-4
 Compile with `make solve`.
-Options:
-- `COMPRESSED_ENCODING`
-- `ALLOW_ROW_ORDER`
-- `ENTER_TO_CONTINUE`
-- `WRITE_TO_FILE`
-- `IN_OP_GC`, `IN_OP_GC_THRES`, `IN_OP_GC_GROWTH`, `GC_GROWTH`, `FORCE_GC`, `GC_KEEPS_CACHE`, `COMPACT_NODES`, `INDEX_BITS`, `CACHE_SHIFT`, `BUCKET_SHIFT`, `PARTITIONED_IMAGE`, `DEBUG`
-- `SAVE_BDD_TO_DISK`: whether to save the strong solution as BDD to disk (default: `1`)
-- `KEEP_REACH`: whether to keep the BDDs of the reachable positions per ply, which are stored in the `reach_w{WIDTH}_h{HEIGHT}` folder during the computation (default: `0`)
+Options (the same as for `count` where not described here; memory/GC options: see [above](#memory-speed-and-garbage-collection-options-count-and-solve)):
+- `COMPRESSED_ENCODING`, `ALLOW_ROW_ORDER`, `ENTER_TO_CONTINUE`, `WRITE_TO_FILE`: as for `count`
+- `SAVE_BDD_TO_DISK`: whether to save the strong solution as BDD to disk (default: `1`). Set `0` if you only need the statistics, e.g. `solve.out 28G 7 6` for timing; saving takes extra time and disk space.
+- `KEEP_REACH`: the forward pass stores the BDD of the reachable positions of every ply in the `reach_w{WIDTH}_h{HEIGHT}` folder, because the retrograde pass needs them only later (this is what keeps memory low). By default each file is deleted once used; `1` keeps them (default: `0`).
 
 Run with `./build/solve.out log2_tablesize width height`.
 
@@ -145,7 +184,7 @@ If `SAVE_BDD_TO_DISK=1`, then for each ply three files will be generated. One BD
 These files will be stored in the `solution_w{WIDTH}_h{HEIGHT}` folder.
 For information on other options, see previous section.
 
-Some example runs:
+Some example runs (timings and RAM of the **original** version unless marked as current):
 
 - `make solve COMPRESSED_ENCODING=1`
     - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 51.79 %, finishes in ~7700 seconds.
@@ -155,7 +194,8 @@ Some example runs:
     - `./build/solve.out 29 6 6`: uses <32 GB RAM, fill-level: 90.00 %, finishes in ~15400 seconds.
 - `make solve COMPRESSED_ENCODING=1 IN_OP_GC=1 IN_OP_GC_THRES=0.9`
     - `./build/solve.out 28 6 6`: uses <16 GB RAM, fill-level: 90.00 %, finishes in ~8500 seconds.
-    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in ~168000 seconds. (See results section for output and [Zenodo](https://zenodo.org/records/14582823))
+    - `./build/solve.out 31 7 6`: uses <128 GB RAM, fill-level: 90.00 %, finishes in ~168000 seconds. (Original version; See results section for output and [Zenodo](https://zenodo.org/records/14582823))
+    - `./build/solve.out 28G 7 6`: with the current version, 28 GiB (1.34 G nodes), fill-level: 95.97 %, finishes in ~50,300 seconds (see [docs](docs/17-7x6-on-32gb.md))
 
 #### Win-Draw-Loss Query
 
@@ -314,6 +354,8 @@ We ran all experiments on a AMD Ryzen 9 5950X 16-Core Processor with 128 GB RAM.
 - `python3 scripts/zip_results.py results/` was used to zip the logs and data results from the experiments for upload at Zenodo.
 
 ## Results
+
+The tables in this section (position counts, the 7 x 6 solution statistics) are results, not timings, so they are valid for both versions; the run times and RAM figures quoted with them are from the **original** version. See [docs](docs/README.md) for current timings.
 
 ### Unique Position Counts
 We were able to independently verify the numbers computed by [John Tromp](https://tromp.github.io/c4/c4.html) and produce novel counts for boards up to size `width + height = 14`.
