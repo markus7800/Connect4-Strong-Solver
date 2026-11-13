@@ -127,7 +127,7 @@ Options specific to `count` (memory/GC options: see the previous section):
 - `SUBTRACT_TERM`: whether to use Connect4 termination criterion (default: `1`)
 - `ENTER_TO_CONTINUE`: whether to require to press enter to start computation (default: `0`)
 - `WRITE_TO_FILE`: whether to write results to `.csv` file (default: `1`)
-- `CHECKPOINT`: `1` writes the state (BDD of the current ply, running total, time) to `checkpoint_w{W}_h{H}/` after every ply (atomically; the previous checkpoint is deleted afterwards). A later run with the same board and the same `COMPRESSED_ENCODING`, `ALLOW_ROW_ORDER`, `SUBTRACT_TERM` and `FULLBDD` resumes automatically, table size and node layout may differ. The checkpoint is removed when the last ply is done. Useful for runs that take days; costs the time to write the BDD of every ply (default: `0`, see [docs](docs/20-count-checkpoint.md))
+- `CHECKPOINT`: `1` writes the state (BDD of the current ply, running total, time) to `checkpoint_w{W}_h{H}/` after every ply (inside the directory given by the environment variable `CHECKPOINT_DIR` if set, e.g. the slurm scratch dir, otherwise the current directory) (atomically; the previous checkpoint is deleted afterwards). A later run with the same board and the same `COMPRESSED_ENCODING`, `ALLOW_ROW_ORDER`, `SUBTRACT_TERM` and `FULLBDD` resumes automatically, table size and node layout may differ. The checkpoint is removed when the last ply is done. Useful for runs that take days; costs the time to write the BDD of every ply (default: `0`, see [docs](docs/20-count-checkpoint.md))
 
 Run with `./build/counts.out log2_tablesize width height`.
 

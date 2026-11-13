@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <time.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -61,6 +63,7 @@
 #endif
 
 #if CHECKPOINT
+#define PATH_BUF 1024
 // everything that is needed to continue after a ply (besides the BDDs)
 typedef struct CountState {
     uint32_t width, height;
@@ -87,7 +90,7 @@ static void checkpoint_filename(char* filename, const char* folder, const char* 
 
 // the state first, so that it never refers to BDD files that are gone
 static void remove_checkpoint_files(const char* folder, int ply) {
-    char filename[100];
+    char filename[PATH_BUF];
     sprintf(filename, "%s/state.txt", folder);
     remove(filename);
     checkpoint_filename(filename, folder, "ply", ply);
@@ -100,7 +103,7 @@ static void remove_checkpoint_files(const char* folder, int ply) {
 // either the old or the new checkpoint), and only then removes the BDDs of the previous checkpoint.
 // With CHECKPOINT_LOW_DISK the previous checkpoint is removed first.
 static void save_checkpoint(const char* folder, countstate_t* state, nodeindex_t current, nodeindex_t full_bdd, variable_t* board_varmap) {
-    char filename[100], tmpname[100];
+    char filename[PATH_BUF], tmpname[PATH_BUF];
     if (CHECKPOINT_LOW_DISK) {
         remove_checkpoint_files(folder, state->ply - 1);
     }
@@ -130,7 +133,7 @@ static void save_checkpoint(const char* folder, countstate_t* state, nodeindex_t
 
 // returns false if there is no checkpoint
 static bool read_checkpoint_state(const char* folder, countstate_t* state) {
-    char filename[100];
+    char filename[PATH_BUF];
     sprintf(filename, "%s/state.txt", folder);
     FILE* f = fopen(filename, "r");
     if (f == NULL) {
@@ -282,8 +285,16 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
         file_varmap[v] = 2 * v - 1;
     }
 
-    char checkpoint_folder[50];
-    sprintf(checkpoint_folder, "checkpoint_w%"PRIu32"_h%"PRIu32"", width, height);
+    // CHECKPOINT_DIR (environment variable): directory in which the checkpoint folder is created (e.g. slurm scratch),
+    // default is the current directory
+    char checkpoint_folder[PATH_BUF];
+    const char* checkpoint_dir = getenv("CHECKPOINT_DIR");
+    if (checkpoint_dir != NULL && checkpoint_dir[0] != '\0') {
+        BDD_CHECK(mkdir(checkpoint_dir, 0777) == 0 || errno == EEXIST, "Could not create CHECKPOINT_DIR :(");
+        snprintf(checkpoint_folder, PATH_BUF, "%s/checkpoint_w%"PRIu32"_h%"PRIu32"", checkpoint_dir, width, height);
+    } else {
+        snprintf(checkpoint_folder, PATH_BUF, "checkpoint_w%"PRIu32"_h%"PRIu32"", width, height);
+    }
     mkdir(checkpoint_folder, 0777);
     countstate_t state;
     if (read_checkpoint_state(checkpoint_folder, &state)) {
@@ -295,7 +306,7 @@ uint64_t connect4(uint32_t width, uint32_t height, uint64_t log2size) {
             "Checkpoint was made with other options (see state.txt) :(");
         printf("Resume from checkpoint of ply %d in %s:\n", state.ply, checkpoint_folder);
 
-        char bddname[100];
+        char bddname[PATH_BUF];
         checkpoint_filename(bddname, checkpoint_folder, "ply", state.ply);
         current = _read_from_file_with_varmap(bddname, file_varmap);
         keepalive_ix(current);
